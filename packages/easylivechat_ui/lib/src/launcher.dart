@@ -40,6 +40,9 @@ class EasyLiveChatLauncher extends StatefulWidget {
   /// Host overrides for the SDK chrome strings (passed to the chat screen).
   final Map<String, String>? strings;
 
+  /// Force the chrome locale from the host app (passed to the chat screen).
+  final String? locale;
+
   const EasyLiveChatLauncher({
     super.key,
     this.themeOverride,
@@ -48,6 +51,7 @@ class EasyLiveChatLauncher extends StatefulWidget {
     this.directionOverride,
     this.onPickAttachments,
     this.strings,
+    this.locale,
   });
 
   @override
@@ -109,6 +113,7 @@ class _EasyLiveChatLauncherState extends State<EasyLiveChatLauncher> {
       directionOverride: widget.directionOverride,
       onPickAttachments: widget.onPickAttachments,
       strings: widget.strings,
+      locale: widget.locale,
     );
     try {
       if (widget.useBottomSheet) {

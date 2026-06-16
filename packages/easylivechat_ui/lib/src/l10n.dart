@@ -33,9 +33,25 @@ class ElcStrings {
     _overrides = Map<String, String>.unmodifiable(strings);
   }
 
-  /// Resolve strings for [localeCode] (e.g. `en`, `ar`, `pt-BR`). Null/unknown
-  /// falls back to the device locale, then English.
+  /// Host-forced chrome locale (e.g. the host app's current locale). Wins over
+  /// both the passed locale and the server workspace locale — the server often
+  /// returns its own default (e.g. `en`) regardless of the visitor's app
+  /// language, so a host that knows its locale should set this.
+  static String? _hostLocale;
+
+  /// Force the chrome locale from the host app. Pass null to clear and fall back
+  /// to the server/device locale.
+  static void setLocale(String? code) {
+    _hostLocale = code;
+  }
+
+  /// Resolve strings: host-forced locale → [localeCode] (server/config) →
+  /// device locale → English.
   factory ElcStrings.of(String? localeCode) {
+    final host = _normalize(_hostLocale);
+    if (host != null && _table.containsKey(host)) {
+      return ElcStrings._(host);
+    }
     final explicit = _normalize(localeCode);
     if (explicit != null && _table.containsKey(explicit)) {
       return ElcStrings._(explicit);

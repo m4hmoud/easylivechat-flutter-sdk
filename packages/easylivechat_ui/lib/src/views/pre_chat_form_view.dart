@@ -297,6 +297,9 @@ class _PreChatFormViewState extends State<PreChatFormView> {
           foregroundColor: _onColor(t.primary),
           disabledBackgroundColor: t.primary.withValues(alpha: 0.5),
           elevation: 0,
+          // Let the text center in the full 50px height (default button padding
+          // squeezes it and clips descenders).
+          padding: EdgeInsets.zero,
           shape:
               RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         ),

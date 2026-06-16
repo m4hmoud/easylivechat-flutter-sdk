@@ -193,6 +193,7 @@ class _FeedbackPromptViewState extends State<FeedbackPromptView> {
               foregroundColor: _onColor(t.primary),
               disabledBackgroundColor: t.primary.withValues(alpha: 0.4),
               elevation: 0,
+              padding: EdgeInsets.zero,
               shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12)),
             ),

@@ -46,12 +46,18 @@ class EasyLiveChatScreen extends StatefulWidget {
   /// chat wording/translation.
   final Map<String, String>? strings;
 
+  /// Force the chrome locale (e.g. the host app's current locale code like
+  /// `kmr`/`ar`), overriding the server workspace locale — the server returns
+  /// its own default (often `en`) regardless of the visitor's app language.
+  final String? locale;
+
   const EasyLiveChatScreen({
     super.key,
     this.themeOverride,
     this.directionOverride,
     this.onPickAttachments,
     this.strings,
+    this.locale,
   });
 
   @override
@@ -71,7 +77,8 @@ class _EasyLiveChatScreenState extends State<EasyLiveChatScreen>
   @override
   void initState() {
     super.initState();
-    // Register host string overrides (own translations) before the views build.
+    // Register host locale + string overrides (own translation) before views build.
+    if (widget.locale != null) ElcStrings.setLocale(widget.locale);
     if (widget.strings != null) ElcStrings.overrideAll(widget.strings!);
     WidgetsBinding.instance.addObserver(this);
     if (EasyLiveChat.instance.isBooted) {
@@ -153,30 +160,35 @@ class _EasyLiveChatScreenState extends State<EasyLiveChatScreen>
     if (!EasyLiveChat.instance.isBooted) {
       return const _BootRequiredScaffold();
     }
-    return ValueListenableBuilder<WidgetConfigModel?>(
-      valueListenable: EasyLiveChat.instance.widgetConfig,
-      builder: (context, config, _) {
-        var theme = config != null
-            ? EasyLiveChatTheme.fromConfig(config,
-                override: widget.themeOverride)
-            : (widget.themeOverride ?? _fallbackTheme);
-        if (widget.directionOverride != null) {
-          theme = theme.copyWith(direction: widget.directionOverride);
-        }
-        return Directionality(
-          textDirection: theme.direction,
-          child: Material(
-            color: theme.background,
-            child: SafeArea(
-              child: ValueListenableBuilder<ChatPhase>(
-                valueListenable: EasyLiveChat.instance.phase,
-                builder: (context, phase, _) =>
-                    _buildPhase(context, phase, config, theme),
+    // Clamp text scaling so a large accessibility font can't clip the fixed-
+    // height controls (e.g. the "Start chat" / "Submit" buttons).
+    return MediaQuery.withClampedTextScaling(
+      maxScaleFactor: 1.3,
+      child: ValueListenableBuilder<WidgetConfigModel?>(
+        valueListenable: EasyLiveChat.instance.widgetConfig,
+        builder: (context, config, _) {
+          var theme = config != null
+              ? EasyLiveChatTheme.fromConfig(config,
+                  override: widget.themeOverride)
+              : (widget.themeOverride ?? _fallbackTheme);
+          if (widget.directionOverride != null) {
+            theme = theme.copyWith(direction: widget.directionOverride);
+          }
+          return Directionality(
+            textDirection: theme.direction,
+            child: Material(
+              color: theme.background,
+              child: SafeArea(
+                child: ValueListenableBuilder<ChatPhase>(
+                  valueListenable: EasyLiveChat.instance.phase,
+                  builder: (context, phase, _) =>
+                      _buildPhase(context, phase, config, theme),
+                ),
               ),
             ),
-          ),
-        );
-      },
+          );
+        },
+      ),
     );
   }
 
