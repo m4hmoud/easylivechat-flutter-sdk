@@ -97,8 +97,12 @@ class _ComposerBarState extends State<ComposerBar> {
 
     _stopTyping();
     // Fire-and-forget optimistic send; the controller surfaces ack/echo via
-    // `messages`. We don't await the server id here.
-    EasyLiveChat.instance.sendMessage(text, attachmentUrls: urls);
+    // `messages` (a failure shows as a failed bubble). Swallow the serverId
+    // future so a no-socket/rejected send isn't an unhandled async error.
+    EasyLiveChat.instance
+        .sendMessage(text, attachmentUrls: urls)
+        .serverMessageId
+        .catchError((_) => '');
 
     _controller.clear();
     setState(() {
@@ -192,18 +196,17 @@ class _ComposerBarState extends State<ComposerBar> {
             children: [
               ListTile(
                 leading: Icon(Icons.image_outlined, color: _theme.text),
-                title: Text(_s.attachImage,
-                    style: TextStyle(color: _theme.text)),
+                title:
+                    Text(_s.attachImage, style: TextStyle(color: _theme.text)),
                 onTap: () {
                   Navigator.of(sheetCtx).pop();
                   _pickImage();
                 },
               ),
               ListTile(
-                leading:
-                    Icon(Icons.attach_file_outlined, color: _theme.text),
-                title: Text(_s.attachFile,
-                    style: TextStyle(color: _theme.text)),
+                leading: Icon(Icons.attach_file_outlined, color: _theme.text),
+                title:
+                    Text(_s.attachFile, style: TextStyle(color: _theme.text)),
                 onTap: () {
                   Navigator.of(sheetCtx).pop();
                   _pickFile();
@@ -229,7 +232,7 @@ class _ComposerBarState extends State<ComposerBar> {
         decoration: BoxDecoration(
           color: t.background,
           border: Border(
-            top: BorderSide(color: t.text.withOpacity(0.08)),
+            top: BorderSide(color: t.text.withValues(alpha: 0.08)),
           ),
         ),
         child: SafeArea(
@@ -271,11 +274,11 @@ class _ComposerBarState extends State<ComposerBar> {
               child: CircularProgressIndicator(
                 strokeWidth: 2,
                 valueColor: AlwaysStoppedAnimation<Color>(
-                    t.text.withOpacity(0.5)),
+                    t.text.withValues(alpha: 0.5)),
               ),
             )
           : Icon(Icons.add_circle_outline,
-              color: t.text.withOpacity(0.7)),
+              color: t.text.withValues(alpha: 0.7)),
     );
   }
 
@@ -291,7 +294,7 @@ class _ComposerBarState extends State<ComposerBar> {
       style: TextStyle(color: t.text, fontSize: 15),
       decoration: InputDecoration(
         hintText: _s.typeAMessage,
-        hintStyle: TextStyle(color: t.text.withOpacity(0.4)),
+        hintStyle: TextStyle(color: t.text.withValues(alpha: 0.4)),
         filled: true,
         fillColor: t.surface,
         isDense: true,
@@ -307,8 +310,9 @@ class _ComposerBarState extends State<ComposerBar> {
 
   Widget _sendButton() {
     final t = _theme;
-    final onPrimary =
-        t.primary.computeLuminance() > 0.5 ? const Color(0xFF0F172A) : Colors.white;
+    final onPrimary = t.primary.computeLuminance() > 0.5
+        ? const Color(0xFF0F172A)
+        : Colors.white;
     return Material(
       color: t.primary,
       shape: const CircleBorder(),
@@ -339,13 +343,13 @@ class _ComposerBarState extends State<ComposerBar> {
             decoration: BoxDecoration(
               color: t.surface,
               borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: t.text.withOpacity(0.12)),
+              border: Border.all(color: t.text.withValues(alpha: 0.12)),
             ),
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
                 Icon(Icons.insert_drive_file_outlined,
-                    size: 16, color: t.text.withOpacity(0.7)),
+                    size: 16, color: t.text.withValues(alpha: 0.7)),
                 const SizedBox(width: 6),
                 ConstrainedBox(
                   constraints: const BoxConstraints(maxWidth: 120),
@@ -361,8 +365,7 @@ class _ComposerBarState extends State<ComposerBar> {
                   padding: EdgeInsets.zero,
                   constraints: const BoxConstraints(),
                   onPressed: () => _removePending(i),
-                  icon: Icon(Icons.close,
-                      color: t.text.withOpacity(0.6)),
+                  icon: Icon(Icons.close, color: t.text.withValues(alpha: 0.6)),
                 ),
               ],
             ),
@@ -376,7 +379,7 @@ class _ComposerBarState extends State<ComposerBar> {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      color: const Color(0xFFDC2626).withOpacity(0.1),
+      color: const Color(0xFFDC2626).withValues(alpha: 0.1),
       child: Text(
         msg,
         style: const TextStyle(color: Color(0xFFDC2626), fontSize: 12),

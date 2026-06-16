@@ -1,3 +1,4 @@
+import '../errors.dart';
 import 'enums.dart';
 import 'pre_chat_form.dart';
 
@@ -63,7 +64,8 @@ class WidgetConfigModel {
   });
 
   factory WidgetConfigModel.fromJson(Map<String, dynamic> j) {
-    String s(String k, String d) => (j[k] as String?)?.trim().isNotEmpty == true ? j[k] as String : d;
+    String s(String k, String d) =>
+        (j[k] as String?)?.trim().isNotEmpty == true ? j[k] as String : d;
     return WidgetConfigModel(
       id: (j['id'] ?? '').toString(),
       tenantId: (j['tenantId'] ?? '').toString(),
@@ -85,7 +87,8 @@ class WidgetConfigModel {
       showAgentNames: j['showAgentNames'] != false,
       collectEmailPreChat: j['collectEmailPreChat'] == true,
       preChatForm: j['preChatForm'] is Map
-          ? PreChatForm.fromJson((j['preChatForm'] as Map).cast<String, dynamic>())
+          ? PreChatForm.fromJson(
+              (j['preChatForm'] as Map).cast<String, dynamic>())
           : PreChatForm.disabled,
       allowedOrigins: (j['allowedOrigins'] is List)
           ? (j['allowedOrigins'] as List).map((e) => e.toString()).toList()
@@ -108,10 +111,21 @@ class ConfigResponse {
     required this.isOpen,
   });
 
-  factory ConfigResponse.fromJson(Map<String, dynamic> j) => ConfigResponse(
-        tenantId: (j['tenantId'] ?? '').toString(),
-        config: WidgetConfigModel.fromJson(
-            (j['config'] as Map).cast<String, dynamic>()),
-        isOpen: j['isOpen'] == true,
+  factory ConfigResponse.fromJson(Map<String, dynamic> j) {
+    final rawConfig = j['config'];
+    // The one non-optional field in the protocol. Everywhere else is
+    // null-tolerant; here a missing/typed `config` is a protocol violation —
+    // surface a typed error instead of a raw TypeError from the cast.
+    if (rawConfig is! Map) {
+      throw const EasyLiveChatError(
+        EasyLiveChatErrorCode.unknown,
+        message: 'GET /config response missing a `config` object.',
       );
+    }
+    return ConfigResponse(
+      tenantId: (j['tenantId'] ?? '').toString(),
+      config: WidgetConfigModel.fromJson(rawConfig.cast<String, dynamic>()),
+      isOpen: j['isOpen'] == true,
+    );
+  }
 }

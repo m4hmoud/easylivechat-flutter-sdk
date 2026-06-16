@@ -23,6 +23,7 @@ class WidgetSocket {
   WidgetSocket({required this.apiBase, required String token}) : _token = token;
 
   IO.Socket? _socket;
+  bool _disposed = false;
 
   // ── inbound streams (broadcast) ──
   final _onMessageNew = StreamController<ChatMessage>.broadcast();
@@ -131,11 +132,11 @@ class WidgetSocket {
     });
 
     socket.on('agent:typing', (data) {
-      // Payload is `{ isTyping }` only; never an explicit false. The controller
-      // arms a ~4s auto-clear. We surface whatever the server sent (defaulting
-      // to true) and let the controller own the timeout.
+      // Payload is `{ isTyping }`; the server only ever sends true and lets the
+      // controller's ~4s timer clear it. Require an explicit true so a malformed
+      // or empty payload can't show a phantom "agent is typing".
       final m = _asMap(data);
-      final isTyping = m?['isTyping'] != false;
+      final isTyping = m?['isTyping'] == true;
       if (!_onAgentTyping.isClosed) _onAgentTyping.add(isTyping);
     });
 
@@ -166,6 +167,22 @@ class WidgetSocket {
     _token = token;
     // Update the live socket so the NEXT (re)connect uses the fresh token.
     _applyAuth();
+  }
+
+  /// Force a fresh handshake carrying the current (re-minted) token. A LIVE
+  /// socket does NOT re-read its handshake auth on a no-op connect(), so a
+  /// stale token would keep flowing until the next natural drop — we disconnect
+  /// first, then connect re-handshakes with [_token]. onDisconnect/onConnect
+  /// fire as usual (the controller backfills the gap on connect).
+  void reconnectWithFreshAuth() {
+    final socket = _socket;
+    if (socket == null) {
+      connect();
+      return;
+    }
+    _applyAuth();
+    socket.disconnect();
+    socket.connect();
   }
 
   /// Push [_token] into both the live socket auth and the underlying manager
@@ -228,6 +245,11 @@ class WidgetSocket {
   }
 
   void dispose() {
+    // Idempotent: teardown can race (controller _teardownSocket's whenComplete
+    // + a re-mint failure path + controller dispose). Closing an already-closed
+    // StreamController throws, so guard the whole thing.
+    if (_disposed) return;
+    _disposed = true;
     final socket = _socket;
     _socket = null;
     if (socket != null) {

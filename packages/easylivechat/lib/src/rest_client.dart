@@ -29,7 +29,8 @@ class RestClient {
 
   /// Future-proof protocol version header sent on every request. The server
   /// currently ignores it (harmless); it lets us negotiate wire changes later.
-  static const String _protocolVersionHeader = 'X-EasyLiveChat-Protocol-Version';
+  static const String _protocolVersionHeader =
+      'X-EasyLiveChat-Protocol-Version';
   static const String _protocolVersion = '1';
 
   /// Base headers attached to every request, optionally adding a Bearer token.
@@ -90,7 +91,8 @@ class RestClient {
           if (email != null) 'email': email,
           if (page != null) 'page': page,
           // Prefer the explicit per-call locale, fall back to config.locale.
-          if ((locale ?? config.locale) != null) 'locale': locale ?? config.locale,
+          if ((locale ?? config.locale) != null)
+            'locale': locale ?? config.locale,
           if (resumeOnly) 'resumeOnly': true,
           if (fields != null && fields.isNotEmpty) 'fields': fields,
         },
@@ -228,15 +230,21 @@ class RestClient {
         'file': MultipartFile.fromBytes(
           bytes,
           filename: filename,
-          contentType: contentType != null
-              ? DioMediaType.parse(contentType)
-              : null,
+          contentType:
+              contentType != null ? DioMediaType.parse(contentType) : null,
         ),
       });
       final res = await _dio.post<dynamic>(
         '${config.normalizedApiBase}/api/uploads',
         data: form,
-        options: Options(headers: _headers(token)),
+        options: Options(
+          headers: _headers(token),
+          // Uploads run up to 25 MB; the default connect-sized timeout (20s)
+          // aborts a large file on a slow cellular link. Give the request body
+          // a generous window, independent of the connect/receive defaults.
+          sendTimeout: const Duration(minutes: 2),
+          receiveTimeout: const Duration(minutes: 2),
+        ),
         onSendProgress: onProgress == null
             ? null
             : (sent, total) {

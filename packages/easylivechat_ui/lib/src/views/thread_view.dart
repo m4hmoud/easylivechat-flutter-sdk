@@ -62,12 +62,20 @@ class _ThreadViewState extends State<ThreadView> {
   void _onMessages() {
     final count = EasyLiveChat.instance.messages.value.length;
     // Auto-scroll only when a *new* (appended) message arrives, not when
-    // older history is prepended.
+    // older history is prepended — and only if the user is already near the
+    // bottom, so an incoming reply doesn't yank them away from history they're
+    // reading. (Their own send is from the bottom, so it still scrolls.)
     final appended = count > _lastCount && !_loadingOlder;
     _lastCount = count;
-    if (appended) {
+    if (appended && _isNearBottom()) {
       WidgetsBinding.instance.addPostFrameCallback((_) => _animateToBottom());
     }
+  }
+
+  bool _isNearBottom() {
+    if (!_scroll.hasClients) return true;
+    final pos = _scroll.position;
+    return pos.maxScrollExtent - pos.pixels <= 160;
   }
 
   void _jumpToBottom() {
@@ -87,9 +95,21 @@ class _ThreadViewState extends State<ThreadView> {
   Future<void> _loadOlder() async {
     if (_loadingOlder || !_hasMoreOlder) return;
     setState(() => _loadingOlder = true);
+    // Capture the viewport so we can keep the user on the same content after
+    // older history is prepended (which grows maxScrollExtent from the top).
+    final beforeExtent =
+        _scroll.hasClients ? _scroll.position.maxScrollExtent : 0.0;
+    final beforePixels = _scroll.hasClients ? _scroll.position.pixels : 0.0;
     try {
       final page = await EasyLiveChat.instance.loadOlderMessages();
       if (mounted && page.nextCursor == null) _hasMoreOlder = false;
+      if (mounted && page.messages.isNotEmpty) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!_scroll.hasClients) return;
+          final delta = _scroll.position.maxScrollExtent - beforeExtent;
+          if (delta > 0) _scroll.jumpTo(beforePixels + delta);
+        });
+      }
     } on EasyLiveChatError {
       // Swallow — the load-older affordance simply stays available to retry.
     } finally {
@@ -124,8 +144,10 @@ class _ThreadViewState extends State<ThreadView> {
                     if (index == 0) return _buildLoadOlder();
                     final msgIndex = index - 1;
                     if (msgIndex < messages.length) {
+                      final m = messages[msgIndex];
                       return MessageBubble(
-                        message: messages[msgIndex],
+                        key: ValueKey(m.id),
+                        message: m,
                         theme: t,
                         showAgentName: _showAgentNames,
                         strings: _s,
@@ -157,7 +179,7 @@ class _ThreadViewState extends State<ThreadView> {
                 child: CircularProgressIndicator(
                   strokeWidth: 2,
                   valueColor: AlwaysStoppedAnimation<Color>(
-                      _theme.text.withOpacity(0.4)),
+                      _theme.text.withValues(alpha: 0.4)),
                 ),
               )
             : TextButton(
@@ -199,7 +221,8 @@ class MessageBubble extends StatelessWidget {
   Widget build(BuildContext context) {
     final bubbleColor = _isCustomer ? theme.primary : theme.surface;
     final textColor = _isCustomer ? _onColor(theme.primary) : theme.text;
-    final align = _isCustomer ? CrossAxisAlignment.end : CrossAxisAlignment.start;
+    final align =
+        _isCustomer ? CrossAxisAlignment.end : CrossAxisAlignment.start;
 
     final body = (message.body ?? '').trim();
     final tiles = _attachmentTiles(textColor);
@@ -215,7 +238,7 @@ class MessageBubble extends StatelessWidget {
               child: Text(
                 _agentName!,
                 style: TextStyle(
-                  color: theme.text.withOpacity(0.6),
+                  color: theme.text.withValues(alpha: 0.6),
                   fontSize: 11,
                   fontWeight: FontWeight.w600,
                 ),
@@ -237,7 +260,7 @@ class MessageBubble extends StatelessWidget {
                 ),
                 border: _isCustomer
                     ? null
-                    : Border.all(color: theme.text.withOpacity(0.08)),
+                    : Border.all(color: theme.text.withValues(alpha: 0.08)),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -259,7 +282,7 @@ class MessageBubble extends StatelessWidget {
                     Text(
                       strings.attachment,
                       style: TextStyle(
-                          color: textColor.withOpacity(0.7),
+                          color: textColor.withValues(alpha: 0.7),
                           fontSize: 14,
                           fontStyle: FontStyle.italic),
                     ),
@@ -268,7 +291,7 @@ class MessageBubble extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 2),
-          _meta(textColorMuted: theme.text.withOpacity(0.45)),
+          _meta(textColorMuted: theme.text.withValues(alpha: 0.45)),
         ],
       ),
     );
@@ -282,16 +305,29 @@ class MessageBubble extends StatelessWidget {
   Widget _meta({required Color textColorMuted}) {
     final time = _formatTime(message.createdAt);
     final parts = <Widget>[
-      Text(time,
-          style: TextStyle(color: textColorMuted, fontSize: 10)),
+      Text(time, style: TextStyle(color: textColorMuted, fontSize: 10)),
     ];
     if (_isCustomer) {
       if (message.failed) {
         parts
           ..add(const SizedBox(width: 6))
-          ..add(Text(strings.sendFailedRetry,
-              style: const TextStyle(
-                  color: _ThreadErrorColor.color, fontSize: 10)));
+          ..add(GestureDetector(
+            onTap: () {
+              // Re-send and swallow the (already UI-reflected) failure future
+              // so a second failure isn't an unhandled async error.
+              EasyLiveChat.instance
+                  .resend(message)
+                  ?.serverMessageId
+                  .catchError((_) => '');
+            },
+            child: Text(strings.sendFailedRetry,
+                style: const TextStyle(
+                  color: _ThreadErrorColor.color,
+                  fontSize: 10,
+                  decoration: TextDecoration.underline,
+                  decorationColor: _ThreadErrorColor.color,
+                )),
+          ));
       } else if (message.isOptimistic ||
           message.deliveryStatus == MessageDeliveryStatus.pending) {
         parts
@@ -359,7 +395,7 @@ class MessageBubble extends StatelessWidget {
             placeholder: (context, _) => Container(
               width: 200,
               height: 140,
-              color: fg.withOpacity(0.08),
+              color: fg.withValues(alpha: 0.08),
               alignment: Alignment.center,
               child: SizedBox(
                 width: 18,
@@ -367,7 +403,7 @@ class MessageBubble extends StatelessWidget {
                 child: CircularProgressIndicator(
                   strokeWidth: 2,
                   valueColor:
-                      AlwaysStoppedAnimation<Color>(fg.withOpacity(0.4)),
+                      AlwaysStoppedAnimation<Color>(fg.withValues(alpha: 0.4)),
                 ),
               ),
             ),
@@ -385,7 +421,7 @@ class MessageBubble extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
         decoration: BoxDecoration(
-          color: fg.withOpacity(0.08),
+          color: fg.withValues(alpha: 0.08),
           borderRadius: BorderRadius.circular(10),
         ),
         child: Row(
@@ -401,7 +437,8 @@ class MessageBubble extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 8),
-            Icon(Icons.download_rounded, size: 16, color: fg.withOpacity(0.7)),
+            Icon(Icons.download_rounded,
+                size: 16, color: fg.withValues(alpha: 0.7)),
           ],
         ),
       ),
@@ -414,20 +451,19 @@ class MessageBubble extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
         decoration: BoxDecoration(
-          color: fg.withOpacity(0.06),
+          color: fg.withValues(alpha: 0.06),
           borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: fg.withOpacity(0.15)),
+          border: Border.all(color: fg.withValues(alpha: 0.15)),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(Icons.broken_image_outlined,
-                size: 18, color: fg.withOpacity(0.6)),
+                size: 18, color: fg.withValues(alpha: 0.6)),
             const SizedBox(width: 8),
             Text(
               strings.mediaUnavailable,
-              style: TextStyle(
-                  color: fg.withOpacity(0.6), fontSize: 13),
+              style: TextStyle(color: fg.withValues(alpha: 0.6), fontSize: 13),
             ),
           ],
         ),
@@ -482,9 +518,9 @@ class _TypingRow extends StatefulWidget {
 
 class _TypingRowState extends State<_TypingRow>
     with SingleTickerProviderStateMixin {
-  late final AnimationController _c =
-      AnimationController(vsync: this, duration: const Duration(milliseconds: 900))
-        ..repeat();
+  late final AnimationController _c = AnimationController(
+      vsync: this, duration: const Duration(milliseconds: 900))
+    ..repeat();
 
   @override
   void dispose() {
@@ -499,49 +535,50 @@ class _TypingRowState extends State<_TypingRow>
       label: widget.label,
       liveRegion: true,
       child: Align(
-      alignment: AlignmentDirectional.centerStart,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-          decoration: BoxDecoration(
-            color: t.surface,
-            borderRadius: const BorderRadius.only(
-              topLeft: Radius.circular(16),
-              topRight: Radius.circular(16),
-              bottomRight: Radius.circular(16),
-              bottomLeft: Radius.circular(4),
+        alignment: AlignmentDirectional.centerStart,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            decoration: BoxDecoration(
+              color: t.surface,
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(16),
+                topRight: Radius.circular(16),
+                bottomRight: Radius.circular(16),
+                bottomLeft: Radius.circular(4),
+              ),
+              border: Border.all(color: t.text.withValues(alpha: 0.08)),
             ),
-            border: Border.all(color: t.text.withOpacity(0.08)),
-          ),
-          child: AnimatedBuilder(
-            animation: _c,
-            builder: (context, _) {
-              return Row(
-                mainAxisSize: MainAxisSize.min,
-                children: List.generate(3, (i) {
-                  final phase = (_c.value + i * 0.33) % 1.0;
-                  final opacity = 0.3 + 0.7 * (1 - (phase - 0.5).abs() * 2).clamp(0.0, 1.0);
-                  return Padding(
-                    padding: EdgeInsets.only(right: i < 2 ? 4 : 0),
-                    child: Opacity(
-                      opacity: opacity,
-                      child: Container(
-                        width: 7,
-                        height: 7,
-                        decoration: BoxDecoration(
-                          color: t.text.withOpacity(0.5),
-                          shape: BoxShape.circle,
+            child: AnimatedBuilder(
+              animation: _c,
+              builder: (context, _) {
+                return Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: List.generate(3, (i) {
+                    final phase = (_c.value + i * 0.33) % 1.0;
+                    final opacity = 0.3 +
+                        0.7 * (1 - (phase - 0.5).abs() * 2).clamp(0.0, 1.0);
+                    return Padding(
+                      padding: EdgeInsets.only(right: i < 2 ? 4 : 0),
+                      child: Opacity(
+                        opacity: opacity,
+                        child: Container(
+                          width: 7,
+                          height: 7,
+                          decoration: BoxDecoration(
+                            color: t.text.withValues(alpha: 0.5),
+                            shape: BoxShape.circle,
+                          ),
                         ),
                       ),
-                    ),
-                  );
-                }),
-              );
-            },
+                    );
+                  }),
+                );
+              },
+            ),
           ),
         ),
-      ),
       ),
     );
   }

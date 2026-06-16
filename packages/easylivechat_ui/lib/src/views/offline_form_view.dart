@@ -168,7 +168,7 @@ class _OfflineFormViewState extends State<OfflineFormView> {
               style: ElevatedButton.styleFrom(
                 backgroundColor: t.primary,
                 foregroundColor: _onColor(t.primary),
-                disabledBackgroundColor: t.primary.withOpacity(0.5),
+                disabledBackgroundColor: t.primary.withValues(alpha: 0.5),
                 elevation: 0,
                 shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12)),
@@ -179,8 +179,8 @@ class _OfflineFormViewState extends State<OfflineFormView> {
                       height: 20,
                       child: CircularProgressIndicator(
                         strokeWidth: 2,
-                        valueColor: AlwaysStoppedAnimation<Color>(
-                            _onColor(t.primary)),
+                        valueColor:
+                            AlwaysStoppedAnimation<Color>(_onColor(t.primary)),
                       ),
                     )
                   : Text(
@@ -229,7 +229,7 @@ class _OfflineFormViewState extends State<OfflineFormView> {
                 const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(10),
-              borderSide: BorderSide(color: t.text.withOpacity(0.15)),
+              borderSide: BorderSide(color: t.text.withValues(alpha: 0.15)),
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(10),
@@ -241,7 +241,8 @@ class _OfflineFormViewState extends State<OfflineFormView> {
             ),
             focusedErrorBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(10),
-              borderSide: const BorderSide(color: Color(0xFFDC2626), width: 1.5),
+              borderSide:
+                  const BorderSide(color: Color(0xFFDC2626), width: 1.5),
             ),
             errorStyle: const TextStyle(color: Color(0xFFDC2626)),
           ),

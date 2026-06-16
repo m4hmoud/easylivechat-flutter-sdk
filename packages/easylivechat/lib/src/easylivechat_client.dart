@@ -37,22 +37,37 @@ class EasyLiveChat {
   /// `EasyLiveChatStorage`); defaults to ephemeral [InMemoryStorage] which is
   /// NOT durable — production apps must provide a persistent implementation
   /// (e.g. the one in `easylivechat_ui`).
-  Future<void> boot(EasyLiveChatConfig config, {EasyLiveChatStorage? storage}) async {
+  Future<void> boot(EasyLiveChatConfig config,
+      {EasyLiveChatStorage? storage}) async {
     if (_c != null) return;
-    _c = SessionController(config: config, storage: storage ?? InMemoryStorage());
+    // Fail fast on a misconfigured apiBase/tenantSlug rather than deep in the
+    // transport with an opaque error.
+    config.validate();
+    _c = SessionController(
+        config: config, storage: storage ?? InMemoryStorage());
     await _c!.boot();
   }
 
+  /// Pre-identify a known (logged-in) visitor BEFORE [open]. [open] then skips
+  /// the pre-chat form and starts the session directly as this person; [fields]
+  /// (your own keys, e.g. phone / userId / app) are sent with the session so
+  /// agents see who they're talking to. Safe to call before or after [boot]
+  /// (re-applied at boot); a no-op identity (`null`s) is ignored.
+  void identify({String? name, String? email, Map<String, String>? fields}) =>
+      _controller.identify(name: name, email: email, fields: fields);
+
   // ── reactive state (read-only) ──
   ValueListenable<ChatPhase> get phase => _controller.phase;
-  ValueListenable<WidgetConfigModel?> get widgetConfig => _controller.widgetConfig;
+  ValueListenable<WidgetConfigModel?> get widgetConfig =>
+      _controller.widgetConfig;
   ValueListenable<bool> get isOpen => _controller.isOpen;
   ValueListenable<ConnectionState> get connection => _controller.connection;
   ValueListenable<List<ChatMessage>> get messages => _controller.messages;
   ValueListenable<bool> get agentTyping => _controller.agentTyping;
   ValueListenable<int> get unreadCount => _controller.unreadCount;
   Stream<ChatMessage> get onMessage => _controller.onMessage;
-  Stream<ProactiveMessage> get onProactiveMessage => _controller.onProactiveMessage;
+  Stream<ProactiveMessage> get onProactiveMessage =>
+      _controller.onProactiveMessage;
   Stream<EasyLiveChatError> get onError => _controller.onError;
 
   String get visitorId => _controller.visitorId;
@@ -62,13 +77,21 @@ class EasyLiveChat {
   Future<WidgetConfigModel> loadConfig() => _controller.loadConfig();
   Future<void> open() => _controller.open();
   Future<bool> silentResume() => _controller.silentResume();
-  Future<void> startSession({String? name, String? email, Map<String, String>? fields}) =>
+  Future<void> startSession(
+          {String? name, String? email, Map<String, String>? fields}) =>
       _controller.startSession(name: name, email: email, fields: fields);
   void closeSession() => _controller.closeSession();
 
   // ── messaging ──
-  SendResult sendMessage(String body, {List<String> attachmentUrls = const []}) =>
+  SendResult sendMessage(String body,
+          {List<String> attachmentUrls = const []}) =>
       _controller.sendMessage(body, attachmentUrls: attachmentUrls);
+
+  /// Re-send a message that previously failed (tap-to-retry). Drops the failed
+  /// row and sends its body + attachments fresh. Returns null when [message] is
+  /// not in a failed state.
+  SendResult? resend(ChatMessage message) => _controller.resend(message);
+
   void setTyping(bool isTyping) => _controller.setTyping(isTyping);
   Future<MessagePage> loadOlderMessages() => _controller.loadOlderMessages();
   void markRead() => _controller.markRead();
@@ -86,16 +109,20 @@ class EasyLiveChat {
         contentType: contentType,
         onProgress: onProgress,
       );
-  String resolveUrl(String relativeOrAbsolute) => _controller.resolveUrl(relativeOrAbsolute);
+  String resolveUrl(String relativeOrAbsolute) =>
+      _controller.resolveUrl(relativeOrAbsolute);
 
   // ── offline + CSAT ──
-  Future<String> submitOfflineForm({String? name, String? email, required String message}) =>
+  Future<String> submitOfflineForm(
+          {String? name, String? email, required String message}) =>
       _controller.submitOfflineForm(name: name, email: email, message: message);
-  Future<FeedbackResult> submitFeedback({required int rating, String? comment}) =>
+  Future<FeedbackResult> submitFeedback(
+          {required int rating, String? comment}) =>
       _controller.submitFeedback(rating: rating, comment: comment);
 
   // ── presence / lifecycle ──
-  void setAppLifecycle(EasyLiveChatLifecycle state) => _controller.setAppLifecycle(state);
+  void setAppLifecycle(EasyLiveChatLifecycle state) =>
+      _controller.setAppLifecycle(state);
   void heartbeat({String? currentUrl, String? currentTitle}) =>
       _controller.heartbeat(currentUrl: currentUrl, currentTitle: currentTitle);
 

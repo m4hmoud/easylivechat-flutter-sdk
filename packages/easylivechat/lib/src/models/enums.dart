@@ -53,7 +53,8 @@ enum MessageDeliveryStatus {
   failed,
   unknown;
 
-  static MessageDeliveryStatus fromWire(Object? w) => _parse(values, w, unknown);
+  static MessageDeliveryStatus fromWire(Object? w) =>
+      _parse(values, w, unknown);
 }
 
 /// Conversation lifecycle. Server (Prisma `ConversationStatus`).

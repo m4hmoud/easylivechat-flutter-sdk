@@ -38,7 +38,11 @@ class ElcStrings {
     if (c.isEmpty) return null;
     // language subtag only: pt-BR / pt_br / zh-Hans → pt / zh
     final lang = c.split(RegExp(r'[-_]')).first;
-    return lang.isEmpty ? null : lang;
+    if (lang.isEmpty) return null;
+    // Kurdish: ckb (Central Kurdish / Sorani) maps to the existing `ku` table;
+    // kmr (Northern Kurdish / Kurmanji / Badini) has its own table below.
+    if (lang == 'ckb') return 'ku';
+    return lang;
   }
 
   String _t(String key) {
@@ -69,6 +73,8 @@ class ElcStrings {
   String get invalidOption => _t('invalidOption');
   String get selectAnOption => _t('selectAnOption');
   String get somethingWentWrong => _t('somethingWentWrong');
+  String get retry => _t('retry');
+  String get couldNotConnect => _t('couldNotConnect');
 
   // ── feedback (CSAT) ──
   String get rateYourChat => _t('rateYourChat');
@@ -122,6 +128,9 @@ class ElcStrings {
       'invalidOption': 'Choose one of the options',
       'selectAnOption': 'Select…',
       'somethingWentWrong': 'Something went wrong. Please try again.',
+      'retry': 'Retry',
+      'couldNotConnect':
+          "Couldn't connect. Check your connection and try again.",
       'rateYourChat': 'Rate your chat',
       'rateHint': 'How was your conversation?',
       'addAComment': 'Add a comment (optional)',
@@ -154,6 +163,8 @@ class ElcStrings {
       'invalidOption': 'اختر أحد الخيارات',
       'selectAnOption': 'اختر…',
       'somethingWentWrong': 'حدث خطأ ما. حاول مرة أخرى.',
+      'retry': 'إعادة المحاولة',
+      'couldNotConnect': 'تعذّر الاتصال. تحقق من اتصالك وحاول مرة أخرى.',
       'rateYourChat': 'قيّم محادثتك',
       'rateHint': 'كيف كانت محادثتك؟',
       'addAComment': 'أضف تعليقًا (اختياري)',
@@ -346,6 +357,9 @@ class ElcStrings {
       'invalidOption': 'یەکێک لە هەڵبژاردەکان هەڵبژێرە',
       'selectAnOption': 'هەڵبژێرە…',
       'somethingWentWrong': 'هەڵەیەک ڕوویدا. تکایە دووبارە هەوڵبدەرەوە.',
+      'retry': 'دووبارە هەوڵبدەرەوە',
+      'couldNotConnect':
+          'پەیوەندی نەکرا. لە پەیوەندیەکەت بڕوانە و دووبارە هەوڵبدەرەوە.',
       'rateYourChat': 'گفتوگۆکەت هەڵبسەنگێنە',
       'rateHint': 'گفتوگۆکەت چۆن بوو؟',
       'addAComment': 'لێدوانێک زیاد بکە (ئارەزوومەندانە)',
@@ -484,6 +498,44 @@ class ElcStrings {
       'yourMessage': '您的留言',
       'sendMessage': '发送留言',
       'offlineThanks': '谢谢！我们会尽快回复您。',
+    },
+    // Northern Kurdish (Kurmanji / Badini, Arabic script). Zirak's default
+    // locale; ckb (Sorani) maps to `ku` above. Core terms verified against the
+    // Zirak apps' own kmr translations.
+    'kmr': {
+      'send': 'فرێکرن',
+      'typeAMessage': 'نامەکێ بنڤیسە',
+      'attach': 'هەڤپێچکرن',
+      'attachImage': 'وێنە',
+      'attachFile': 'پەل',
+      'agentTyping': 'د نڤیسینێ دا…',
+      'loadOlder': 'نامەێن کەڤن باربکە',
+      'mediaUnavailable': 'مێدیا بەردەست نینە',
+      'download': 'داگرتن',
+      'image': 'وێنە',
+      'attachment': 'هەڤپێچ',
+      'sendFailedRetry': 'نەهاتە فرێکرن. بۆ دووبارە هەوڵدانێ بکرتە بکە.',
+      'sending': 'د هنێریت…',
+      'startChat': 'دەستپێکرنا چاتێ',
+      'fieldRequired': 'ئەڤ خانە پێدڤی یە',
+      'invalidEmail': 'ئیمەیلەکا دروست بنڤیسە',
+      'invalidNumber': 'ژمارەکا دروست بنڤیسە',
+      'invalidOption': 'یەکێ ژ هەلبژارتنان هەلبژێرە',
+      'selectAnOption': 'هەلبژێرە…',
+      'somethingWentWrong': 'چەوتیەک چێبوو. ژکەرەمێ دووبارە هەوڵ بدە.',
+      'retry': 'دووبارە هەوڵدان',
+      'couldNotConnect':
+          'پەیوەندی نەهاتە کرن. پەیوەندیا خۆ ببینە و دووبارە هەوڵ بدە.',
+      'rateYourChat': 'چاتا خۆ هەلسەنگێنە',
+      'rateHint': 'ئاخڤتنا تە چاوا بوو؟',
+      'addAComment': 'تێبینیەکێ زێدە بکە (هەلبژارتی)',
+      'submit': 'پێشکێش بکە',
+      'thanksForFeedback': 'سوپاس بۆ بۆچوونا تە!',
+      'yourName': 'ناڤێ تە',
+      'yourEmail': 'ئیمەیلا تە',
+      'yourMessage': 'نامەیا تە',
+      'sendMessage': 'نامەیێ فرێکە',
+      'offlineThanks': 'سوپاس! ئەم دێ ب تە ڤە پەیوەندیێ کەین.',
     },
   };
 }

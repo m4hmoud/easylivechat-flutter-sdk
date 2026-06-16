@@ -23,9 +23,16 @@ class PresenceSocket {
   });
 
   io.Socket? _socket;
+  bool _disposed = false;
 
   final _onProactive = StreamController<ProactiveMessage>.broadcast();
   Stream<ProactiveMessage> get onProactive => _onProactive.stream;
+
+  /// `connect_error` — last handshake error (e.g. bad tenantSlug/visitorId).
+  /// Presence is receive-only and non-fatal, so we expose the last error for
+  /// diagnostics rather than a stream; pre-chat outreach just won't arrive.
+  final _onConnectError = StreamController<String>.broadcast();
+  Stream<String> get onConnectError => _onConnectError.stream;
 
   /// Connect to `<apiBase>/widget-presence` with the query handshake and
   /// auto-reconnect (reconnectionDelay ~1500ms). Receive-only.
@@ -43,9 +50,20 @@ class PresenceSocket {
     );
     _socket = socket;
 
-    // Receive-only: the sole inbound event on this namespace.
+    // Surface handshake failures (bad tenantSlug/visitorId) instead of failing
+    // silently. Non-fatal: presence is receive-only outreach.
+    socket.onConnectError((err) {
+      if (!_onConnectError.isClosed) _onConnectError.add('$err');
+    });
+    socket.onError((err) {
+      if (!_onConnectError.isClosed) _onConnectError.add('$err');
+    });
+
+    // Receive-only: the sole inbound event on this namespace. Guard the add —
+    // an event can race teardown (clearListeners is best-effort) after the
+    // controller closed the stream.
     socket.on('widget:proactive-message', (data) {
-      if (data is Map) {
+      if (data is Map && !_onProactive.isClosed) {
         _onProactive.add(
           ProactiveMessage.fromJson(data.cast<String, dynamic>()),
         );
@@ -62,8 +80,14 @@ class PresenceSocket {
   }
 
   void dispose() {
-    // Tear down the socket first, then close the broadcast stream.
+    // Idempotent: dispose can be called more than once (teardown + controller
+    // dispose); closing an already-closed StreamController throws.
+    if (_disposed) return;
+    _disposed = true;
+    // disconnect() synchronously clears listeners before we close the streams,
+    // so no late proactive event can land after close.
     unawaited(disconnect());
     _onProactive.close();
+    _onConnectError.close();
   }
 }

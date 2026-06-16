@@ -1,3 +1,5 @@
+import 'errors.dart';
+
 /// Immutable configuration for the EasyLiveChat client.
 class EasyLiveChatConfig {
   /// API base, e.g. `https://api.livechattools.com` (no trailing slash needed).
@@ -50,6 +52,27 @@ class EasyLiveChatConfig {
   });
 
   /// `apiBase` with any trailing slash removed.
-  String get normalizedApiBase =>
-      apiBase.endsWith('/') ? apiBase.substring(0, apiBase.length - 1) : apiBase;
+  String get normalizedApiBase => apiBase.endsWith('/')
+      ? apiBase.substring(0, apiBase.length - 1)
+      : apiBase;
+
+  /// Validate the config at boot (runtime — a `const` constructor can't run
+  /// method-based asserts). Throws an [EasyLiveChatError] for a misconfiguration
+  /// that would otherwise fail opaquely deep in the transport. `http://` is
+  /// allowed (local/staging) but disables TLS for the visitor JWT + PII.
+  void validate() {
+    if (apiBase.trim().isEmpty) {
+      throw const EasyLiveChatError(EasyLiveChatErrorCode.unknown,
+          message: 'EasyLiveChatConfig.apiBase must not be empty.');
+    }
+    if (!apiBase.startsWith('https://') && !apiBase.startsWith('http://')) {
+      throw EasyLiveChatError(EasyLiveChatErrorCode.unknown,
+          message: 'EasyLiveChatConfig.apiBase must include an http(s):// '
+              'scheme, e.g. https://api.example.com (got "$apiBase").');
+    }
+    if (tenantSlug.trim().isEmpty) {
+      throw const EasyLiveChatError(EasyLiveChatErrorCode.unknown,
+          message: 'EasyLiveChatConfig.tenantSlug must not be empty.');
+    }
+  }
 }

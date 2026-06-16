@@ -5,12 +5,14 @@ description: >-
   can embed live customer support into any Flutter app. No UI; pure protocol +
   state. Pair with easylivechat_ui for prebuilt widgets.
 version: 0.1.0
+# Consumed via git dependency (not pub.dev).
+publish_to: 'none'
 homepage: https://livechattools.com
 repository: https://github.com/nullsam/easylivechat
 
 environment:
-  sdk: ">=3.3.0 <4.0.0"
-  flutter: ">=3.19.0"
+  sdk: ">=3.6.0 <4.0.0"
+  flutter: ">=3.27.0"
 
 dependencies:
   flutter:

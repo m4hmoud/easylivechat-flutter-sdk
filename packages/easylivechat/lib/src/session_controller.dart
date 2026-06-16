@@ -87,6 +87,13 @@ class SessionController {
   String? _visitorId;
   StoredProfile? _profile;
 
+  // Host-supplied identity for a known (logged-in) visitor. When set, [open]
+  // skips the pre-chat form and starts the session directly as this person.
+  bool _hasIdentity = false;
+  String? _identityName;
+  String? _identityEmail;
+  Map<String, String>? _identityFields;
+
   String? _token;
   String? _conversationId;
 
@@ -110,6 +117,12 @@ class SessionController {
 
   /// Single-flight guard for token re-mint (`silentResume`-based).
   Completer<bool>? _remintInFlight;
+
+  /// Single-flight guard for [silentResume]. `open()` awaits it while an
+  /// incoming proactive message also fires it fire-and-forget; without this
+  /// two concurrent resumes adopt two sessions (duplicate sockets, clobbered
+  /// conversation state).
+  Completer<bool>? _silentResumeInFlight;
 
   /// Conversations whose CSAT prompt has already been shown — guards against
   /// `conversation:closed` re-fire (server emits on ANY *→CLOSED PATCH).
@@ -155,6 +168,26 @@ class SessionController {
     }
   }
 
+  /// Pre-identify a known (logged-in) visitor. Call before [open]; [open] then
+  /// skips the pre-chat form and starts directly as this person. A fully-null
+  /// identity is ignored (stays anonymous). Also seeds the cached profile so
+  /// [silentResume] carries the name/email.
+  void identify({String? name, String? email, Map<String, String>? fields}) {
+    final hasAny = (name != null && name.trim().isNotEmpty) ||
+        (email != null && email.trim().isNotEmpty) ||
+        (fields != null && fields.isNotEmpty);
+    if (!hasAny) return;
+    _hasIdentity = true;
+    _identityName = name;
+    _identityEmail = email;
+    _identityFields = fields;
+    _profile = StoredProfile(
+      name: name ?? _profile?.name,
+      email: email ?? _profile?.email,
+      preChat: fields ?? _profile?.preChat,
+    );
+  }
+
   /// `GET /config`. Sets [widgetConfig] + [isOpen]. If the workspace is outside
   /// working hours, drops to [ChatPhase.offline].
   Future<WidgetConfigModel> loadConfig() async {
@@ -181,7 +214,17 @@ class SessionController {
     final resumed = await silentResume();
     if (resumed) return;
 
-    if (!cfg.preChatForm.enabled) {
+    if (_hasIdentity) {
+      // Known (logged-in) visitor: skip the pre-chat form, start directly as
+      // this person. The host vouches for the identity, so don't re-validate
+      // against the server form fields.
+      await startSession(
+        name: _identityName,
+        email: _identityEmail,
+        fields: _identityFields,
+        skipValidation: true,
+      );
+    } else if (!cfg.preChatForm.enabled) {
       // Anonymous start: no pre-chat gate.
       await startSession();
     } else {
@@ -194,7 +237,22 @@ class SessionController {
   /// On false, restores a sensible phase (prechat / idle / offline) so the
   /// controller never strands at [ChatPhase.resuming]; callers (e.g. [open])
   /// may then override it.
-  Future<bool> silentResume() async {
+  Future<bool> silentResume() {
+    final inflight = _silentResumeInFlight;
+    if (inflight != null) return inflight.future;
+    final completer = _silentResumeInFlight = Completer<bool>();
+    _silentResumeImpl().then(
+      (v) {
+        if (!completer.isCompleted) completer.complete(v);
+      },
+      onError: (Object e) {
+        if (!completer.isCompleted) completer.completeError(e);
+      },
+    ).whenComplete(() => _silentResumeInFlight = null);
+    return completer.future;
+  }
+
+  Future<bool> _silentResumeImpl() async {
     _setPhase(ChatPhase.resuming);
     final SessionResult res;
     try {
@@ -236,10 +294,15 @@ class SessionController {
     String? name,
     String? email,
     Map<String, String>? fields,
+    bool skipValidation = false,
   }) async {
     // Client-side validation mirroring the server (server stays the authority).
+    // Skipped for a host-identified visitor (see [identify]).
     final cfg = widgetConfig.value;
-    if (cfg != null && cfg.preChatForm.enabled && fields != null) {
+    if (!skipValidation &&
+        cfg != null &&
+        cfg.preChatForm.enabled &&
+        fields != null) {
       for (final PreChatField field in cfg.preChatForm.fields) {
         final err = field.validate(fields[field.id]);
         if (err != null) {
@@ -290,6 +353,10 @@ class SessionController {
 
     _setMessages(_dedupSort(res.messages));
     _connectSocket();
+    // Presence (`/widget-presence`) is the pre-chat proactive channel. Once the
+    // full chat socket is up, the `/widgets` namespace delivers proactive too —
+    // keeping presence open would double-deliver outreach and waste a socket.
+    _teardownPresence();
     _setPhase(ChatPhase.chat);
     _startHeartbeat();
   }
@@ -307,7 +374,8 @@ class SessionController {
   /// Optimistically append a `tmp-` message and emit `message:send`. The
   /// returned [SendResult.serverMessageId] resolves to the server id on ack
   /// (or throws [EasyLiveChatError] on `ok:false`).
-  SendResult sendMessage(String body, {List<String> attachmentUrls = const []}) {
+  SendResult sendMessage(String body,
+      {List<String> attachmentUrls = const []}) {
     final tempId = 'tmp-${_uuid.v4()}';
     final convId = _conversationId ?? '';
     final optimistic = ChatMessage.optimistic(
@@ -327,12 +395,11 @@ class SessionController {
           message: 'No active socket — call open()/startSession() first.');
       _emitError(err);
       completer.completeError(err);
-      return SendResult(optimistic: optimistic, serverMessageId: completer.future);
+      return SendResult(
+          optimistic: optimistic, serverMessageId: completer.future);
     }
 
-    socket
-        .sendMessage(body: body, attachmentUrls: attachmentUrls)
-        .then((ack) {
+    socket.sendMessage(body: body, attachmentUrls: attachmentUrls).then((ack) {
       if (ack.ok) {
         final serverId = ack.messageId;
         if (serverId != null) {
@@ -366,7 +433,20 @@ class SessionController {
       if (!completer.isCompleted) completer.completeError(err);
     });
 
-    return SendResult(optimistic: optimistic, serverMessageId: completer.future);
+    return SendResult(
+        optimistic: optimistic, serverMessageId: completer.future);
+  }
+
+  /// Re-send a previously failed message (tap-to-retry). Drops the failed row
+  /// and re-sends its body + attachments as a fresh optimistic message. Returns
+  /// null when [message] is not in a failed state.
+  SendResult? resend(ChatMessage message) {
+    if (!message.failed) return null;
+    _removeMessage(message.id);
+    return sendMessage(
+      message.body ?? '',
+      attachmentUrls: message.attachmentUrls,
+    );
   }
 
   /// Emit `typing { isTyping }` (caller debounces).
@@ -496,6 +576,9 @@ class SessionController {
   /// while foregrounded; the periodic timer calls this directly.
   void heartbeat({String? currentUrl, String? currentTitle}) {
     if (!config.enableHeartbeat) return;
+    // Guard the visitorId getter: heartbeat() is public and can be called (e.g.
+    // via setAppLifecycle) before boot() finishes, when _visitorId is null.
+    if (_visitorId == null) return;
     // Tolerant endpoint (always 2xx) — swallow transport errors silently.
     rest
         .heartbeat(
@@ -519,7 +602,8 @@ class SessionController {
       _socket!.updateToken(token);
       return;
     }
-    final socket = WidgetSocket(apiBase: config.normalizedApiBase, token: token);
+    final socket =
+        WidgetSocket(apiBase: config.normalizedApiBase, token: token);
     _socket = socket;
     connection.value = ConnectionState.connecting;
 
@@ -529,7 +613,8 @@ class SessionController {
     _socketSubs.add(socket.onAvailability.listen((open) {
       isOpen.value = open;
     }));
-    _socketSubs.add(socket.onConversationClosed.listen(_handleConversationClosed));
+    _socketSubs
+        .add(socket.onConversationClosed.listen(_handleConversationClosed));
     _socketSubs.add(socket.onProactive.listen(_handleProactive));
     _socketSubs.add(socket.onConnectionChange.listen(_handleConnectionChange));
     _socketSubs.add(socket.onConnectError.listen(_handleConnectError));
@@ -585,12 +670,18 @@ class SessionController {
       return;
     }
 
-    // 2) Reconcile a pending optimistic message of ours. The widget protocol
-    //    does NOT echo clientId, so we match the first pending optimistic
-    //    CUSTOMER message with the same trimmed body.
+    // 2) Reconcile a still-unreconciled local send of ours. The widget protocol
+    //    does NOT echo a clientId, so we match the OLDEST local row that still
+    //    carries a `tmp-` id (the list is createdAt-sorted, so indexWhere is
+    //    FIFO) with the same trimmed body, then consume it (its id becomes the
+    //    server id, so a second identical echo matches the next pending temp —
+    //    not this one). Keying on the `tmp-` id rather than `isOptimistic` also
+    //    catches an ack'd-but-id-less send (`_markSent` clears `isOptimistic`
+    //    but keeps the `tmp-` id), so its echo replaces it instead of appending
+    //    a duplicate.
     if (msg.isFromCustomer) {
       final optIdx = list.indexWhere((m) =>
-          m.isOptimistic &&
+          m.isLocalTemp &&
           m.isFromCustomer &&
           (m.body ?? '').trim() == (msg.body ?? '').trim());
       if (optIdx != -1) {
@@ -600,9 +691,13 @@ class SessionController {
       }
     }
 
-    // 3) Genuinely new message.
+    // 3) Genuinely new message. Unread counts only AGENT replies the user
+    //    hasn't seen — never our own echoes, system/bot rows, or anything once
+    //    the conversation has moved to the feedback/closed phase.
     _appendMessage(msg);
-    if (phase.value != ChatPhase.chat && !msg.isFromCustomer) {
+    if (msg.isFromAgent &&
+        phase.value != ChatPhase.chat &&
+        phase.value != ChatPhase.feedback) {
       unreadCount.value = unreadCount.value + 1;
     }
     if (!_onMessage.isClosed) _onMessage.add(msg);
@@ -676,17 +771,37 @@ class SessionController {
     connection.value = _token != null
         ? ConnectionState.reconnecting
         : ConnectionState.disconnected;
-    final e = error.toUpperCase();
     // Auth-class handshake failures (missing/expired/invalid token) → re-mint.
-    if (e.contains('TOKEN') ||
-        e.contains('UNAUTH') ||
-        e.contains('JWT') ||
-        e.contains('EXPIRED') ||
-        e.contains('SIGNATURE')) {
+    if (_isAuthHandshakeError(error)) {
       _remintToken();
     } else {
-      _emitError(EasyLiveChatError(EasyLiveChatErrorCode.socket, message: error));
+      _emitError(
+          EasyLiveChatError(EasyLiveChatErrorCode.socket, message: error));
     }
+  }
+
+  /// Heuristic: does this `connect_error` look like an auth/JWT handshake
+  /// rejection (→ re-mint) rather than a generic transport error? The server
+  /// sends stable-ish codes (e.g. `WIDGET_TOKEN_MISSING`) and jose verify
+  /// messages. We match specific token/JWT signals — NOT a bare `TOKEN` — so a
+  /// benign message that merely contains the word "token" can't trigger a
+  /// re-mint storm. (Ideally the server sends one machine code we match exactly.)
+  static bool _isAuthHandshakeError(String error) {
+    final e = error.toUpperCase();
+    const signals = [
+      'WIDGET_TOKEN',
+      'TOKEN_MISSING',
+      'TOKEN_EXPIRED',
+      'TOKEN_INVALID',
+      'INVALID_TOKEN',
+      'UNAUTHORIZED',
+      'UNAUTHENTICATED',
+      'JWT',
+      'JWS',
+      'SIGNATURE',
+      'ERR_JW', // jose: ERR_JWS_INVALID / ERR_JWT_EXPIRED / ERR_JWK_*
+    ];
+    return signals.any(e.contains);
   }
 
   // ──────────────────────────────────────────────────────────────────────
@@ -737,15 +852,19 @@ class SessionController {
           _token = res.token;
           _conversationId = res.conversationId ?? _conversationId;
           await storage.write(StorageKeys.token, res.token!);
-          // Re-supply the token on the (re)connect and backfill the gap.
+          // Apply the fresh token. A LIVE socket won't re-read its handshake
+          // auth on a no-op connect(), so force a fresh handshake — its
+          // onConnect (with _hasConnectedOnce already true) then owns the gap
+          // backfill. A cold socket connects for the first time, which is NOT
+          // treated as a reconnect, so backfill inline only in that case.
           final socket = _socket;
           if (socket != null) {
             socket.updateToken(res.token!);
-            if (!socket.isConnected) socket.connect();
+            socket.reconnectWithFreshAuth();
           } else {
             _connectSocket();
+            await _backfillAfterReconnect();
           }
-          await _backfillAfterReconnect();
           if (!completer.isCompleted) completer.complete(true);
         } else {
           // Conversation CLOSED — don't loop. Drop to pre-chat / anonymous.
@@ -778,10 +897,8 @@ class SessionController {
     final token = _token;
     if (token == null) return;
 
-    final known = messages.value
-        .where((m) => !m.isOptimistic)
-        .map((m) => m.id)
-        .toSet();
+    final known =
+        messages.value.where((m) => !m.isOptimistic).map((m) => m.id).toSet();
 
     final fetched = <ChatMessage>[];
     String? cursor;
@@ -920,6 +1037,14 @@ class SessionController {
     _setMessages(next);
   }
 
+  void _removeMessage(String id) {
+    final list = messages.value;
+    final idx = list.indexWhere((m) => m.id == id);
+    if (idx == -1) return;
+    final next = List<ChatMessage>.of(list)..removeAt(idx);
+    _setMessages(next);
+  }
+
   // ──────────────────────────────────────────────────────────────────────
   //  Misc helpers
   // ──────────────────────────────────────────────────────────────────────
@@ -960,6 +1085,7 @@ class SessionController {
   }
 
   void dispose() {
+    if (_disposed) return;
     _disposed = true;
     _typingTimer?.cancel();
     _stopHeartbeat();

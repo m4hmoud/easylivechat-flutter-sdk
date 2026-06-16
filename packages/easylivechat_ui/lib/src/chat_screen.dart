@@ -1,6 +1,9 @@
+import 'dart:async';
+
 import 'package:easylivechat/easylivechat.dart';
 import 'package:flutter/material.dart';
 
+import 'l10n.dart';
 import 'theme.dart';
 import 'views/composer_bar.dart';
 import 'views/feedback_prompt_view.dart';
@@ -34,10 +37,29 @@ class EasyLiveChatScreen extends StatefulWidget {
 
 class _EasyLiveChatScreenState extends State<EasyLiveChatScreen>
     with WidgetsBindingObserver {
+  /// Latches the (non-idempotent) open() so a phase rebuild can't re-fire it.
+  bool _openRequested = false;
+
+  /// A blocking failure while loading config / starting the session, shown as
+  /// a full-screen error + retry. Later (send/socket) errors are handled inline.
+  EasyLiveChatError? _error;
+  StreamSubscription<EasyLiveChatError>? _errSub;
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    if (EasyLiveChat.instance.isBooted) {
+      // Surface a full-screen error only while we're still blocked loading the
+      // config (no config yet). Once config is in, send/socket errors are owned
+      // by the composer/thread, not this screen.
+      _errSub = EasyLiveChat.instance.onError.listen((e) {
+        if (!mounted) return;
+        if (EasyLiveChat.instance.widgetConfig.value == null) {
+          setState(() => _error = e);
+        }
+      });
+    }
     // If the host pushed the screen without going through the launcher, kick
     // the session machine after the first frame.
     WidgetsBinding.instance.addPostFrameCallback((_) => _maybeOpen());
@@ -45,6 +67,7 @@ class _EasyLiveChatScreenState extends State<EasyLiveChatScreen>
 
   @override
   void dispose() {
+    _errSub?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
@@ -56,19 +79,43 @@ class _EasyLiveChatScreenState extends State<EasyLiveChatScreen>
       case AppLifecycleState.resumed:
         EasyLiveChat.instance.setAppLifecycle(EasyLiveChatLifecycle.resumed);
       case AppLifecycleState.paused:
-      case AppLifecycleState.inactive:
       case AppLifecycleState.detached:
       case AppLifecycleState.hidden:
         EasyLiveChat.instance.setAppLifecycle(EasyLiveChatLifecycle.paused);
+      case AppLifecycleState.inactive:
+        // Transient (call banner, app switcher, control center). Don't churn
+        // heartbeat/presence — it's common on iOS.
+        break;
     }
   }
 
   void _maybeOpen() {
+    if (_openRequested) return;
     if (!EasyLiveChat.instance.isBooted) return;
-    if (EasyLiveChat.instance.phase.value == ChatPhase.idle) {
-      // Fire-and-forget; the phase listenable drives the UI as it progresses.
-      EasyLiveChat.instance.open();
-    }
+    if (EasyLiveChat.instance.phase.value != ChatPhase.idle) return;
+    _startOpen();
+  }
+
+  void _startOpen() {
+    _openRequested = true;
+    // open() is fire-and-forget for the happy path (the phase listenable drives
+    // the UI), but a loadConfig failure throws OUT of open() rather than onto
+    // onError — catch it so we show an error+retry instead of an endless spinner.
+    EasyLiveChat.instance.open().catchError((Object e) {
+      if (!mounted) return;
+      setState(() => _error = e is EasyLiveChatError
+          ? e
+          : EasyLiveChatError(EasyLiveChatErrorCode.unknown,
+              message: e.toString()));
+    });
+  }
+
+  void _retry() {
+    setState(() {
+      _error = null;
+      _openRequested = false;
+    });
+    _startOpen();
   }
 
   @override
@@ -80,7 +127,8 @@ class _EasyLiveChatScreenState extends State<EasyLiveChatScreen>
       valueListenable: EasyLiveChat.instance.widgetConfig,
       builder: (context, config, _) {
         final theme = config != null
-            ? EasyLiveChatTheme.fromConfig(config, override: widget.themeOverride)
+            ? EasyLiveChatTheme.fromConfig(config,
+                override: widget.themeOverride)
             : (widget.themeOverride ?? _fallbackTheme);
         return Directionality(
           textDirection: theme.direction,
@@ -109,31 +157,23 @@ class _EasyLiveChatScreenState extends State<EasyLiveChatScreen>
       case ChatPhase.idle:
       case ChatPhase.loading:
       case ChatPhase.resuming:
+        if (_error != null) return _buildError(config, theme);
         // Re-trigger open() if we landed in idle (e.g. host pushed us directly).
-        if (phase == ChatPhase.idle) _maybeOpen();
-        return _Centered(
-          child: CircularProgressIndicator(
-            valueColor: AlwaysStoppedAnimation<Color>(theme.primary),
-          ),
-        );
+        // Schedule post-frame — never start work from inside build().
+        if (phase == ChatPhase.idle && !_openRequested) {
+          WidgetsBinding.instance.addPostFrameCallback((_) => _maybeOpen());
+        }
+        return _spinner(theme);
 
       case ChatPhase.offline:
         if (config == null) {
-          return _Centered(
-            child: CircularProgressIndicator(
-              valueColor: AlwaysStoppedAnimation<Color>(theme.primary),
-            ),
-          );
+          return _error != null ? _buildError(config, theme) : _spinner(theme);
         }
         return OfflineFormView(config: config, theme: theme);
 
       case ChatPhase.prechat:
         if (config == null) {
-          return _Centered(
-            child: CircularProgressIndicator(
-              valueColor: AlwaysStoppedAnimation<Color>(theme.primary),
-            ),
-          );
+          return _error != null ? _buildError(config, theme) : _spinner(theme);
         }
         return PreChatFormView(config: config, theme: theme);
 
@@ -148,6 +188,22 @@ class _EasyLiveChatScreenState extends State<EasyLiveChatScreen>
       case ChatPhase.feedback:
         return FeedbackPromptView(theme: theme);
     }
+  }
+
+  Widget _spinner(EasyLiveChatTheme theme) => _Centered(
+        child: CircularProgressIndicator(
+          valueColor: AlwaysStoppedAnimation<Color>(theme.primary),
+        ),
+      );
+
+  Widget _buildError(WidgetConfigModel? config, EasyLiveChatTheme theme) {
+    final s = ElcStrings.of(config?.locale);
+    return _ErrorRetry(
+      theme: theme,
+      message: s.couldNotConnect,
+      retryLabel: s.retry,
+      onRetry: _retry,
+    );
   }
 
   static const EasyLiveChatTheme _fallbackTheme = EasyLiveChatTheme(
@@ -165,6 +221,51 @@ class _Centered extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Center(child: child);
+}
+
+/// Full-screen error + retry, shown when config/session loading fails (instead
+/// of an endless spinner).
+class _ErrorRetry extends StatelessWidget {
+  final EasyLiveChatTheme theme;
+  final String message;
+  final String retryLabel;
+  final VoidCallback onRetry;
+
+  const _ErrorRetry({
+    required this.theme,
+    required this.message,
+    required this.retryLabel,
+    required this.onRetry,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.cloud_off_rounded,
+                size: 40, color: theme.text.withValues(alpha: 0.4)),
+            const SizedBox(height: 16),
+            Text(
+              message,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                  color: theme.text.withValues(alpha: 0.8), fontSize: 15),
+            ),
+            const SizedBox(height: 20),
+            FilledButton(
+              onPressed: onRetry,
+              style: FilledButton.styleFrom(backgroundColor: theme.primary),
+              child: Text(retryLabel),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 /// Shown if the screen is presented before `EasyLiveChat.boot()` was called.
