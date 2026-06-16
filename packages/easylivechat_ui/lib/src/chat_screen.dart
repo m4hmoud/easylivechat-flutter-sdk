@@ -4,6 +4,7 @@ import 'package:easylivechat/easylivechat.dart';
 import 'package:flutter/material.dart';
 
 import 'l10n.dart';
+import 'picked_file.dart';
 import 'theme.dart';
 import 'views/composer_bar.dart';
 import 'views/feedback_prompt_view.dart';
@@ -34,10 +35,23 @@ class EasyLiveChatScreen extends StatefulWidget {
   /// server/config direction is used.
   final TextDirection? directionOverride;
 
+  /// Host hook that fully owns attachment picking (e.g. the app's own
+  /// camera/gallery bottom sheet). When set, the composer's attach button calls
+  /// this instead of the built-in image/file pickers.
+  final ElcAttachmentPicker? onPickAttachments;
+
+  /// Host overrides for the SDK chrome strings, keyed by string key (e.g.
+  /// `{'send': '…', 'typeAMessage': '…'}`). Applied to every locale; keys not
+  /// provided fall back to the built-in translations. Lets a host fully own the
+  /// chat wording/translation.
+  final Map<String, String>? strings;
+
   const EasyLiveChatScreen({
     super.key,
     this.themeOverride,
     this.directionOverride,
+    this.onPickAttachments,
+    this.strings,
   });
 
   @override
@@ -57,6 +71,8 @@ class _EasyLiveChatScreenState extends State<EasyLiveChatScreen>
   @override
   void initState() {
     super.initState();
+    // Register host string overrides (own translations) before the views build.
+    if (widget.strings != null) ElcStrings.overrideAll(widget.strings!);
     WidgetsBinding.instance.addObserver(this);
     if (EasyLiveChat.instance.isBooted) {
       // Surface a full-screen error only while we're still blocked loading the
@@ -101,7 +117,12 @@ class _EasyLiveChatScreenState extends State<EasyLiveChatScreen>
   void _maybeOpen() {
     if (_openRequested) return;
     if (!EasyLiveChat.instance.isBooted) return;
-    if (EasyLiveChat.instance.phase.value != ChatPhase.idle) return;
+    final p = EasyLiveChat.instance.phase.value;
+    // Open on a fresh mount when idle, OR when a previous session ended at the
+    // feedback/CSAT screen — so reopening the chat after rating starts a fresh
+    // conversation (the old one is closed) instead of re-showing the already-
+    // submitted rate screen.
+    if (p != ChatPhase.idle && p != ChatPhase.feedback) return;
     _startOpen();
   }
 
@@ -193,7 +214,10 @@ class _EasyLiveChatScreenState extends State<EasyLiveChatScreen>
         return Column(
           children: [
             Expanded(child: ThreadView(theme: theme)),
-            ComposerBar(theme: theme),
+            ComposerBar(
+              theme: theme,
+              onPickAttachments: widget.onPickAttachments,
+            ),
           ],
         );
 

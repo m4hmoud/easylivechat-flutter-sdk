@@ -16,6 +16,23 @@ class ElcStrings {
   final String _lang;
   const ElcStrings._(this._lang);
 
+  /// Host-provided overrides keyed by string key (e.g. `'send'`,
+  /// `'typeAMessage'`). When a key is present here it wins over the built-in
+  /// localized table for EVERY locale — lets a host fully own the chrome
+  /// wording/translation. Keys not provided fall back to the built-in tables.
+  ///
+  /// Set once (e.g. via `EasyLiveChatScreen(strings: {...})`, or directly):
+  /// ```dart
+  /// ElcStrings.overrideAll({'send': 'بنێرە', 'typeAMessage': 'پەیامێک بنووسە'});
+  /// ```
+  static Map<String, String> _overrides = const {};
+
+  /// Replace the host string overrides (merges over the built-in table). Pass an
+  /// empty map to clear.
+  static void overrideAll(Map<String, String> strings) {
+    _overrides = Map<String, String>.unmodifiable(strings);
+  }
+
   /// Resolve strings for [localeCode] (e.g. `en`, `ar`, `pt-BR`). Null/unknown
   /// falls back to the device locale, then English.
   factory ElcStrings.of(String? localeCode) {
@@ -46,6 +63,8 @@ class ElcStrings {
   }
 
   String _t(String key) {
+    final o = _overrides[key];
+    if (o != null) return o;
     final m = _table[_lang] ?? _table['en']!;
     return m[key] ?? _table['en']![key] ?? key;
   }

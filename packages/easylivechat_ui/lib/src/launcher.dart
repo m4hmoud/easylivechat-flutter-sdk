@@ -3,6 +3,7 @@ import 'package:easylivechat/easylivechat.dart';
 import 'package:flutter/material.dart';
 
 import 'chat_screen.dart';
+import 'picked_file.dart';
 import 'theme.dart';
 
 /// Floating launcher bubble — the native replacement for the web widget loader.
@@ -33,12 +34,20 @@ class EasyLiveChatLauncher extends StatefulWidget {
   /// independent of the server workspace direction.
   final TextDirection? directionOverride;
 
+  /// Host hook that fully owns attachment picking (passed to the chat screen).
+  final ElcAttachmentPicker? onPickAttachments;
+
+  /// Host overrides for the SDK chrome strings (passed to the chat screen).
+  final Map<String, String>? strings;
+
   const EasyLiveChatLauncher({
     super.key,
     this.themeOverride,
     this.alignment,
     this.useBottomSheet = false,
     this.directionOverride,
+    this.onPickAttachments,
+    this.strings,
   });
 
   @override
@@ -98,6 +107,8 @@ class _EasyLiveChatLauncherState extends State<EasyLiveChatLauncher> {
     final screen = EasyLiveChatScreen(
       themeOverride: widget.themeOverride,
       directionOverride: widget.directionOverride,
+      onPickAttachments: widget.onPickAttachments,
+      strings: widget.strings,
     );
     try {
       if (widget.useBottomSheet) {

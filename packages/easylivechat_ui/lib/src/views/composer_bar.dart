@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../l10n.dart';
+import '../picked_file.dart';
 import '../theme.dart';
 
 /// The message composer (native analog of the web `Composer.tsx`).
@@ -22,7 +23,12 @@ import '../theme.dart';
 class ComposerBar extends StatefulWidget {
   final EasyLiveChatTheme theme;
 
-  const ComposerBar({super.key, required this.theme});
+  /// Host hook that fully owns attachment picking (e.g. the app's own
+  /// camera/gallery bottom sheet). When set, the attach button calls this and
+  /// uploads whatever it returns, instead of the built-in image/file pickers.
+  final ElcAttachmentPicker? onPickAttachments;
+
+  const ComposerBar({super.key, required this.theme, this.onPickAttachments});
 
   @override
   State<ComposerBar> createState() => _ComposerBarState();
@@ -112,6 +118,29 @@ class _ComposerBarState extends State<ComposerBar> {
   }
 
   // ── attachments ──
+
+  /// Attach tapped: defer to the host picker when provided, else the built-in
+  /// image/file menu.
+  Future<void> _onAttach() async {
+    if (_uploading) return;
+    final picker = widget.onPickAttachments;
+    if (picker == null) {
+      _showAttachMenu();
+      return;
+    }
+    try {
+      final files = await picker(context);
+      for (final f in files) {
+        await _upload(
+          bytes: f.bytes,
+          filename: f.filename,
+          contentType: f.contentType,
+        );
+      }
+    } catch (_) {
+      _showAttachError();
+    }
+  }
 
   Future<void> _pickImage() async {
     try {
@@ -265,7 +294,7 @@ class _ComposerBarState extends State<ComposerBar> {
   Widget _attachButton() {
     final t = _theme;
     return IconButton(
-      onPressed: _uploading ? null : _showAttachMenu,
+      onPressed: _uploading ? null : _onAttach,
       tooltip: _s.attach,
       icon: _uploading
           ? SizedBox(
