@@ -296,6 +296,9 @@ class _ComposerBarState extends State<ComposerBar> {
     return IconButton(
       onPressed: _uploading ? null : _onAttach,
       tooltip: _s.attach,
+      // Match the send button's box so the row centers cleanly.
+      padding: EdgeInsets.zero,
+      constraints: const BoxConstraints.tightFor(width: 44, height: 44),
       icon: _uploading
           ? SizedBox(
               width: 20,
@@ -313,25 +316,25 @@ class _ComposerBarState extends State<ComposerBar> {
 
   Widget _textField() {
     final t = _theme;
-    return TextField(
-      controller: _controller,
-      focusNode: _focus,
-      minLines: 1,
-      maxLines: 5,
-      textInputAction: TextInputAction.send,
-      onSubmitted: (_) => _send(),
-      style: TextStyle(color: t.text, fontSize: 15),
-      decoration: InputDecoration(
-        hintText: _s.typeAMessage,
-        hintStyle: TextStyle(color: t.text.withValues(alpha: 0.4)),
-        filled: true,
-        fillColor: t.surface,
-        isDense: true,
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(22),
-          borderSide: BorderSide.none,
+    // Fixed-height (44, matching the round buttons) TRANSPARENT box so the text
+    // centres on the same line as the attach/send buttons — no fill, no border.
+    return Container(
+      constraints: const BoxConstraints(minHeight: 44),
+      alignment: Alignment.center,
+      padding: const EdgeInsets.symmetric(horizontal: 8),
+      child: TextField(
+        controller: _controller,
+        focusNode: _focus,
+        minLines: 1,
+        maxLines: 5,
+        textInputAction: TextInputAction.send,
+        onSubmitted: (_) => _send(),
+        style: TextStyle(color: t.text, fontSize: 15),
+        decoration: InputDecoration(
+          isCollapsed: true,
+          border: InputBorder.none,
+          hintText: _s.typeAMessage,
+          hintStyle: TextStyle(color: t.text.withValues(alpha: 0.4)),
         ),
       ),
     );
