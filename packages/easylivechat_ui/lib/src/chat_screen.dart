@@ -29,7 +29,16 @@ class EasyLiveChatScreen extends StatefulWidget {
   /// Host theme override; non-null fields win over the server config.
   final EasyLiveChatTheme? themeOverride;
 
-  const EasyLiveChatScreen({super.key, this.themeOverride});
+  /// Force the layout direction (e.g. from the host app's current locale),
+  /// independent of the server workspace direction. When null, the
+  /// server/config direction is used.
+  final TextDirection? directionOverride;
+
+  const EasyLiveChatScreen({
+    super.key,
+    this.themeOverride,
+    this.directionOverride,
+  });
 
   @override
   State<EasyLiveChatScreen> createState() => _EasyLiveChatScreenState();
@@ -126,10 +135,13 @@ class _EasyLiveChatScreenState extends State<EasyLiveChatScreen>
     return ValueListenableBuilder<WidgetConfigModel?>(
       valueListenable: EasyLiveChat.instance.widgetConfig,
       builder: (context, config, _) {
-        final theme = config != null
+        var theme = config != null
             ? EasyLiveChatTheme.fromConfig(config,
                 override: widget.themeOverride)
             : (widget.themeOverride ?? _fallbackTheme);
+        if (widget.directionOverride != null) {
+          theme = theme.copyWith(direction: widget.directionOverride);
+        }
         return Directionality(
           textDirection: theme.direction,
           child: Material(

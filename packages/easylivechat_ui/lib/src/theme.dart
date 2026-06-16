@@ -88,6 +88,28 @@ class EasyLiveChatTheme {
     );
   }
 
+  /// Copy with selective overrides (e.g. force [direction] from the host's
+  /// app locale, independent of the server workspace direction).
+  EasyLiveChatTheme copyWith({
+    Color? primary,
+    Color? background,
+    Color? surface,
+    Color? text,
+    TextDirection? direction,
+    String? logoUrl,
+    String? bubbleIconUrl,
+  }) {
+    return EasyLiveChatTheme(
+      primary: primary ?? this.primary,
+      background: background ?? this.background,
+      surface: surface ?? this.surface,
+      text: text ?? this.text,
+      direction: direction ?? this.direction,
+      logoUrl: logoUrl ?? this.logoUrl,
+      bubbleIconUrl: bubbleIconUrl ?? this.bubbleIconUrl,
+    );
+  }
+
   /// Parse a CSS-style hex string (`#RGB`, `#RRGGBB`, `#AARRGGBB`, with or
   /// without the leading `#`) into a [Color]. Returns [fallback] (default
   /// opaque black) on any malformed input — theming must never crash the UI.

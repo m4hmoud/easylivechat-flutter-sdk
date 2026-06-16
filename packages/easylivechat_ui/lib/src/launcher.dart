@@ -29,11 +29,16 @@ class EasyLiveChatLauncher extends StatefulWidget {
   /// Present the chat screen as a modal bottom sheet instead of a full route.
   final bool useBottomSheet;
 
+  /// Force the chat layout direction (e.g. from the host app locale),
+  /// independent of the server workspace direction.
+  final TextDirection? directionOverride;
+
   const EasyLiveChatLauncher({
     super.key,
     this.themeOverride,
     this.alignment,
     this.useBottomSheet = false,
+    this.directionOverride,
   });
 
   @override
@@ -90,7 +95,10 @@ class _EasyLiveChatLauncherState extends State<EasyLiveChatLauncher> {
       _presented = true;
     });
 
-    final screen = EasyLiveChatScreen(themeOverride: widget.themeOverride);
+    final screen = EasyLiveChatScreen(
+      themeOverride: widget.themeOverride,
+      directionOverride: widget.directionOverride,
+    );
     try {
       if (widget.useBottomSheet) {
         await showModalBottomSheet<void>(
