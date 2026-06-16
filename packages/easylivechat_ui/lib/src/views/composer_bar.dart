@@ -274,7 +274,7 @@ class _ComposerBarState extends State<ComposerBar> {
               Padding(
                 padding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
                 child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.end,
+                  crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
                     _attachButton(),
                     const SizedBox(width: 4),
