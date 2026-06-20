@@ -4,7 +4,7 @@ description: >-
   support inbox. Speaks the anonymous widget protocol (HTTP + Socket.IO) so you
   can embed live customer support into any Flutter app. No UI; pure protocol +
   state. Pair with easylivechat_ui for prebuilt widgets.
-version: 0.1.0
+version: 0.1.7
 # Consumed via git dependency (not pub.dev).
 publish_to: 'none'
 homepage: https://livechattools.com

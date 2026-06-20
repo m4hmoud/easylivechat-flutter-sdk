@@ -93,6 +93,8 @@ class RestClient {
           // Prefer the explicit per-call locale, fall back to config.locale.
           if ((locale ?? config.locale) != null)
             'locale': locale ?? config.locale,
+          // Channel/inbox routing key — omitted when null (server => default).
+          if (config.channel != null) 'channel': config.channel,
           if (resumeOnly) 'resumeOnly': true,
           if (fields != null && fields.isNotEmpty) 'fields': fields,
         },

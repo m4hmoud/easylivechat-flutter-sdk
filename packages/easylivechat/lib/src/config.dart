@@ -13,6 +13,11 @@ class EasyLiveChatConfig {
   /// used for SDK chrome formatting. Null => device default.
   final String? locale;
 
+  /// Channel/inbox key (e.g. `'rider'`, `'driver'`). Routes the conversation
+  /// to that inbox in the dashboard so agents can be assigned per channel.
+  /// Null => the workspace's `default` channel.
+  final String? channel;
+
   /// Optional `?origin=` value for `GET /:slug/config`. Native clients should
   /// usually OMIT this — the server's `allowedOrigins` gate is skipped entirely
   /// when no origin is supplied. Only set it if the tenant requires a match.
@@ -43,6 +48,7 @@ class EasyLiveChatConfig {
     required this.apiBase,
     required this.tenantSlug,
     this.locale,
+    this.channel,
     this.originHeader,
     this.enablePresenceSocket = true,
     this.enableHeartbeat = true,
