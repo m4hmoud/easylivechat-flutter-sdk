@@ -49,12 +49,17 @@ class EasyLiveChat {
   }
 
   /// Pre-identify a known (logged-in) visitor BEFORE [open]. [open] then skips
-  /// the pre-chat form and starts the session directly as this person; [fields]
-  /// (your own keys, e.g. phone / userId / app) are sent with the session so
-  /// agents see who they're talking to. Safe to call before or after [boot]
-  /// (re-applied at boot); a no-op identity (`null`s) is ignored.
-  void identify({String? name, String? email, Map<String, String>? fields}) =>
-      _controller.identify(name: name, email: email, fields: fields);
+  /// the pre-chat form and starts the session directly as this person; [phone]
+  /// (optional) and [fields] (your own keys, e.g. userId / app) are sent with
+  /// the session so agents see who they're talking to. Safe to call before or
+  /// after [boot] (re-applied at boot); a no-op identity (`null`s) is ignored.
+  void identify(
+          {String? name,
+          String? email,
+          String? phone,
+          Map<String, String>? fields}) =>
+      _controller.identify(
+          name: name, email: email, phone: phone, fields: fields);
 
   // ── reactive state (read-only) ──
   ValueListenable<ChatPhase> get phase => _controller.phase;
@@ -78,8 +83,12 @@ class EasyLiveChat {
   Future<void> open() => _controller.open();
   Future<bool> silentResume() => _controller.silentResume();
   Future<void> startSession(
-          {String? name, String? email, Map<String, String>? fields}) =>
-      _controller.startSession(name: name, email: email, fields: fields);
+          {String? name,
+          String? email,
+          String? phone,
+          Map<String, String>? fields}) =>
+      _controller.startSession(
+          name: name, email: email, phone: phone, fields: fields);
   void closeSession() => _controller.closeSession();
 
   // ── messaging ──

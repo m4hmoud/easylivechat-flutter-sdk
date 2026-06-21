@@ -4,7 +4,7 @@ description: >-
   chat screen (pre-chat form, thread, composer, attachments, CSAT, offline
   form) driven by the server widget config. Built on the headless easylivechat
   core. Embed live support in a few lines.
-version: 0.1.7
+version: 0.1.8
 # Consumed via git dependency (not pub.dev); `none` also allows the path dep on
 # the sibling `easylivechat` core without an invalid_dependency warning.
 publish_to: 'none'

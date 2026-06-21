@@ -92,6 +92,7 @@ class SessionController {
   bool _hasIdentity = false;
   String? _identityName;
   String? _identityEmail;
+  String? _phone;
   Map<String, String>? _identityFields;
 
   String? _token;
@@ -172,14 +173,20 @@ class SessionController {
   /// skips the pre-chat form and starts directly as this person. A fully-null
   /// identity is ignored (stays anonymous). Also seeds the cached profile so
   /// [silentResume] carries the name/email.
-  void identify({String? name, String? email, Map<String, String>? fields}) {
+  void identify(
+      {String? name,
+      String? email,
+      String? phone,
+      Map<String, String>? fields}) {
     final hasAny = (name != null && name.trim().isNotEmpty) ||
         (email != null && email.trim().isNotEmpty) ||
+        (phone != null && phone.trim().isNotEmpty) ||
         (fields != null && fields.isNotEmpty);
     if (!hasAny) return;
     _hasIdentity = true;
     _identityName = name;
     _identityEmail = email;
+    _phone = phone ?? _phone;
     _identityFields = fields;
     _profile = StoredProfile(
       name: name ?? _profile?.name,
@@ -221,6 +228,7 @@ class SessionController {
       await startSession(
         name: _identityName,
         email: _identityEmail,
+        phone: _phone,
         fields: _identityFields,
         skipValidation: true,
       );
@@ -293,6 +301,7 @@ class SessionController {
   Future<void> startSession({
     String? name,
     String? email,
+    String? phone,
     Map<String, String>? fields,
     bool skipValidation = false,
   }) async {
@@ -318,6 +327,7 @@ class SessionController {
             visitorId: visitorId,
             name: name ?? _profile?.name,
             email: email ?? _profile?.email,
+            phone: phone ?? _phone,
             locale: _effectiveLocale,
             fields: fields,
           ));

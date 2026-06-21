@@ -68,7 +68,7 @@ class RestClient {
   }
 
   /// `POST /:slug/session` — public; MINTS the widget JWT.
-  /// Body keys: visitorId (required), name?, email?, page?, locale?,
+  /// Body keys: visitorId (required), name?, email?, phone?, page?, locale?,
   /// resumeOnly?, fields? (keyed by PreChatField.id). On pre-chat failure the
   /// server returns 400 `{ error, fieldId }` => throw [EasyLiveChatError].
   /// On `resumeOnly:true` with no active conversation the response has no
@@ -77,6 +77,7 @@ class RestClient {
     required String visitorId,
     String? name,
     String? email,
+    String? phone,
     String? page,
     String? locale,
     bool resumeOnly = false,
@@ -89,6 +90,7 @@ class RestClient {
           'visitorId': visitorId,
           if (name != null) 'name': name,
           if (email != null) 'email': email,
+          if (phone != null && phone.trim().isNotEmpty) 'phone': phone,
           if (page != null) 'page': page,
           // Prefer the explicit per-call locale, fall back to config.locale.
           if ((locale ?? config.locale) != null)
