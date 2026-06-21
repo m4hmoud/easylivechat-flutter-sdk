@@ -18,6 +18,12 @@ class EasyLiveChatConfig {
   /// Null => the workspace's `default` channel.
   final String? channel;
 
+  /// Arbitrary client-provided custom attributes (e.g. device/app info like
+  /// OS, model, network, app version). Sent verbatim on session start; the
+  /// server stores them on the contact and shows them in the dashboard. These
+  /// are NOT validated/filtered like pre-chat form fields.
+  final Map<String, String>? attributes;
+
   /// Optional `?origin=` value for `GET /:slug/config`. Native clients should
   /// usually OMIT this — the server's `allowedOrigins` gate is skipped entirely
   /// when no origin is supplied. Only set it if the tenant requires a match.

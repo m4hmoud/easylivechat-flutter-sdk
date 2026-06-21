@@ -97,6 +97,10 @@ class RestClient {
             'locale': locale ?? config.locale,
           // Channel/inbox routing key — omitted when null (server => default).
           if (config.channel != null) 'channel': config.channel,
+          // Client-provided custom attributes (device/app info). Stored as-is
+          // by the server; not validated like pre-chat fields.
+          if (config.attributes != null && config.attributes!.isNotEmpty)
+            'attributes': config.attributes,
           if (resumeOnly) 'resumeOnly': true,
           if (fields != null && fields.isNotEmpty) 'fields': fields,
         },
