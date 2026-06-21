@@ -186,12 +186,17 @@ class SessionController {
     _hasIdentity = true;
     _identityName = name;
     _identityEmail = email;
-    _phone = phone ?? _phone;
+    _phone = phone;
     _identityFields = fields;
+    // identify() is AUTHORITATIVE: the host is declaring the full visitor
+    // identity for this session, so replace the persisted profile rather than
+    // merging stale fields. A value the host no longer supplies (e.g. email)
+    // must be cleared — otherwise an old (or a previous user's) email leaks
+    // into the new session from secure storage.
     _profile = StoredProfile(
-      name: name ?? _profile?.name,
-      email: email ?? _profile?.email,
-      preChat: fields ?? _profile?.preChat,
+      name: name,
+      email: email,
+      preChat: fields,
     );
   }
 
