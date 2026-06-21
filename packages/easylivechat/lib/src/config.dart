@@ -55,6 +55,7 @@ class EasyLiveChatConfig {
     required this.tenantSlug,
     this.locale,
     this.channel,
+    this.attributes,
     this.originHeader,
     this.enablePresenceSocket = true,
     this.enableHeartbeat = true,
