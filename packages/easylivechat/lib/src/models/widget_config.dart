@@ -102,16 +102,43 @@ class ConfigResponse {
   /// Working-hours availability at fetch time (`isWithinWorkingHours`).
   final bool isOpen;
 
+  /// Whether any agent is currently accepting chats. Only gates the widget for
+  /// tenants running `chatAvailabilityMode = WHEN_ACCEPTING`.
+  final bool agentsAccepting;
+
+  /// `ALWAYS` (default) or `WHEN_ACCEPTING` — whether [agentsAccepting] is
+  /// allowed to close the widget at all.
+  final String chatAvailabilityMode;
+
+  /// Whether the offline/async form is offered when closed.
+  final bool asyncEnabled;
+
   const ConfigResponse({
     required this.tenantId,
     required this.config,
     required this.isOpen,
+    this.agentsAccepting = true,
+    this.chatAvailabilityMode = 'ALWAYS',
+    this.asyncEnabled = false,
   });
+
+  /// True when either availability gate says the workspace is unavailable.
+  /// Mirrors the web widget's rule so both clients agree.
+  bool get isClosed {
+    if (!isOpen) return true;
+    return chatAvailabilityMode == 'WHEN_ACCEPTING' && !agentsAccepting && asyncEnabled;
+  }
 
   factory ConfigResponse.fromJson(Map<String, dynamic> j) => ConfigResponse(
         tenantId: (j['tenantId'] ?? '').toString(),
         config: WidgetConfigModel.fromJson(
             (j['config'] as Map).cast<String, dynamic>()),
         isOpen: j['isOpen'] == true,
+        // Absent on older servers — default to the permissive value so a
+        // missing field can never close the widget.
+        agentsAccepting: j['agentsAccepting'] != false,
+        chatAvailabilityMode:
+            (j['chatAvailabilityMode'] ?? 'ALWAYS').toString(),
+        asyncEnabled: j['asyncEnabled'] == true,
       );
 }

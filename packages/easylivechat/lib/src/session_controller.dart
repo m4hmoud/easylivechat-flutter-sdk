@@ -68,6 +68,15 @@ class SessionController {
   final ValueNotifier<ChatPhase> phase = ValueNotifier(ChatPhase.idle);
   final ValueNotifier<WidgetConfigModel?> widgetConfig = ValueNotifier(null);
   final ValueNotifier<bool> isOpen = ValueNotifier(true);
+
+  /// Whether any agent is accepting chats. Only gates the UI for tenants
+  /// running `chatAvailabilityMode = WHEN_ACCEPTING`.
+  final ValueNotifier<bool> agentsAccepting = ValueNotifier(true);
+
+  /// Tenant gating rules, captured from `GET /config` so a later live
+  /// availability push is judged by the same rules as the initial load.
+  String _chatAvailabilityMode = 'ALWAYS';
+  bool _asyncEnabled = false;
   final ValueNotifier<ConnectionState> connection =
       ValueNotifier(ConnectionState.disconnected);
   final ValueNotifier<List<ChatMessage>> messages = ValueNotifier(const []);
@@ -162,10 +171,40 @@ class SessionController {
     final res = await _guardAuth(() => rest.getConfig());
     widgetConfig.value = res.config;
     isOpen.value = res.isOpen;
-    if (!res.isOpen) {
+    agentsAccepting.value = res.agentsAccepting;
+    // Remember the tenant's gating rules so a later `workspace:availability`
+    // push can be re-evaluated the same way this first decision was.
+    _chatAvailabilityMode = res.chatAvailabilityMode;
+    _asyncEnabled = res.asyncEnabled;
+    if (res.isClosed) {
       _setPhase(ChatPhase.offline);
     }
     return res.config;
+  }
+
+  /// True when either availability gate says the workspace is unavailable.
+  bool get _workspaceClosed {
+    if (!isOpen.value) return true;
+    return _chatAvailabilityMode == 'WHEN_ACCEPTING' &&
+        !agentsAccepting.value &&
+        _asyncEnabled;
+  }
+
+  /// Re-gate the UI after a live availability push.
+  ///
+  /// A visitor already in a conversation is left alone: an agent may still be
+  /// wrapping up after hours, and dropping them onto the offline form would
+  /// discard what they are in the middle of writing. Everyone else moves to
+  /// (or out of) the offline form.
+  void _applyAvailabilityChange() {
+    final p = phase.value;
+    if (p == ChatPhase.chat || p == ChatPhase.feedback) return;
+
+    if (_workspaceClosed) {
+      if (p != ChatPhase.offline) _setPhase(ChatPhase.offline);
+      return;
+    }
+    if (p == ChatPhase.offline) _setPhase(_idlePhase());
   }
 
   /// Full orchestration: config → silentResume → (prechat | anonymous start)
@@ -223,7 +262,7 @@ class SessionController {
   /// The phase to fall back to when there is no active conversation: offline
   /// outside working hours, prechat when a form is configured, else idle.
   ChatPhase _idlePhase() {
-    if (!isOpen.value) return ChatPhase.offline;
+    if (_workspaceClosed) return ChatPhase.offline;
     final cfg = widgetConfig.value;
     if (cfg != null && cfg.preChatForm.enabled) return ChatPhase.prechat;
     return ChatPhase.idle;
@@ -528,6 +567,11 @@ class SessionController {
     _socketSubs.add(socket.onAgentTyping.listen(_handleAgentTyping));
     _socketSubs.add(socket.onAvailability.listen((open) {
       isOpen.value = open;
+      _applyAvailabilityChange();
+    }));
+    _socketSubs.add(socket.onAgentsAccepting.listen((accepting) {
+      agentsAccepting.value = accepting;
+      _applyAvailabilityChange();
     }));
     _socketSubs.add(socket.onConversationClosed.listen(_handleConversationClosed));
     _socketSubs.add(socket.onProactive.listen(_handleProactive));
@@ -977,6 +1021,7 @@ class SessionController {
     phase.dispose();
     widgetConfig.dispose();
     isOpen.dispose();
+    agentsAccepting.dispose();
     connection.dispose();
     messages.dispose();
     agentTyping.dispose();
