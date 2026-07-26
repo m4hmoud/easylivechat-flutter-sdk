@@ -192,13 +192,14 @@ class SessionController {
 
   /// Re-gate the UI after a live availability push.
   ///
-  /// A visitor already in a conversation is left alone: an agent may still be
-  /// wrapping up after hours, and dropping them onto the offline form would
-  /// discard what they are in the middle of writing. Everyone else moves to
-  /// (or out of) the offline form.
+  /// Closing time is a hard stop: a visitor mid-conversation is moved to the
+  /// offline form too, so nobody can keep sending into a closed workspace.
+  /// Only [ChatPhase.feedback] is spared — it is a post-chat rating screen with
+  /// no composer, so it can't send anything anyway, and replacing it would just
+  /// lose the rating.
   void _applyAvailabilityChange() {
     final p = phase.value;
-    if (p == ChatPhase.chat || p == ChatPhase.feedback) return;
+    if (p == ChatPhase.feedback) return;
 
     if (_workspaceClosed) {
       if (p != ChatPhase.offline) _setPhase(ChatPhase.offline);
@@ -210,12 +211,20 @@ class SessionController {
   /// Full orchestration: config → silentResume → (prechat | anonymous start)
   /// → connect /widgets.
   Future<void> open() async {
-    final cfg = widgetConfig.value ?? await loadConfig();
+    // ALWAYS re-fetch. This used to be `widgetConfig.value ?? await
+    // loadConfig()`, so reopening the chat within one app session reused the
+    // config captured at startup — `isOpen` was frozen at whatever it was then,
+    // and no amount of server-side correctness could reach the UI.
+    final cfg = await loadConfig();
 
     // Open the receive-only presence socket for pre-chat proactive outreach.
     if (config.enablePresenceSocket) {
       _connectPresence();
     }
+
+    // Closed means closed: don't resume an existing thread into a live
+    // composer. loadConfig() has already put us in ChatPhase.offline.
+    if (_workspaceClosed) return;
 
     final resumed = await silentResume();
     if (resumed) return;
