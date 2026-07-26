@@ -22,6 +22,16 @@ String _defaultNotice(ElcStrings strings) {
       ? strings.closedForLabel.replaceAll('{label}', label)
       : strings.closedNotice;
 
+  // The BUSINESS's clock, formatted server-side. Rendering the instant here
+  // would use the device's zone — "back at 09:00" would read 07:00 to a
+  // visitor one country over, for a business that opens at nine.
+  final local = elc.nextOpenLocal.value;
+  if (local != null && local.isNotEmpty) {
+    return '$head ${strings.backAt.replaceAll('{time}', local)}';
+  }
+
+  // Older server: fall back to the instant in device-local time rather than
+  // dropping the reopening time entirely.
   final next = elc.nextOpenAt.value;
   if (next == null) return head;
   final hh = next.hour.toString().padLeft(2, '0');

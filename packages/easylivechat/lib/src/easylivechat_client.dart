@@ -80,6 +80,13 @@ class EasyLiveChat {
   /// Server-decided: `CHAT`, `LEAVE_MESSAGE` or `NOTICE_ONLY`.
   ValueListenable<String> get visitorMode => _controller.visitorMode;
 
+  /// When the workspace reopens, as `HH:mm` on the BUSINESS's clock.
+  ValueListenable<String?> get nextOpenLocal => _controller.nextOpenLocal;
+
+  /// The tenant's configured IANA timezone, e.g. `Asia/Baghdad`.
+  ValueListenable<String?> get workspaceTimezone =>
+      _controller.workspaceTimezone;
+
   /// Why: `OPEN`, `AFTER_HOURS` or `NO_AGENTS`.
   ValueListenable<String> get availabilityReason => _controller.availabilityReason;
 

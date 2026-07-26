@@ -42,6 +42,8 @@ Map<String, dynamic> configPayload({
       'reason': reason,
       'closureLabel': closureLabel,
       'nextOpenAt': nextOpenAt,
+      'nextOpenLocal': '09:00',
+      'timezone': 'Asia/Baghdad',
       'chatAvailabilityMode': 'ALWAYS',
       'asyncEnabled': false,
     };
@@ -80,11 +82,22 @@ void main() {
       expect(ConfigResponse.fromJson(configPayload()).closureLabel, isNull);
     });
 
+    test('carries the business clock, not the device one', () {
+      final res = ConfigResponse.fromJson(configPayload());
+
+      // 06:00Z is 09:00 in Baghdad. A device in another zone must still be
+      // told nine, because that is when the business opens.
+      expect(res.nextOpenLocal, '09:00');
+      expect(res.timezone, 'Asia/Baghdad');
+    });
+
     test('an older server that omits the fields stays permissive', () {
       final legacy = configPayload()
         ..remove('visitorMode')
         ..remove('reason')
-        ..remove('nextOpenAt');
+        ..remove('nextOpenAt')
+        ..remove('nextOpenLocal')
+        ..remove('timezone');
 
       final res = ConfigResponse.fromJson(legacy);
 
@@ -93,6 +106,8 @@ void main() {
       expect(res.noticeOnly, isFalse);
       expect(res.reason, 'OPEN');
       expect(res.nextOpenAt, isNull);
+      expect(res.nextOpenLocal, isNull);
+      expect(res.timezone, isNull);
     });
 
     test('a garbled nextOpenAt is ignored rather than thrown on', () {
@@ -111,8 +126,12 @@ void main() {
         'reason': 'HOLIDAY',
         'closureLabel': 'Eid al-Adha',
         'nextOpenAt': '2026-07-26T06:00:00.000Z',
+        'nextOpenLocal': '09:00',
+        'timezone': 'Asia/Baghdad',
       });
 
+      expect(a.nextOpenLocal, '09:00');
+      expect(a.timezone, 'Asia/Baghdad');
       expect(a.visitorMode, 'NOTICE_ONLY');
       expect(a.reason, 'HOLIDAY');
       expect(a.closureLabel, 'Eid al-Adha');

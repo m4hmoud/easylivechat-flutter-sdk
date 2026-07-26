@@ -224,6 +224,8 @@ class SessionController {
     availabilityReason.value = res.reason;
     nextOpenAt.value = res.nextOpenAt;
     closureLabel.value = res.closureLabel;
+    nextOpenLocal.value = res.nextOpenLocal;
+    workspaceTimezone.value = res.timezone;
     // Deliberately NOT ChatPhase.offline. A visitor who arrives out of hours
     // continues into the ordinary chat and simply sees a notice (bind
     // [workspaceClosed]) — their message becomes a PENDING conversation that is
@@ -351,6 +353,8 @@ class SessionController {
       availabilityReason.value = res.reason;
       nextOpenAt.value = res.nextOpenAt;
       closureLabel.value = res.closureLabel;
+      nextOpenLocal.value = res.nextOpenLocal;
+      workspaceTimezone.value = res.timezone;
       _chatAvailabilityMode = res.chatAvailabilityMode;
       _asyncEnabled = res.asyncEnabled;
 
@@ -378,6 +382,14 @@ class SessionController {
   final ValueNotifier<String> availabilityReason = ValueNotifier('OPEN');
   final ValueNotifier<DateTime?> nextOpenAt = ValueNotifier(null);
   final ValueNotifier<String?> closureLabel = ValueNotifier(null);
+
+  /// When the workspace reopens, as `HH:mm` on the BUSINESS's clock. Formatted
+  /// server-side — Dart has no IANA database, so the device could only ever
+  /// render its own zone, which is the wrong answer for a visitor abroad.
+  final ValueNotifier<String?> nextOpenLocal = ValueNotifier(null);
+
+  /// The tenant's configured IANA timezone, e.g. `Asia/Baghdad`.
+  final ValueNotifier<String?> workspaceTimezone = ValueNotifier(null);
 
   /// True when the tenant chose "show a notice only" — the composer must be
   /// disabled, not hidden: an input that vanishes reads as breakage, whereas a
@@ -416,6 +428,8 @@ class SessionController {
     availabilityReason.value = a.reason;
     nextOpenAt.value = a.nextOpenAt;
     closureLabel.value = a.closureLabel;
+    nextOpenLocal.value = a.nextOpenLocal;
+    workspaceTimezone.value = a.timezone;
     // Same rule as refreshAvailability(): a visitor with a conversation keeps
     // it (minus the composer); one without gets the notice.
     if (composerLocked &&
@@ -1271,6 +1285,8 @@ class SessionController {
     isOpen.dispose();
     agentsAccepting.dispose();
     visitorMode.dispose();
+    nextOpenLocal.dispose();
+    workspaceTimezone.dispose();
     availabilityReason.dispose();
     nextOpenAt.dispose();
     closureLabel.dispose();

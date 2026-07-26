@@ -121,6 +121,17 @@ class WorkspaceAvailability {
   /// The closure's name when [reason] is `HOLIDAY`, e.g. "Eid al-Adha".
   final String? closureLabel;
 
+  /// [nextOpenAt] as `HH:mm` on the BUSINESS's clock, formatted by the server.
+  ///
+  /// Dart carries no IANA timezone database, so an app cannot render "09:00 in
+  /// Baghdad" from an instant on its own — it can only show the device's own
+  /// zone, which is a different time for a visitor who is travelling or abroad.
+  /// The server knows the tenant's timezone and sends the answer.
+  final String? nextOpenLocal;
+
+  /// The tenant's configured IANA timezone, e.g. `Asia/Baghdad`.
+  final String? timezone;
+
   const WorkspaceAvailability({
     required this.isOpen,
     this.agentsAccepting = true,
@@ -128,6 +139,8 @@ class WorkspaceAvailability {
     this.reason = 'OPEN',
     this.nextOpenAt,
     this.closureLabel,
+    this.nextOpenLocal,
+    this.timezone,
   });
 
   /// Every field is optional: a server that predates them must not be read as
@@ -142,8 +155,16 @@ class WorkspaceAvailability {
       nextOpenAt: _parseIsoDate(j['nextOpenAt']),
       closureLabel:
           (label is String && label.trim().isNotEmpty) ? label.trim() : null,
+      nextOpenLocal: _trimmedOrNull(j['nextOpenLocal']),
+      timezone: _trimmedOrNull(j['timezone']),
     );
   }
+}
+
+String? _trimmedOrNull(Object? v) {
+  if (v is! String) return null;
+  final t = v.trim();
+  return t.isEmpty ? null : t;
 }
 
 DateTime? _parseIsoDate(Object? v) {
@@ -186,6 +207,13 @@ class ConfigResponse {
   /// Naming it reads far better than a bare "we're closed".
   final String? closureLabel;
 
+  /// [nextOpenAt] as `HH:mm` on the business's clock. See
+  /// [WorkspaceAvailability.nextOpenLocal] for why the server formats it.
+  final String? nextOpenLocal;
+
+  /// The tenant's configured IANA timezone, e.g. `Asia/Baghdad`.
+  final String? timezone;
+
   const ConfigResponse({
     required this.tenantId,
     required this.config,
@@ -197,6 +225,8 @@ class ConfigResponse {
     this.reason = 'OPEN',
     this.nextOpenAt,
     this.closureLabel,
+    this.nextOpenLocal,
+    this.timezone,
   });
 
   /// True when the tenant chose to show a notice and take nothing.
@@ -241,6 +271,8 @@ class ConfigResponse {
       closureLabel: (j['closureLabel'] as String?)?.trim().isEmpty ?? true
           ? null
           : (j['closureLabel'] as String).trim(),
+      nextOpenLocal: _trimmedOrNull(j['nextOpenLocal']),
+      timezone: _trimmedOrNull(j['timezone']),
     );
   }
 }
