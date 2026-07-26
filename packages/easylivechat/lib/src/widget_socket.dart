@@ -30,6 +30,7 @@ class WidgetSocket {
   final _onMessageUpdated = StreamController<ChatMessage>.broadcast();
   final _onAgentTyping = StreamController<bool>.broadcast();
   final _onAvailability = StreamController<bool>.broadcast();
+  final _onAgentsAccepting = StreamController<bool>.broadcast();
   final _onConversationClosed = StreamController<String>.broadcast();
   final _onProactive = StreamController<ProactiveMessage>.broadcast();
   final _onConnectionChange = StreamController<bool>.broadcast();
@@ -46,8 +47,15 @@ class WidgetSocket {
   /// so the controller arms a ~4s auto-clear.
   Stream<bool> get onAgentTyping => _onAgentTyping.stream;
 
-  /// `workspace:availability` — `{ isOpen }`, fired on connect + change.
+  /// `workspace:availability` — the working-hours gate, fired on connect and
+  /// whenever it changes (a shift boundary, or an admin editing the schedule).
   Stream<bool> get onAvailability => _onAvailability.stream;
+
+  /// The second availability gate from the same event: whether any agent is
+  /// currently accepting chats. Only decides anything for tenants running
+  /// `chatAvailabilityMode = WHEN_ACCEPTING`; emits `true` against servers that
+  /// don't send the field.
+  Stream<bool> get onAgentsAccepting => _onAgentsAccepting.stream;
 
   /// `conversation:closed` — `{ conversationId }`. NOTE: the server emits on
   /// ANY *→CLOSED PATCH (not only OPEN→CLOSED) — consumers must guard against
@@ -144,6 +152,10 @@ class WidgetSocket {
       final m = _asMap(data);
       final isOpen = m?['isOpen'] == true;
       if (!_onAvailability.isClosed) _onAvailability.add(isOpen);
+      // Older servers omit `agentsAccepting`; absent means "don't let this gate
+      // close the widget", hence `!= false` rather than `== true`.
+      final accepting = m?['agentsAccepting'] != false;
+      if (!_onAgentsAccepting.isClosed) _onAgentsAccepting.add(accepting);
     });
 
     socket.on('conversation:closed', (data) {
@@ -260,6 +272,7 @@ class WidgetSocket {
     _onMessageUpdated.close();
     _onAgentTyping.close();
     _onAvailability.close();
+    _onAgentsAccepting.close();
     _onConversationClosed.close();
     _onProactive.close();
     _onConnectionChange.close();

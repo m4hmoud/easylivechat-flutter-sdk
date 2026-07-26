@@ -66,6 +66,10 @@ class EasyLiveChat {
   ValueListenable<WidgetConfigModel?> get widgetConfig =>
       _controller.widgetConfig;
   ValueListenable<bool> get isOpen => _controller.isOpen;
+
+  /// Whether any agent is currently accepting chats. Updates live alongside
+  /// [isOpen]; only gates the UI for `WHEN_ACCEPTING` tenants.
+  ValueListenable<bool> get agentsAccepting => _controller.agentsAccepting;
   ValueListenable<ConnectionState> get connection => _controller.connection;
   ValueListenable<List<ChatMessage>> get messages => _controller.messages;
   ValueListenable<bool> get agentTyping => _controller.agentTyping;
