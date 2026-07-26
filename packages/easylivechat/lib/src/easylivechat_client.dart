@@ -106,6 +106,10 @@ class EasyLiveChat {
   // ── lifecycle ──
   Future<WidgetConfigModel> loadConfig() => _controller.loadConfig();
   Future<void> open() => _controller.open();
+
+  /// Re-read availability and re-gate the UI. Call whenever the chat becomes
+  /// visible again — reopening the screen, or the app returning to foreground.
+  Future<void> refreshAvailability() => _controller.refreshAvailability();
   Future<bool> silentResume() => _controller.silentResume();
   Future<void> startSession(
           {String? name,

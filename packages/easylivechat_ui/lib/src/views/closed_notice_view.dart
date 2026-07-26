@@ -4,6 +4,68 @@ import 'package:flutter/material.dart';
 import '../l10n.dart';
 import '../theme.dart';
 
+/// Being shut and being understaffed are different states and read differently
+/// to a visitor: "back at 09:00" is actionable, "everyone's busy" is not. The
+/// server tells us which via `reason`.
+String _defaultNotice(ElcStrings strings) {
+  final elc = EasyLiveChat.instance;
+  if (!elc.isBooted) return strings.closedNotice;
+
+  if (elc.availabilityReason.value == 'NO_AGENTS') return strings.noAgentsNotice;
+
+  // A named closure ("Closed for Eid al-Adha") tells the visitor far more than
+  // a generic "we're offline", so prefer it when the server sent one.
+  final label = elc.closureLabel.value;
+  final head = (elc.availabilityReason.value == 'HOLIDAY' &&
+          label != null &&
+          label.isNotEmpty)
+      ? strings.closedForLabel.replaceAll('{label}', label)
+      : strings.closedNotice;
+
+  final next = elc.nextOpenAt.value;
+  if (next == null) return head;
+  final hh = next.hour.toString().padLeft(2, '0');
+  final mm = next.minute.toString().padLeft(2, '0');
+  return '$head ${strings.backAt.replaceAll('{time}', '$hh:$mm')}';
+}
+
+/// The business's own logo, or a neutral placeholder when it has none or the
+/// image fails to load — an empty gap where a logo should be looks broken.
+class _BusinessMark extends StatelessWidget {
+  final String? logoUrl;
+  final EasyLiveChatTheme theme;
+
+  const _BusinessMark({required this.logoUrl, required this.theme});
+
+  @override
+  Widget build(BuildContext context) {
+    const size = 76.0;
+    final fallback = Icon(
+      Icons.chat_bubble_outline_rounded,
+      size: 32,
+      color: theme.primary.withValues(alpha: 0.55),
+    );
+    final url = logoUrl?.trim() ?? '';
+
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        color: theme.primary.withValues(alpha: 0.08),
+        shape: BoxShape.circle,
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: url.isEmpty
+          ? Center(child: fallback)
+          : Image.network(
+              url,
+              fit: BoxFit.cover,
+              errorBuilder: (_, __, ___) => Center(child: fallback),
+            ),
+    );
+  }
+}
+
 /// Shown when the workspace is closed and no conversation can be started.
 ///
 /// This replaced a ticket/offline form. The form was a dead end: whatever the
@@ -33,21 +95,41 @@ class ClosedNoticeView extends StatelessWidget {
     final strings = ElcStrings.of(config.locale);
     final message = config.offlineMessage.trim().isNotEmpty
         ? config.offlineMessage.trim()
-        : strings.closedNotice;
+        : _defaultNotice(strings);
 
     return Center(
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 24),
-        child: Text(
-          message,
-          textAlign: TextAlign.center,
-          style: TextStyle(
-            // The theme exposes only primary/background/surface/text; muted is
-            // derived, matching how the other views tint.
-            color: theme.text.withValues(alpha: 0.7),
-            fontSize: 15,
-            height: 1.5,
-          ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _BusinessMark(logoUrl: config.logoUrl, theme: theme),
+            const SizedBox(height: 20),
+            // Stated first and in full contrast: whatever the tenant's body
+            // copy says, the visitor learns the state from this line alone.
+            Text(
+              strings.unavailableTitle,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: theme.text,
+                fontSize: 17,
+                height: 1.35,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 10),
+            Text(
+              message,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                // The theme exposes only primary/background/surface/text; muted
+                // is derived, matching how the other views tint.
+                color: theme.text.withValues(alpha: 0.7),
+                fontSize: 15,
+                height: 1.5,
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -68,31 +150,6 @@ class ClosedNoticeBanner extends StatelessWidget {
     required this.config,
     required this.theme,
   });
-
-  /// Being shut and being understaffed are different states and read
-  /// differently to a visitor: "back at 09:00" is actionable, "everyone's busy"
-  /// is not. The server tells us which via `reason`.
-  String _defaultNotice(ElcStrings strings) {
-    final elc = EasyLiveChat.instance;
-    if (!elc.isBooted) return strings.closedNotice;
-
-    if (elc.availabilityReason.value == 'NO_AGENTS') return strings.noAgentsNotice;
-
-    // A named closure ("Closed for Eid al-Adha") tells the visitor far more
-    // than a generic "we're offline", so prefer it when the server sent one.
-    final label = elc.closureLabel.value;
-    final head = (elc.availabilityReason.value == 'HOLIDAY' &&
-            label != null &&
-            label.isNotEmpty)
-        ? strings.closedForLabel.replaceAll('{label}', label)
-        : strings.closedNotice;
-
-    final next = elc.nextOpenAt.value;
-    if (next == null) return head;
-    final hh = next.hour.toString().padLeft(2, '0');
-    final mm = next.minute.toString().padLeft(2, '0');
-    return '$head ${strings.backAt.replaceAll('{time}', '$hh:$mm')}';
-  }
 
   @override
   Widget build(BuildContext context) {

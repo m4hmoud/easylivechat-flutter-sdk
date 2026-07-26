@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:easylivechat/easylivechat.dart';
 import 'package:flutter/material.dart';
@@ -49,12 +51,20 @@ class _ThreadViewState extends State<ThreadView> {
     super.initState();
     _lastCount = EasyLiveChat.instance.messages.value.length;
     EasyLiveChat.instance.messages.addListener(_onMessages);
-    WidgetsBinding.instance.addPostFrameCallback((_) => _jumpToBottom());
+    // History loads itself: one page as soon as the thread appears, then more
+    // as the visitor scrolls up. Making them find and tap "load earlier" to
+    // see their own conversation was busywork.
+    _scroll.addListener(_onScroll);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _jumpToBottom();
+      unawaited(_loadOlder());
+    });
   }
 
   @override
   void dispose() {
     EasyLiveChat.instance.messages.removeListener(_onMessages);
+    _scroll.removeListener(_onScroll);
     _scroll.dispose();
     super.dispose();
   }
@@ -90,6 +100,15 @@ class _ThreadViewState extends State<ThreadView> {
       duration: const Duration(milliseconds: 250),
       curve: Curves.easeOut,
     );
+  }
+
+  /// Pull the next page in as the visitor approaches the top of the thread.
+  void _onScroll() {
+    if (!_scroll.hasClients || _loadingOlder || !_hasMoreOlder) return;
+    // Oldest first, so the top of the list is offset 0 — start fetching a
+    // little before the visitor actually reaches it.
+    const triggerPx = 240.0;
+    if (_scroll.position.pixels <= triggerPx) unawaited(_loadOlder());
   }
 
   Future<void> _loadOlder() async {
@@ -182,17 +201,9 @@ class _ThreadViewState extends State<ThreadView> {
                       _theme.text.withValues(alpha: 0.4)),
                 ),
               )
-            : TextButton(
-                onPressed: _loadOlder,
-                child: Text(
-                  _s.loadOlder,
-                  style: TextStyle(
-                    color: _theme.primary,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
+            // No affordance: loading is automatic, so an idle moment shows
+            // nothing rather than a button that would do what already happens.
+            : const SizedBox.shrink(),
       ),
     );
   }

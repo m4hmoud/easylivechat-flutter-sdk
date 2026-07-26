@@ -242,11 +242,16 @@ class SessionController {
       _connectPresence();
     }
 
-    // The tenant chose to show a notice and take nothing. Don't start a session
-    // the server would refuse (403 CHAT_UNAVAILABLE) and don't resume an old
-    // thread into a composer that cannot send — show the notice and stop.
+    // The tenant chose to show a notice and take nothing NEW. An existing
+    // conversation is still worth showing — a visitor reopening the chat after
+    // hours is usually coming back to read the reply they were promised, and
+    // hiding it behind a notice loses them their own history. So resume first
+    // and fall back to the bare notice only when there is nothing to show.
+    // Sending stays blocked either way: the composer is locked here and the
+    // server refuses the write regardless of what the client renders.
     if (composerLocked) {
-      _setPhase(ChatPhase.offline);
+      final resumed = await silentResume();
+      if (!resumed) _setPhase(ChatPhase.offline);
       return;
     }
 
@@ -320,6 +325,45 @@ class SessionController {
 
   /// The phase to fall back to when there is no active conversation: offline
   /// outside working hours, prechat when a form is configured, else idle.
+  /// Re-read availability from the server and re-gate the UI.
+  ///
+  /// Cheap and safe to call whenever the chat becomes visible. [open] only
+  /// runs its full flow from an idle phase, so reopening the screen on a
+  /// singleton still sitting in `chat` used to refresh nothing at all — the
+  /// visitor kept whatever availability was true when they first opened it,
+  /// which could be hours earlier and several shift boundaries ago.
+  ///
+  /// Deliberately does NOT touch the conversation, socket or messages: this is
+  /// about whether the workspace is open, not about restarting the session.
+  Future<void> refreshAvailability() async {
+    if (_disposed) return;
+    try {
+      final res = await rest.getConfig();
+      if (_disposed) return;
+      widgetConfig.value = res.config;
+      isOpen.value = res.isOpen;
+      agentsAccepting.value = res.agentsAccepting;
+      visitorMode.value = res.visitorMode;
+      availabilityReason.value = res.reason;
+      nextOpenAt.value = res.nextOpenAt;
+      closureLabel.value = res.closureLabel;
+      _chatAvailabilityMode = res.chatAvailabilityMode;
+      _asyncEnabled = res.asyncEnabled;
+
+      // The tenant takes no messages now. Showing the notice is the honest
+      // thing to do — the server would refuse a send anyway. The rating screen
+      // is left alone; it has no composer and replacing it loses the rating.
+      if (composerLocked &&
+          phase.value != ChatPhase.offline &&
+          phase.value != ChatPhase.feedback) {
+        _setPhase(ChatPhase.offline);
+      }
+    } catch (_) {
+      // Availability is a refinement of what we already show; a failed refresh
+      // must never break a working chat.
+    }
+  }
+
   /// Tenant gating rules, captured from `GET /config` so a later live
   /// availability push is judged by the same rules as the initial load.
   String _chatAvailabilityMode = 'ALWAYS';

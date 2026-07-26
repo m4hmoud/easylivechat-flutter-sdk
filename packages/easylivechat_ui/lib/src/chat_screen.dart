@@ -110,6 +110,16 @@ class _EasyLiveChatScreenState extends State<EasyLiveChatScreen>
     switch (state) {
       case AppLifecycleState.resumed:
         EasyLiveChat.instance.setAppLifecycle(EasyLiveChatLifecycle.resumed);
+        // The workspace may have closed — or reopened — while the app sat in
+        // the background. Re-ask rather than trusting stale state; from the
+        // notice screen this also lets the chat come back by itself.
+        // Only the notice screen is worth re-driving through open(); clearing
+        // the guard unconditionally could double-open on top of a request
+        // that is still in flight.
+        if (EasyLiveChat.instance.phase.value == ChatPhase.offline) {
+          _openRequested = false;
+        }
+        _maybeOpen();
       case AppLifecycleState.paused:
       case AppLifecycleState.detached:
       case AppLifecycleState.hidden:
@@ -129,8 +139,20 @@ class _EasyLiveChatScreenState extends State<EasyLiveChatScreen>
     // feedback/CSAT screen — so reopening the chat after rating starts a fresh
     // conversation (the old one is closed) instead of re-showing the already-
     // submitted rate screen.
-    if (p != ChatPhase.idle && p != ChatPhase.feedback) return;
-    _startOpen();
+    //
+    // `offline` re-opens too: it is a snapshot of an availability answer that
+    // has since expired, and open() re-fetches the config and lands on
+    // whichever screen is right now — the notice again, or the live chat.
+    if (p == ChatPhase.idle ||
+        p == ChatPhase.feedback ||
+        p == ChatPhase.offline) {
+      _startOpen();
+      return;
+    }
+    // A live session: open() would be a no-op, but this is still a fresh *view*
+    // of the chat, and availability is decided by the server and can have moved
+    // since the last open (hours boundary, agents going offline).
+    unawaited(EasyLiveChat.instance.refreshAvailability());
   }
 
   void _startOpen() {
@@ -227,8 +249,11 @@ class _EasyLiveChatScreenState extends State<EasyLiveChatScreen>
           children: [
             // Closed, but the composer stays live: the message becomes a
             // PENDING conversation the team picks up when they are back.
+            // Also when only the composer is locked: an input that refuses to
+            // type with nothing explaining why reads as a broken app.
             if (EasyLiveChat.instance.isBooted &&
-                EasyLiveChat.instance.workspaceClosed)
+                (EasyLiveChat.instance.workspaceClosed ||
+                    EasyLiveChat.instance.composerLocked))
               ClosedNoticeBanner(config: config, theme: theme),
             Expanded(child: ThreadView(theme: theme)),
             ComposerBar(

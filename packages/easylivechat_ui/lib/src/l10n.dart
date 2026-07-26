@@ -138,6 +138,10 @@ class ElcStrings {
   /// Used instead of [closedNotice] when the closure has a name.
   String get closedForLabel => _t('closedForLabel');
 
+  /// Headline on the closed screen. Short and unambiguous — the visitor should
+  /// know they cannot be helped right now before reading a word of body copy.
+  String get unavailableTitle => _t('unavailableTitle');
+
   /// Map a server/SDK error code to a human, localized message (best effort).
   String forErrorCode(String code) {
     switch (code) {
@@ -192,6 +196,7 @@ class ElcStrings {
       'backAt': "We're back at {time}.",
       'noAgentsNotice': "Everyone's busy right now. Leave a message and we'll reply shortly.",
       'closedForLabel': "We're closed for {label}.",
+      'unavailableTitle': "We're not available right now",
       'offlineThanks': "Thanks! We'll get back to you.",
     },
     'ar': {
@@ -230,6 +235,7 @@ class ElcStrings {
       'backAt': 'نعود الساعة {time}.',
       'noAgentsNotice': 'الجميع مشغول حالياً. اترك رسالة وسنرد قريباً.',
       'closedForLabel': 'نحن مغلقون بمناسبة {label}.',
+      'unavailableTitle': 'غير متاحين حالياً',
       'offlineThanks': 'شكرًا! سنعاود التواصل معك.',
     },
     'de': {
@@ -266,6 +272,7 @@ class ElcStrings {
       'backAt': 'Wir sind ab {time} wieder da.',
       'noAgentsNotice': 'Gerade sind alle beschäftigt. Hinterlassen Sie eine Nachricht — wir melden uns gleich.',
       'closedForLabel': 'Wir haben wegen {label} geschlossen.',
+      'unavailableTitle': 'Wir sind gerade nicht erreichbar',
       'offlineThanks': 'Danke! Wir melden uns bei Ihnen.',
     },
     'es': {
@@ -302,6 +309,7 @@ class ElcStrings {
       'backAt': 'Volvemos a las {time}.',
       'noAgentsNotice': 'Ahora mismo todos están ocupados. Deja un mensaje y te responderemos en breve.',
       'closedForLabel': 'Cerramos por {label}.',
+      'unavailableTitle': 'No estamos disponibles ahora',
       'offlineThanks': '¡Gracias! Te responderemos pronto.',
     },
     'fr': {
@@ -338,6 +346,7 @@ class ElcStrings {
       'backAt': 'Nous revenons à {time}.',
       'noAgentsNotice': "Tout le monde est occupé pour l'instant. Laissez un message, nous répondrons vite.",
       'closedForLabel': 'Nous sommes fermés pour {label}.',
+      'unavailableTitle': 'Nous ne sommes pas disponibles pour le moment',
       'offlineThanks': 'Merci ! Nous reviendrons vers vous.',
     },
     'hi': {
@@ -374,6 +383,7 @@ class ElcStrings {
       'backAt': 'हम {time} बजे लौटते हैं।',
       'noAgentsNotice': 'अभी सभी व्यस्त हैं। संदेश छोड़ें, हम जल्द उत्तर देंगे।',
       'closedForLabel': 'हम {label} के कारण बंद हैं।',
+      'unavailableTitle': 'हम अभी उपलब्ध नहीं हैं',
       'offlineThanks': 'धन्यवाद! हम आपसे जल्द संपर्क करेंगे।',
     },
     'it': {
@@ -410,6 +420,7 @@ class ElcStrings {
       'backAt': 'Torniamo alle {time}.',
       'noAgentsNotice': 'Al momento sono tutti occupati. Lascia un messaggio e ti risponderemo a breve.',
       'closedForLabel': 'Siamo chiusi per {label}.',
+      'unavailableTitle': 'Al momento non siamo disponibili',
       'offlineThanks': 'Grazie! Ti risponderemo presto.',
     },
     'ku': {
@@ -449,6 +460,7 @@ class ElcStrings {
       'backAt': 'لە {time} دەگەڕێینەوە.',
       'noAgentsNotice': 'ئێستا هەموو خەریکن. نامەیەک بەجێبهێڵە، بەم زووانە وەڵامت دەدەینەوە.',
       'closedForLabel': 'بەهۆی {label} داخراوین.',
+      'unavailableTitle': 'ئێستا بەردەست نین',
       'offlineThanks': 'سوپاس! بەمزووانە پەیوەندیت پێوە دەکەین.',
     },
     'pt': {
@@ -485,6 +497,7 @@ class ElcStrings {
       'backAt': 'Voltamos às {time}.',
       'noAgentsNotice': 'Estamos todos ocupados neste momento. Deixe uma mensagem e responderemos em breve.',
       'closedForLabel': 'Estamos fechados por {label}.',
+      'unavailableTitle': 'Não estamos disponíveis no momento',
       'offlineThanks': 'Obrigado! Entraremos em contato.',
     },
     'tr': {
@@ -521,6 +534,7 @@ class ElcStrings {
       'backAt': '{time} itibarıyla döneriz.',
       'noAgentsNotice': 'Şu anda herkes meşgul. Mesaj bırakın, kısa sürede dönelim.',
       'closedForLabel': '{label} nedeniyle kapalıyız.',
+      'unavailableTitle': 'Şu anda müsait değiliz',
       'offlineThanks': 'Teşekkürler! Size geri döneceğiz.',
     },
     'ur': {
@@ -557,6 +571,7 @@ class ElcStrings {
       'backAt': 'ہم {time} بجے واپس آتے ہیں۔',
       'noAgentsNotice': 'اس وقت سب مصروف ہیں۔ پیغام چھوڑیں، ہم جلد جواب دیں گے۔',
       'closedForLabel': 'ہم {label} کی وجہ سے بند ہیں۔',
+      'unavailableTitle': 'ہم اس وقت دستیاب نہیں ہیں',
       'offlineThanks': 'شکریہ! ہم جلد آپ سے رابطہ کریں گے۔',
     },
     'zh': {
@@ -593,6 +608,7 @@ class ElcStrings {
       'backAt': '我们将于 {time} 回来。',
       'noAgentsNotice': '目前大家都在忙。请留言，我们会尽快回复。',
       'closedForLabel': '我们因{label}休息。',
+      'unavailableTitle': '我们现在无法接待',
       'offlineThanks': '谢谢！我们会尽快回复您。',
     },
     // Northern Kurdish (Kurmanji / Badini, Arabic script). Zirak's default
@@ -635,6 +651,7 @@ class ElcStrings {
       'backAt': 'Em di {time} de vedigerin.',
       'noAgentsNotice': 'Niha her kes mijûl e. Peyamekê bihêlin, em ê zû bersivê bidin.',
       'closedForLabel': 'Em ji ber {label} girtî ne.',
+      'unavailableTitle': 'Em niha ne amade ne',
       'offlineThanks': 'سوپاس! ئەم دێ ب تە ڤە پەیوەندیێ کەین.',
     },
   };
