@@ -106,6 +106,10 @@ class SessionController {
   /// message; null => no more history / not yet loaded).
   String? _oldestCursor;
 
+  /// Distinguishes the two meanings of a null [_oldestCursor]: "never asked"
+  /// (fetch the newest page) from "reached the beginning" (stop).
+  bool _historyLoadedOnce = false;
+
   WidgetSocket? _socket;
   PresenceSocket? _presence;
   StreamSubscription<ProactiveMessage>? _presenceSub;
@@ -471,6 +475,9 @@ class SessionController {
     _token = res.token;
     _conversationId = res.conversationId;
     _oldestCursor = res.nextCursor;
+    // The payload IS the newest page, so the next fetch continues from its
+    // cursor — or stops, when the whole conversation already arrived.
+    _historyLoadedOnce = true;
     await storage.write(StorageKeys.token, res.token!);
     if (res.conversationId != null) {
       await storage.write(StorageKeys.conversationId, res.conversationId!);
@@ -585,6 +592,14 @@ class SessionController {
     if (token == null) {
       return const MessagePage(messages: [], nextCursor: null);
     }
+    // A null cursor means the session payload already reached the start of the
+    // conversation. Passing it to the API would re-fetch the NEWEST page
+    // instead — harmless (the merge dedupes) but a wasted round trip on every
+    // short thread, and now that loading is automatic it happens unprompted.
+    if (_oldestCursor == null && _historyLoadedOnce) {
+      return const MessagePage(messages: [], nextCursor: null);
+    }
+    _historyLoadedOnce = true;
     final page = await _guardAuth(() => rest.getMessages(
           token: token,
           cursor: _oldestCursor,
