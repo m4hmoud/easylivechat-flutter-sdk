@@ -11,7 +11,20 @@ class EasyLiveChatConfig {
 
   /// Overrides the device locale sent to the server (`Contact.locale`) and
   /// used for SDK chrome formatting. Null => device default.
+  ///
+  /// Free-form: hosts often send a readable language NAME here because it is
+  /// what agents see in the dashboard. Use [contentLocale] to pick the language
+  /// of the tenant's own copy.
   final String? locale;
+
+  /// Language code (`en`, `ar`, `ku`, `kmr`…) the tenant's customer-facing copy
+  /// should come back in — welcome text, offline message, pre-chat labels.
+  ///
+  /// Separate from [locale] precisely because that one is a display value the
+  /// server cannot match against, so without this every mobile visitor got the
+  /// workspace's default language however well the tenant had translated it.
+  /// Unknown codes fall back to that default server-side.
+  final String? contentLocale;
 
   /// Channel/inbox key (e.g. `'rider'`, `'driver'`). Routes the conversation
   /// to that inbox in the dashboard so agents can be assigned per channel.
@@ -54,6 +67,7 @@ class EasyLiveChatConfig {
     required this.apiBase,
     required this.tenantSlug,
     this.locale,
+    this.contentLocale,
     this.channel,
     this.attributes,
     this.originHeader,

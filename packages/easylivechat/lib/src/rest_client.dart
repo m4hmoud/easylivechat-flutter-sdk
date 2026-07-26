@@ -57,6 +57,8 @@ class RestClient {
         queryParameters: {
           if (config.originHeader != null && config.originHeader!.isNotEmpty)
             'origin': config.originHeader,
+          if (config.contentLocale != null && config.contentLocale!.isNotEmpty)
+            'locale': config.contentLocale,
         },
         options: Options(headers: _headers()),
       );
