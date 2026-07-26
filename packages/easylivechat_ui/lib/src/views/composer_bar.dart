@@ -96,6 +96,10 @@ class _ComposerBarState extends State<ComposerBar> {
 
   // ── send ──
 
+  /// True while the workspace is shut AND the tenant chose to take no message.
+  bool get _locked => EasyLiveChat.instance.isBooted &&
+      EasyLiveChat.instance.composerLocked;
+
   void _send() {
     final text = _controller.text.trim();
     final urls = _pending.map((f) => f.url).toList(growable: false);
@@ -327,13 +331,17 @@ class _ComposerBarState extends State<ComposerBar> {
         focusNode: _focus,
         minLines: 1,
         maxLines: 5,
+        // NOTICE_ONLY tenants take nothing while closed. Disabled rather than
+        // hidden: an input that vanishes reads as breakage, whereas a greyed
+        // one carrying the notice as its hint explains itself.
+        enabled: !_locked,
         textInputAction: TextInputAction.send,
         onSubmitted: (_) => _send(),
         style: TextStyle(color: t.text, fontSize: 15),
         decoration: InputDecoration(
           isCollapsed: true,
           border: InputBorder.none,
-          hintText: _s.typeAMessage,
+          hintText: _locked ? _s.closedNotice : _s.typeAMessage,
           hintStyle: TextStyle(color: t.text.withValues(alpha: 0.4)),
         ),
       ),

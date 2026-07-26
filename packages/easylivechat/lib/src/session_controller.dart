@@ -216,6 +216,9 @@ class SessionController {
     // push is judged exactly as this first decision was.
     _chatAvailabilityMode = res.chatAvailabilityMode;
     _asyncEnabled = res.asyncEnabled;
+    visitorMode.value = res.visitorMode;
+    availabilityReason.value = res.reason;
+    nextOpenAt.value = res.nextOpenAt;
     // Deliberately NOT ChatPhase.offline. A visitor who arrives out of hours
     // continues into the ordinary chat and simply sees a notice (bind
     // [workspaceClosed]) — their message becomes a PENDING conversation that is
@@ -236,6 +239,14 @@ class SessionController {
     // Open the receive-only presence socket for pre-chat proactive outreach.
     if (config.enablePresenceSocket) {
       _connectPresence();
+    }
+
+    // The tenant chose to show a notice and take nothing. Don't start a session
+    // the server would refuse (403 CHAT_UNAVAILABLE) and don't resume an old
+    // thread into a composer that cannot send — show the notice and stop.
+    if (composerLocked) {
+      _setPhase(ChatPhase.offline);
+      return;
     }
 
     final resumed = await silentResume();
@@ -312,6 +323,16 @@ class SessionController {
   /// availability push is judged by the same rules as the initial load.
   String _chatAvailabilityMode = 'ALWAYS';
   bool _asyncEnabled = false;
+
+  /// The server's decision, mirrored for the UI to bind.
+  final ValueNotifier<String> visitorMode = ValueNotifier('CHAT');
+  final ValueNotifier<String> availabilityReason = ValueNotifier('OPEN');
+  final ValueNotifier<DateTime?> nextOpenAt = ValueNotifier(null);
+
+  /// True when the tenant chose "show a notice only" — the composer must be
+  /// disabled, not hidden: an input that vanishes reads as breakage, whereas a
+  /// disabled one under the notice explains itself.
+  bool get composerLocked => visitorMode.value == 'NOTICE_ONLY';
 
   /// True when either availability gate says the workspace is unavailable:
   /// outside working hours, or (for WHEN_ACCEPTING tenants) nobody accepting.
@@ -1167,6 +1188,9 @@ class SessionController {
     widgetConfig.dispose();
     isOpen.dispose();
     agentsAccepting.dispose();
+    visitorMode.dispose();
+    availabilityReason.dispose();
+    nextOpenAt.dispose();
     connection.dispose();
     messages.dispose();
     agentTyping.dispose();

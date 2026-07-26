@@ -76,6 +76,18 @@ class EasyLiveChat {
   /// It never blocks writing, because a message sent while closed still becomes
   /// a real conversation the team picks up when they are back.
   bool get workspaceClosed => _controller.workspaceClosed;
+
+  /// Server-decided: `CHAT`, `LEAVE_MESSAGE` or `NOTICE_ONLY`.
+  ValueListenable<String> get visitorMode => _controller.visitorMode;
+
+  /// Why: `OPEN`, `AFTER_HOURS` or `NO_AGENTS`.
+  ValueListenable<String> get availabilityReason => _controller.availabilityReason;
+
+  /// When we next open — lets the UI say "back at 09:00". Null when open.
+  ValueListenable<DateTime?> get nextOpenAt => _controller.nextOpenAt;
+
+  /// True when the tenant chose to show a notice and take nothing.
+  bool get composerLocked => _controller.composerLocked;
   ValueListenable<ConnectionState> get connection => _controller.connection;
   ValueListenable<List<ChatMessage>> get messages => _controller.messages;
   ValueListenable<bool> get agentTyping => _controller.agentTyping;

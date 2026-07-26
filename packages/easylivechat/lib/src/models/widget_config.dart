@@ -116,6 +116,18 @@ class ConfigResponse {
   /// Whether the offline/async form is offered when closed.
   final bool asyncEnabled;
 
+  /// What the visitor may do, decided server-side: `CHAT`, `LEAVE_MESSAGE` or
+  /// `NOTICE_ONLY`. Clients render this rather than re-deriving the policy —
+  /// three copies of that logic is how the widget, this SDK and the server's
+  /// own session gate came to disagree.
+  final String visitorMode;
+
+  /// Why: `OPEN`, `AFTER_HOURS` or `NO_AGENTS`. Picks which notice to show.
+  final String reason;
+
+  /// When we next open, so the UI can say "back at 09:00". Null when open.
+  final DateTime? nextOpenAt;
+
   const ConfigResponse({
     required this.tenantId,
     required this.config,
@@ -123,7 +135,13 @@ class ConfigResponse {
     this.agentsAccepting = true,
     this.chatAvailabilityMode = 'ALWAYS',
     this.asyncEnabled = false,
+    this.visitorMode = 'CHAT',
+    this.reason = 'OPEN',
+    this.nextOpenAt,
   });
+
+  /// True when the tenant chose to show a notice and take nothing.
+  bool get noticeOnly => visitorMode == 'NOTICE_ONLY';
 
   /// True when either availability gate says the workspace is unavailable.
   /// Mirrors the web widget's rule so both clients agree.

@@ -129,6 +129,12 @@ class ElcStrings {
   /// the message waits for the team — so this informs rather than blocks.
   String get closedNotice => _t('closedNotice');
 
+  /// Appended to [closedNotice] when the server tells us when we reopen.
+  String get backAt => _t('backAt');
+
+  /// Distinct from [closedNotice]: we ARE open, there's just nobody free.
+  String get noAgentsNotice => _t('noAgentsNotice');
+
   /// Map a server/SDK error code to a human, localized message (best effort).
   String forErrorCode(String code) {
     switch (code) {
@@ -180,6 +186,8 @@ class ElcStrings {
       'yourMessage': 'Your message',
       'sendMessage': 'Send message',
       'closedNotice': "Our team is offline right now. Leave your message and we'll reply as soon as we're back.",
+      'backAt': "We're back at {time}.",
+      'noAgentsNotice': "Everyone's busy right now. Leave a message and we'll reply shortly.",
       'offlineThanks': "Thanks! We'll get back to you.",
     },
     'ar': {
@@ -215,6 +223,8 @@ class ElcStrings {
       'yourMessage': 'رسالتك',
       'sendMessage': 'إرسال الرسالة',
       'closedNotice': 'فريقنا غير متاح حالياً. اترك رسالتك وسنرد عليك فور عودتنا.',
+      'backAt': 'نعود الساعة {time}.',
+      'noAgentsNotice': 'الجميع مشغول حالياً. اترك رسالة وسنرد قريباً.',
       'offlineThanks': 'شكرًا! سنعاود التواصل معك.',
     },
     'de': {
@@ -248,6 +258,8 @@ class ElcStrings {
       'yourMessage': 'Ihre Nachricht',
       'sendMessage': 'Nachricht senden',
       'closedNotice': 'Unser Team ist gerade offline. Hinterlassen Sie Ihre Nachricht — wir antworten, sobald wir zurück sind.',
+      'backAt': 'Wir sind ab {time} wieder da.',
+      'noAgentsNotice': 'Gerade sind alle beschäftigt. Hinterlassen Sie eine Nachricht — wir melden uns gleich.',
       'offlineThanks': 'Danke! Wir melden uns bei Ihnen.',
     },
     'es': {
@@ -281,6 +293,8 @@ class ElcStrings {
       'yourMessage': 'Tu mensaje',
       'sendMessage': 'Enviar mensaje',
       'closedNotice': 'Nuestro equipo no está disponible ahora. Deja tu mensaje y te responderemos en cuanto volvamos.',
+      'backAt': 'Volvemos a las {time}.',
+      'noAgentsNotice': 'Ahora mismo todos están ocupados. Deja un mensaje y te responderemos en breve.',
       'offlineThanks': '¡Gracias! Te responderemos pronto.',
     },
     'fr': {
@@ -314,6 +328,8 @@ class ElcStrings {
       'yourMessage': 'Votre message',
       'sendMessage': 'Envoyer le message',
       'closedNotice': 'Notre équipe est hors ligne pour le moment. Laissez votre message, nous répondrons dès notre retour.',
+      'backAt': 'Nous revenons à {time}.',
+      'noAgentsNotice': "Tout le monde est occupé pour l'instant. Laissez un message, nous répondrons vite.",
       'offlineThanks': 'Merci ! Nous reviendrons vers vous.',
     },
     'hi': {
@@ -347,6 +363,8 @@ class ElcStrings {
       'yourMessage': 'आपका संदेश',
       'sendMessage': 'संदेश भेजें',
       'closedNotice': 'हमारी टीम अभी ऑफ़लाइन है। अपना संदेश छोड़ें, लौटते ही हम उत्तर देंगे।',
+      'backAt': 'हम {time} बजे लौटते हैं।',
+      'noAgentsNotice': 'अभी सभी व्यस्त हैं। संदेश छोड़ें, हम जल्द उत्तर देंगे।',
       'offlineThanks': 'धन्यवाद! हम आपसे जल्द संपर्क करेंगे।',
     },
     'it': {
@@ -380,6 +398,8 @@ class ElcStrings {
       'yourMessage': 'Il tuo messaggio',
       'sendMessage': 'Invia messaggio',
       'closedNotice': 'Il nostro team non è disponibile al momento. Lascia il tuo messaggio e ti risponderemo appena torniamo.',
+      'backAt': 'Torniamo alle {time}.',
+      'noAgentsNotice': 'Al momento sono tutti occupati. Lascia un messaggio e ti risponderemo a breve.',
       'offlineThanks': 'Grazie! Ti risponderemo presto.',
     },
     'ku': {
@@ -416,6 +436,8 @@ class ElcStrings {
       'yourMessage': 'پەیامەکەت',
       'sendMessage': 'ناردنی پەیام',
       'closedNotice': 'تیمەکەمان ئێستا دەرەوەی کارە. نامەکەت بەجێبهێڵە، هەرکە گەڕاینەوە وەڵامت دەدەینەوە.',
+      'backAt': 'لە {time} دەگەڕێینەوە.',
+      'noAgentsNotice': 'ئێستا هەموو خەریکن. نامەیەک بەجێبهێڵە، بەم زووانە وەڵامت دەدەینەوە.',
       'offlineThanks': 'سوپاس! بەمزووانە پەیوەندیت پێوە دەکەین.',
     },
     'pt': {
@@ -449,6 +471,8 @@ class ElcStrings {
       'yourMessage': 'Sua mensagem',
       'sendMessage': 'Enviar mensagem',
       'closedNotice': 'A nossa equipa está offline neste momento. Deixe a sua mensagem e responderemos assim que voltarmos.',
+      'backAt': 'Voltamos às {time}.',
+      'noAgentsNotice': 'Estamos todos ocupados neste momento. Deixe uma mensagem e responderemos em breve.',
       'offlineThanks': 'Obrigado! Entraremos em contato.',
     },
     'tr': {
@@ -482,6 +506,8 @@ class ElcStrings {
       'yourMessage': 'Mesajınız',
       'sendMessage': 'Mesaj gönder',
       'closedNotice': 'Ekibimiz şu anda çevrimdışı. Mesajınızı bırakın, döndüğümüzde hemen yanıtlayalım.',
+      'backAt': '{time} itibarıyla döneriz.',
+      'noAgentsNotice': 'Şu anda herkes meşgul. Mesaj bırakın, kısa sürede dönelim.',
       'offlineThanks': 'Teşekkürler! Size geri döneceğiz.',
     },
     'ur': {
@@ -515,6 +541,8 @@ class ElcStrings {
       'yourMessage': 'آپ کا پیغام',
       'sendMessage': 'پیغام بھیجیں',
       'closedNotice': 'ہماری ٹیم اس وقت آف لائن ہے۔ اپنا پیغام چھوڑ دیں، واپس آتے ہی جواب دیں گے۔',
+      'backAt': 'ہم {time} بجے واپس آتے ہیں۔',
+      'noAgentsNotice': 'اس وقت سب مصروف ہیں۔ پیغام چھوڑیں، ہم جلد جواب دیں گے۔',
       'offlineThanks': 'شکریہ! ہم جلد آپ سے رابطہ کریں گے۔',
     },
     'zh': {
@@ -548,6 +576,8 @@ class ElcStrings {
       'yourMessage': '您的留言',
       'sendMessage': '发送留言',
       'closedNotice': '我们的团队当前不在线。请留言，我们回来后会尽快回复。',
+      'backAt': '我们将于 {time} 回来。',
+      'noAgentsNotice': '目前大家都在忙。请留言，我们会尽快回复。',
       'offlineThanks': '谢谢！我们会尽快回复您。',
     },
     // Northern Kurdish (Kurmanji / Badini, Arabic script). Zirak's default
@@ -587,6 +617,8 @@ class ElcStrings {
       'yourMessage': 'نامەیا تە',
       'sendMessage': 'نامەیێ فرێکە',
       'closedNotice': 'Tîma me niha ne li ser xetê ye. Peyama xwe bihêlin — gava em vegerin em ê bersiva we bidin.',
+      'backAt': 'Em di {time} de vedigerin.',
+      'noAgentsNotice': 'Niha her kes mijûl e. Peyamekê bihêlin, em ê zû bersivê bidin.',
       'offlineThanks': 'سوپاس! ئەم دێ ب تە ڤە پەیوەندیێ کەین.',
     },
   };

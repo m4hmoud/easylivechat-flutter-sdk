@@ -69,13 +69,29 @@ class ClosedNoticeBanner extends StatelessWidget {
     required this.theme,
   });
 
+  /// Being shut and being understaffed are different states and read
+  /// differently to a visitor: "back at 09:00" is actionable, "everyone's busy"
+  /// is not. The server tells us which via `reason`.
+  String _defaultNotice(ElcStrings strings) {
+    final elc = EasyLiveChat.instance;
+    if (!elc.isBooted) return strings.closedNotice;
+
+    if (elc.availabilityReason.value == 'NO_AGENTS') return strings.noAgentsNotice;
+
+    final next = elc.nextOpenAt.value;
+    if (next == null) return strings.closedNotice;
+    final hh = next.hour.toString().padLeft(2, '0');
+    final mm = next.minute.toString().padLeft(2, '0');
+    return '${strings.closedNotice} ${strings.backAt.replaceAll('{time}', '$hh:$mm')}';
+  }
+
   @override
   Widget build(BuildContext context) {
     final cfg = config;
     final strings = ElcStrings.of(cfg?.locale ?? 'en');
     final message = (cfg != null && cfg.offlineMessage.trim().isNotEmpty)
         ? cfg.offlineMessage.trim()
-        : strings.closedNotice;
+        : _defaultNotice(strings);
 
     return Container(
       width: double.infinity,
