@@ -408,6 +408,24 @@ class SessionController {
   /// intent is explicit at the call sites rather than looking like an omission.
   void _applyAvailabilityChange() {}
 
+  /// Adopt a server availability verdict, from the socket or a config fetch.
+  void _applyWorkspaceAvailability(WorkspaceAvailability a) {
+    isOpen.value = a.isOpen;
+    agentsAccepting.value = a.agentsAccepting;
+    visitorMode.value = a.visitorMode;
+    availabilityReason.value = a.reason;
+    nextOpenAt.value = a.nextOpenAt;
+    closureLabel.value = a.closureLabel;
+    // Same rule as refreshAvailability(): a visitor with a conversation keeps
+    // it (minus the composer); one without gets the notice.
+    if (composerLocked &&
+        _conversationId == null &&
+        phase.value != ChatPhase.offline &&
+        phase.value != ChatPhase.feedback) {
+      _setPhase(ChatPhase.offline);
+    }
+  }
+
   ChatPhase _idlePhase() {
     final cfg = widgetConfig.value;
     if (cfg != null && cfg.preChatForm.enabled) return ChatPhase.prechat;
@@ -758,6 +776,9 @@ class SessionController {
       agentsAccepting.value = accepting;
       _applyAvailabilityChange();
     }));
+    // The verdict itself, so a workspace that closes (or reopens) mid-session
+    // reaches the visitor without waiting for them to reopen the screen.
+    _socketSubs.add(socket.onWorkspaceMode.listen(_applyWorkspaceAvailability));
     _socketSubs
         .add(socket.onConversationClosed.listen(_handleConversationClosed));
     _socketSubs.add(socket.onProactive.listen(_handleProactive));

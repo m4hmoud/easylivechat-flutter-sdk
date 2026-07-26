@@ -105,14 +105,6 @@ class ProactiveMessage {
       );
 }
 
-/// Working-hours availability (`workspace:availability`).
-class WorkspaceAvailability {
-  final bool isOpen;
-  const WorkspaceAvailability(this.isOpen);
-  factory WorkspaceAvailability.fromJson(Map<String, dynamic> j) =>
-      WorkspaceAvailability(j['isOpen'] == true);
-}
-
 /// The visitor's locally-cached identity/profile, persisted across launches.
 class StoredProfile {
   final String? name;

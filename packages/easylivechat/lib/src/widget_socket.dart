@@ -4,6 +4,7 @@ import 'package:socket_io_client/socket_io_client.dart' as IO;
 
 import 'models/chat_message.dart';
 import 'models/results.dart';
+import 'models/widget_config.dart';
 
 /// Socket.IO client for the `/widgets` namespace (full chat; JWT required).
 ///
@@ -31,6 +32,8 @@ class WidgetSocket {
   final _onAgentTyping = StreamController<bool>.broadcast();
   final _onAvailability = StreamController<bool>.broadcast();
   final _onAgentsAccepting = StreamController<bool>.broadcast();
+  final _onWorkspaceMode =
+      StreamController<WorkspaceAvailability>.broadcast();
   final _onConversationClosed = StreamController<String>.broadcast();
   final _onProactive = StreamController<ProactiveMessage>.broadcast();
   final _onConnectionChange = StreamController<bool>.broadcast();
@@ -56,6 +59,11 @@ class WidgetSocket {
   /// `chatAvailabilityMode = WHEN_ACCEPTING`; emits `true` against servers that
   /// don't send the field.
   Stream<bool> get onAgentsAccepting => _onAgentsAccepting.stream;
+
+  /// The server's whole verdict from the same event — what the visitor may do
+  /// and why. [onAvailability] and [onAgentsAccepting] are the raw gates that
+  /// feed it; this is the answer they add up to, and it is the one to render.
+  Stream<WorkspaceAvailability> get onWorkspaceMode => _onWorkspaceMode.stream;
 
   /// `conversation:closed` — `{ conversationId }`. NOTE: the server emits on
   /// ANY *→CLOSED PATCH (not only OPEN→CLOSED) — consumers must guard against
@@ -156,6 +164,11 @@ class WidgetSocket {
       // close the widget", hence `!= false` rather than `== true`.
       final accepting = m?['agentsAccepting'] != false;
       if (!_onAgentsAccepting.isClosed) _onAgentsAccepting.add(accepting);
+      // Older servers send only the two booleans above; absent fields fall back
+      // to the permissive defaults inside WorkspaceAvailability.
+      if (m != null && !_onWorkspaceMode.isClosed) {
+        _onWorkspaceMode.add(WorkspaceAvailability.fromJson(m));
+      }
     });
 
     socket.on('conversation:closed', (data) {
@@ -273,6 +286,7 @@ class WidgetSocket {
     _onAgentTyping.close();
     _onAvailability.close();
     _onAgentsAccepting.close();
+    _onWorkspaceMode.close();
     _onConversationClosed.close();
     _onProactive.close();
     _onConnectionChange.close();

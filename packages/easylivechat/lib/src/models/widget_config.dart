@@ -97,6 +97,60 @@ class WidgetConfigModel {
   }
 }
 
+/// The server's availability verdict for a workspace.
+///
+/// Arrives two ways — in `GET /:slug/config` at open time, and on the
+/// `workspace:availability` socket event when it changes — so it lives in one
+/// place rather than being re-parsed (or, as it was, quietly dropped) in each.
+class WorkspaceAvailability {
+  /// Inside working hours.
+  final bool isOpen;
+
+  /// Any agent currently accepting chats.
+  final bool agentsAccepting;
+
+  /// What the visitor may do: `CHAT`, `LEAVE_MESSAGE` or `NOTICE_ONLY`.
+  final String visitorMode;
+
+  /// Why: `OPEN`, `AFTER_HOURS`, `NO_AGENTS` or `HOLIDAY`.
+  final String reason;
+
+  /// When we next open, so the UI can say "back at 09:00". Null when open.
+  final DateTime? nextOpenAt;
+
+  /// The closure's name when [reason] is `HOLIDAY`, e.g. "Eid al-Adha".
+  final String? closureLabel;
+
+  const WorkspaceAvailability({
+    required this.isOpen,
+    this.agentsAccepting = true,
+    this.visitorMode = 'CHAT',
+    this.reason = 'OPEN',
+    this.nextOpenAt,
+    this.closureLabel,
+  });
+
+  /// Every field is optional: a server that predates them must not be read as
+  /// closing the widget, so each absent value falls back to the permissive one.
+  factory WorkspaceAvailability.fromJson(Map<String, dynamic> j) {
+    final label = j['closureLabel'];
+    return WorkspaceAvailability(
+      isOpen: j['isOpen'] == true,
+      agentsAccepting: j['agentsAccepting'] != false,
+      visitorMode: (j['visitorMode'] ?? 'CHAT').toString(),
+      reason: (j['reason'] ?? 'OPEN').toString(),
+      nextOpenAt: _parseIsoDate(j['nextOpenAt']),
+      closureLabel:
+          (label is String && label.trim().isNotEmpty) ? label.trim() : null,
+    );
+  }
+}
+
+DateTime? _parseIsoDate(Object? v) {
+  if (v is! String || v.trim().isEmpty) return null;
+  return DateTime.tryParse(v)?.toLocal();
+}
+
 /// Envelope of `GET /:slug/config`.
 class ConfigResponse {
   final String tenantId;
@@ -177,6 +231,16 @@ class ConfigResponse {
       agentsAccepting: j['agentsAccepting'] != false,
       chatAvailabilityMode: (j['chatAvailabilityMode'] ?? 'ALWAYS').toString(),
       asyncEnabled: j['asyncEnabled'] == true,
+      // The server's verdict. Defaulting these to the permissive values on an
+      // older server is deliberate; silently defaulting them while a CURRENT
+      // server was sending NOTICE_ONLY is what left the widget offering a
+      // pre-chat form to visitors it had already been told to turn away.
+      visitorMode: (j['visitorMode'] ?? 'CHAT').toString(),
+      reason: (j['reason'] ?? 'OPEN').toString(),
+      nextOpenAt: _parseIsoDate(j['nextOpenAt']),
+      closureLabel: (j['closureLabel'] as String?)?.trim().isEmpty ?? true
+          ? null
+          : (j['closureLabel'] as String).trim(),
     );
   }
 }
