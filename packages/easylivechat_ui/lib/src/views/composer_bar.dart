@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:easylivechat/easylivechat.dart';
+import 'package:flutter/foundation.dart' show ValueListenable;
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
@@ -97,8 +98,17 @@ class _ComposerBarState extends State<ComposerBar> {
   // ── send ──
 
   /// True while the workspace is shut AND the tenant chose to take no message.
+  ///
+  /// Read through [_lockListenable] rather than once at build time: a visitor
+  /// already sitting on the chat screen when closing time arrives has to see
+  /// the composer lock, and a plain getter never rebuilds.
   bool get _locked => EasyLiveChat.instance.isBooted &&
       EasyLiveChat.instance.composerLocked;
+
+  /// Rebuild trigger for [_locked] — the server pushes visitorMode on every
+  /// availability change.
+  ValueListenable<String>? get _lockListenable =>
+      EasyLiveChat.instance.isBooted ? EasyLiveChat.instance.visitorMode : null;
 
   void _send() {
     final text = _controller.text.trim();
@@ -258,6 +268,17 @@ class _ComposerBarState extends State<ComposerBar> {
 
   @override
   Widget build(BuildContext context) {
+    final listenable = _lockListenable;
+    if (listenable == null) return _build(context);
+    // Rebuild whenever the server pushes a new visitorMode, so closing time
+    // locks a composer the visitor is already looking at.
+    return ValueListenableBuilder<String>(
+      valueListenable: listenable,
+      builder: (context, _, __) => _build(context),
+    );
+  }
+
+  Widget _build(BuildContext context) {
     final t = _theme;
     return Directionality(
       textDirection: t.direction,
