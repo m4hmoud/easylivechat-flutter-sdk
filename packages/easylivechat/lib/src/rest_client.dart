@@ -97,6 +97,12 @@ class RestClient {
           // Prefer the explicit per-call locale, fall back to config.locale.
           if ((locale ?? config.locale) != null)
             'locale': locale ?? config.locale,
+          // The locale CODE. `locale` above is free-form — hosts put a readable
+          // language name there because it is what agents see — so the server
+          // cannot match it against anything. This is what picks the visitor's
+          // language for the auto-greeting.
+          if (config.contentLocale != null && config.contentLocale!.isNotEmpty)
+            'contentLocale': config.contentLocale,
           // Channel/inbox routing key — omitted when null (server => default).
           if (config.channel != null) 'channel': config.channel,
           // Client-provided custom attributes (device/app info). Stored as-is
