@@ -1,5 +1,6 @@
 import '../errors.dart';
 import 'enums.dart';
+import 'post_chat_form.dart';
 import 'pre_chat_form.dart';
 
 /// The full `WidgetConfig` row returned by `GET /:slug/config`, plus the
@@ -37,6 +38,10 @@ class WidgetConfigModel {
   final bool collectEmailPreChat; // legacy fallback flag
 
   final PreChatForm preChatForm;
+
+  /// The survey shown once the conversation is closed. Built by the tenant in
+  /// the dashboard; empty/disabled means fall back to the built-in CSAT.
+  final PostChatForm postChatForm;
   final List<String> allowedOrigins;
 
   const WidgetConfigModel({
@@ -60,6 +65,7 @@ class WidgetConfigModel {
     required this.showAgentNames,
     required this.collectEmailPreChat,
     required this.preChatForm,
+    this.postChatForm = PostChatForm.disabled,
     this.allowedOrigins = const [],
   });
 
@@ -86,6 +92,10 @@ class WidgetConfigModel {
       showAgentAvatars: j['showAgentAvatars'] != false,
       showAgentNames: j['showAgentNames'] != false,
       collectEmailPreChat: j['collectEmailPreChat'] == true,
+      postChatForm: j['postChatForm'] is Map
+          ? PostChatForm.fromJson(
+              (j['postChatForm'] as Map).cast<String, dynamic>())
+          : PostChatForm.disabled,
       preChatForm: j['preChatForm'] is Map
           ? PreChatForm.fromJson(
               (j['preChatForm'] as Map).cast<String, dynamic>())

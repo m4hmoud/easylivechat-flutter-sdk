@@ -9,6 +9,7 @@ import 'theme.dart';
 import 'views/composer_bar.dart';
 import 'views/feedback_prompt_view.dart';
 import 'views/closed_notice_view.dart';
+import 'views/post_chat_form_view.dart';
 import 'views/pre_chat_form_view.dart';
 import 'views/thread_view.dart';
 
@@ -20,7 +21,8 @@ import 'views/thread_view.dart';
 ///  • `offline` → [ClosedNoticeView];
 ///  • `prechat` → [PreChatFormView];
 ///  • `chat` → a [Column] of [ThreadView] + [ComposerBar];
-///  • `feedback` → [FeedbackPromptView].
+///  • `feedback` → [PostChatFormView] when the tenant configured a survey,
+///    otherwise [FeedbackPromptView].
 ///
 /// The subtree is wrapped in a [Directionality] driven by `theme.direction` so
 /// `ar`/`ku` tenants flip bubbles + composer. A [WidgetsBindingObserver] relays
@@ -264,6 +266,13 @@ class _EasyLiveChatScreenState extends State<EasyLiveChatScreen>
         );
 
       case ChatPhase.feedback:
+        // A tenant that built a survey in the dashboard gets exactly that;
+        // everyone else keeps the built-in CSAT. Same rule as the web widget,
+        // so a visitor's questions don't depend on which client they opened.
+        final postChat = config?.postChatForm;
+        if (config != null && (postChat?.hasFields ?? false)) {
+          return PostChatFormView(config: config, theme: theme);
+        }
         return FeedbackPromptView(theme: theme);
     }
   }

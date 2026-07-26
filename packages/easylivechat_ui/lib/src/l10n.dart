@@ -153,6 +153,11 @@ class ElcStrings {
         return invalidNumber;
       case 'INVALID_OPTION':
         return invalidOption;
+      case 'INVALID_RATING':
+        // The post-chat survey's rating field. "Please pick a rating" and
+        // "this field is required" are the same instruction to a visitor
+        // staring at an unset row of stars.
+        return fieldRequired;
       default:
         return somethingWentWrong;
     }

@@ -189,6 +189,33 @@ class RestClient {
     }
   }
 
+  /// `POST /:slug/conversations/:id/post-chat` — Bearer [token]; the token's
+  /// conversationId must equal [conversationId]. One-shot, like feedback, but
+  /// the server answers 409 `ALREADY_SUBMITTED` rather than `ALREADY_RATED`.
+  ///
+  /// [fields] is keyed by field **id**, never label — the same contract the
+  /// pre-chat form submits under, and what the dashboard reads back.
+  Future<void> postChat({
+    required String token,
+    required String conversationId,
+    required Map<String, String> fields,
+    String? locale,
+  }) async {
+    try {
+      final res = await _dio.post<dynamic>(
+        '$_base/$_slug/conversations/$conversationId/post-chat',
+        data: {
+          'fields': fields,
+          if (locale != null && locale.isNotEmpty) 'locale': locale,
+        },
+        options: Options(headers: _headers(token)),
+      );
+      if (!_ok(res.statusCode)) throwFor(res);
+    } on DioException catch (e) {
+      throw _networkError(e);
+    }
+  }
+
   /// `POST /visitor/heartbeat` — public; tenant from body.tenantSlug (NOTE: no
   /// `:slug` path segment). Always tolerant/2xx. Keep cadence modest — first
   /// arrival / re-arrival after idle notifies agents.

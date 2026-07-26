@@ -132,6 +132,12 @@ class EasyLiveChat {
           {List<String> attachmentUrls = const []}) =>
       _controller.sendMessage(body, attachmentUrls: attachmentUrls);
 
+  /// Submit the tenant's post-chat survey (see
+  /// [WidgetConfigModel.postChatForm]). Keyed by field id. A conversation that
+  /// was already answered resolves normally — one-shot, not an error.
+  Future<void> submitPostChat(Map<String, String> fields) =>
+      _controller.submitPostChat(fields);
+
   /// Re-send a message that previously failed (tap-to-retry). Drops the failed
   /// row and sends its body + attachments fresh. Returns null when [message] is
   /// not in a failed state.

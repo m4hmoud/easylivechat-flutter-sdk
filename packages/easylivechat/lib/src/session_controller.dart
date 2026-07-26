@@ -137,7 +137,9 @@ class SessionController {
   /// `conversation:closed` re-fire (server emits on ANY *→CLOSED PATCH).
   final Set<String> _closedHandled = {};
 
-  /// Conversations the visitor has already rated (or that were terminal).
+  /// Conversations whose post-chat step is finished — rated, surveyed, or
+  /// terminal. One set for both, because the visitor only ever sees one of the
+  /// two and neither should reappear after it is done.
   final Set<String> _ratedConversations = {};
 
   bool _disposed = false;
@@ -723,6 +725,39 @@ class SessionController {
       // Already rated — treat as terminal so the prompt won't reappear.
       if (e.code == EasyLiveChatErrorCode.alreadyRated) {
         _ratedConversations.add(convId);
+      }
+      rethrow;
+    }
+  }
+
+  /// Submit the tenant's post-chat survey for the conversation just closed.
+  ///
+  /// [fields] is keyed by field **id** — what
+  /// [WidgetConfigModel.postChatForm] declares and what the dashboard reads
+  /// back. Validation is client-side for UX only; the server re-checks.
+  ///
+  /// Like [submitFeedback], a 409 from the server means someone already
+  /// answered, which is a finished state rather than a failure — swallowed so
+  /// the survey doesn't reappear on the next close event.
+  Future<void> submitPostChat(Map<String, String> fields) async {
+    final token = _token;
+    final convId = _conversationId;
+    if (token == null || convId == null) {
+      throw const EasyLiveChatError(EasyLiveChatErrorCode.noToken,
+          message: 'The post-chat survey requires an active session token.');
+    }
+    try {
+      await _guardAuth(() => rest.postChat(
+            token: token,
+            conversationId: convId,
+            fields: fields,
+            locale: config.contentLocale ?? config.locale,
+          ));
+      _ratedConversations.add(convId);
+    } on EasyLiveChatError catch (e) {
+      if (e.code == EasyLiveChatErrorCode.alreadySubmitted) {
+        _ratedConversations.add(convId);
+        return;
       }
       rethrow;
     }

@@ -21,6 +21,7 @@ export 'src/storage.dart'
 export 'src/models/enums.dart';
 export 'src/models/chat_message.dart';
 export 'src/models/pre_chat_form.dart';
+export 'src/models/post_chat_form.dart';
 export 'src/models/widget_config.dart';
 export 'src/models/results.dart';
 export 'src/session_controller.dart'
