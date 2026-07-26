@@ -78,11 +78,20 @@ class ClosedNoticeBanner extends StatelessWidget {
 
     if (elc.availabilityReason.value == 'NO_AGENTS') return strings.noAgentsNotice;
 
+    // A named closure ("Closed for Eid al-Adha") tells the visitor far more
+    // than a generic "we're offline", so prefer it when the server sent one.
+    final label = elc.closureLabel.value;
+    final head = (elc.availabilityReason.value == 'HOLIDAY' &&
+            label != null &&
+            label.isNotEmpty)
+        ? strings.closedForLabel.replaceAll('{label}', label)
+        : strings.closedNotice;
+
     final next = elc.nextOpenAt.value;
-    if (next == null) return strings.closedNotice;
+    if (next == null) return head;
     final hh = next.hour.toString().padLeft(2, '0');
     final mm = next.minute.toString().padLeft(2, '0');
-    return '${strings.closedNotice} ${strings.backAt.replaceAll('{time}', '$hh:$mm')}';
+    return '$head ${strings.backAt.replaceAll('{time}', '$hh:$mm')}';
   }
 
   @override

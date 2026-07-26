@@ -219,6 +219,7 @@ class SessionController {
     visitorMode.value = res.visitorMode;
     availabilityReason.value = res.reason;
     nextOpenAt.value = res.nextOpenAt;
+    closureLabel.value = res.closureLabel;
     // Deliberately NOT ChatPhase.offline. A visitor who arrives out of hours
     // continues into the ordinary chat and simply sees a notice (bind
     // [workspaceClosed]) — their message becomes a PENDING conversation that is
@@ -328,6 +329,7 @@ class SessionController {
   final ValueNotifier<String> visitorMode = ValueNotifier('CHAT');
   final ValueNotifier<String> availabilityReason = ValueNotifier('OPEN');
   final ValueNotifier<DateTime?> nextOpenAt = ValueNotifier(null);
+  final ValueNotifier<String?> closureLabel = ValueNotifier(null);
 
   /// True when the tenant chose "show a notice only" — the composer must be
   /// disabled, not hidden: an input that vanishes reads as breakage, whereas a
@@ -1191,6 +1193,7 @@ class SessionController {
     visitorMode.dispose();
     availabilityReason.dispose();
     nextOpenAt.dispose();
+    closureLabel.dispose();
     connection.dispose();
     messages.dispose();
     agentTyping.dispose();

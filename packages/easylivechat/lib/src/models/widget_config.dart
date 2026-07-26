@@ -128,6 +128,10 @@ class ConfigResponse {
   /// When we next open, so the UI can say "back at 09:00". Null when open.
   final DateTime? nextOpenAt;
 
+  /// The holiday/closure name when [reason] is `HOLIDAY`, e.g. "Eid al-Adha".
+  /// Naming it reads far better than a bare "we're closed".
+  final String? closureLabel;
+
   const ConfigResponse({
     required this.tenantId,
     required this.config,
@@ -138,6 +142,7 @@ class ConfigResponse {
     this.visitorMode = 'CHAT',
     this.reason = 'OPEN',
     this.nextOpenAt,
+    this.closureLabel,
   });
 
   /// True when the tenant chose to show a notice and take nothing.

@@ -86,6 +86,9 @@ class EasyLiveChat {
   /// When we next open — lets the UI say "back at 09:00". Null when open.
   ValueListenable<DateTime?> get nextOpenAt => _controller.nextOpenAt;
 
+  /// Holiday/closure name when the reason is `HOLIDAY`, else null.
+  ValueListenable<String?> get closureLabel => _controller.closureLabel;
+
   /// True when the tenant chose to show a notice and take nothing.
   bool get composerLocked => _controller.composerLocked;
   ValueListenable<ConnectionState> get connection => _controller.connection;
