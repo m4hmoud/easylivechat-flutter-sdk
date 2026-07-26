@@ -125,6 +125,10 @@ class ElcStrings {
   String get sendMessage => _t('sendMessage');
   String get offlineThanks => _t('offlineThanks');
 
+  /// Banner shown while the workspace is closed. The visitor can still write —
+  /// the message waits for the team — so this informs rather than blocks.
+  String get closedNotice => _t('closedNotice');
+
   /// Map a server/SDK error code to a human, localized message (best effort).
   String forErrorCode(String code) {
     switch (code) {
@@ -175,6 +179,7 @@ class ElcStrings {
       'yourEmail': 'Your email',
       'yourMessage': 'Your message',
       'sendMessage': 'Send message',
+      'closedNotice': "Our team is offline right now. Leave your message and we'll reply as soon as we're back.",
       'offlineThanks': "Thanks! We'll get back to you.",
     },
     'ar': {
@@ -209,6 +214,7 @@ class ElcStrings {
       'yourEmail': 'بريدك الإلكتروني',
       'yourMessage': 'رسالتك',
       'sendMessage': 'إرسال الرسالة',
+      'closedNotice': 'فريقنا غير متاح حالياً. اترك رسالتك وسنرد عليك فور عودتنا.',
       'offlineThanks': 'شكرًا! سنعاود التواصل معك.',
     },
     'de': {
@@ -241,6 +247,7 @@ class ElcStrings {
       'yourEmail': 'Ihre E-Mail',
       'yourMessage': 'Ihre Nachricht',
       'sendMessage': 'Nachricht senden',
+      'closedNotice': 'Unser Team ist gerade offline. Hinterlassen Sie Ihre Nachricht — wir antworten, sobald wir zurück sind.',
       'offlineThanks': 'Danke! Wir melden uns bei Ihnen.',
     },
     'es': {
@@ -273,6 +280,7 @@ class ElcStrings {
       'yourEmail': 'Tu correo',
       'yourMessage': 'Tu mensaje',
       'sendMessage': 'Enviar mensaje',
+      'closedNotice': 'Nuestro equipo no está disponible ahora. Deja tu mensaje y te responderemos en cuanto volvamos.',
       'offlineThanks': '¡Gracias! Te responderemos pronto.',
     },
     'fr': {
@@ -305,6 +313,7 @@ class ElcStrings {
       'yourEmail': 'Votre e-mail',
       'yourMessage': 'Votre message',
       'sendMessage': 'Envoyer le message',
+      'closedNotice': 'Notre équipe est hors ligne pour le moment. Laissez votre message, nous répondrons dès notre retour.',
       'offlineThanks': 'Merci ! Nous reviendrons vers vous.',
     },
     'hi': {
@@ -337,6 +346,7 @@ class ElcStrings {
       'yourEmail': 'आपका ईमेल',
       'yourMessage': 'आपका संदेश',
       'sendMessage': 'संदेश भेजें',
+      'closedNotice': 'हमारी टीम अभी ऑफ़लाइन है। अपना संदेश छोड़ें, लौटते ही हम उत्तर देंगे।',
       'offlineThanks': 'धन्यवाद! हम आपसे जल्द संपर्क करेंगे।',
     },
     'it': {
@@ -369,6 +379,7 @@ class ElcStrings {
       'yourEmail': 'La tua email',
       'yourMessage': 'Il tuo messaggio',
       'sendMessage': 'Invia messaggio',
+      'closedNotice': 'Il nostro team non è disponibile al momento. Lascia il tuo messaggio e ti risponderemo appena torniamo.',
       'offlineThanks': 'Grazie! Ti risponderemo presto.',
     },
     'ku': {
@@ -404,6 +415,7 @@ class ElcStrings {
       'yourEmail': 'ئیمەیڵەکەت',
       'yourMessage': 'پەیامەکەت',
       'sendMessage': 'ناردنی پەیام',
+      'closedNotice': 'تیمەکەمان ئێستا دەرەوەی کارە. نامەکەت بەجێبهێڵە، هەرکە گەڕاینەوە وەڵامت دەدەینەوە.',
       'offlineThanks': 'سوپاس! بەمزووانە پەیوەندیت پێوە دەکەین.',
     },
     'pt': {
@@ -436,6 +448,7 @@ class ElcStrings {
       'yourEmail': 'Seu e-mail',
       'yourMessage': 'Sua mensagem',
       'sendMessage': 'Enviar mensagem',
+      'closedNotice': 'A nossa equipa está offline neste momento. Deixe a sua mensagem e responderemos assim que voltarmos.',
       'offlineThanks': 'Obrigado! Entraremos em contato.',
     },
     'tr': {
@@ -468,6 +481,7 @@ class ElcStrings {
       'yourEmail': 'E-postanız',
       'yourMessage': 'Mesajınız',
       'sendMessage': 'Mesaj gönder',
+      'closedNotice': 'Ekibimiz şu anda çevrimdışı. Mesajınızı bırakın, döndüğümüzde hemen yanıtlayalım.',
       'offlineThanks': 'Teşekkürler! Size geri döneceğiz.',
     },
     'ur': {
@@ -500,6 +514,7 @@ class ElcStrings {
       'yourEmail': 'آپ کا ای میل',
       'yourMessage': 'آپ کا پیغام',
       'sendMessage': 'پیغام بھیجیں',
+      'closedNotice': 'ہماری ٹیم اس وقت آف لائن ہے۔ اپنا پیغام چھوڑ دیں، واپس آتے ہی جواب دیں گے۔',
       'offlineThanks': 'شکریہ! ہم جلد آپ سے رابطہ کریں گے۔',
     },
     'zh': {
@@ -532,6 +547,7 @@ class ElcStrings {
       'yourEmail': '您的邮箱',
       'yourMessage': '您的留言',
       'sendMessage': '发送留言',
+      'closedNotice': '我们的团队当前不在线。请留言，我们回来后会尽快回复。',
       'offlineThanks': '谢谢！我们会尽快回复您。',
     },
     // Northern Kurdish (Kurmanji / Badini, Arabic script). Zirak's default
@@ -570,6 +586,7 @@ class ElcStrings {
       'yourEmail': 'ئیمەیلا تە',
       'yourMessage': 'نامەیا تە',
       'sendMessage': 'نامەیێ فرێکە',
+      'closedNotice': 'Tîma me niha ne li ser xetê ye. Peyama xwe bihêlin — gava em vegerin em ê bersiva we bidin.',
       'offlineThanks': 'سوپاس! ئەم دێ ب تە ڤە پەیوەندیێ کەین.',
     },
   };

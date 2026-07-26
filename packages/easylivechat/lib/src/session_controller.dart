@@ -216,9 +216,11 @@ class SessionController {
     // push is judged exactly as this first decision was.
     _chatAvailabilityMode = res.chatAvailabilityMode;
     _asyncEnabled = res.asyncEnabled;
-    if (res.isClosed) {
-      _setPhase(ChatPhase.offline);
-    }
+    // Deliberately NOT ChatPhase.offline. A visitor who arrives out of hours
+    // continues into the ordinary chat and simply sees a notice (bind
+    // [workspaceClosed]) — their message becomes a PENDING conversation that is
+    // auto-assigned when the team returns. The old behaviour dropped them onto
+    // a ticket form, a dead end whose submissions never became conversations.
     return res.config;
   }
 
@@ -235,10 +237,6 @@ class SessionController {
     if (config.enablePresenceSocket) {
       _connectPresence();
     }
-
-    // Closed means closed: don't resume an existing thread into a live
-    // composer. loadConfig() has already put us in ChatPhase.offline.
-    if (_workspaceClosed) return;
 
     final resumed = await silentResume();
     if (resumed) return;
@@ -315,7 +313,14 @@ class SessionController {
   String _chatAvailabilityMode = 'ALWAYS';
   bool _asyncEnabled = false;
 
-  /// True when either availability gate says the workspace is unavailable.
+  /// True when either availability gate says the workspace is unavailable:
+  /// outside working hours, or (for WHEN_ACCEPTING tenants) nobody accepting.
+  ///
+  /// Presentational only — bind it to show a notice. It never blocks writing,
+  /// because a message sent while closed is still a real conversation that the
+  /// team picks up when they are back.
+  bool get workspaceClosed => _workspaceClosed;
+
   bool get _workspaceClosed {
     if (!isOpen.value) return true;
     return _chatAvailabilityMode == 'WHEN_ACCEPTING' &&
@@ -323,26 +328,16 @@ class SessionController {
         _asyncEnabled;
   }
 
-  /// Re-gate the UI after a live availability push.
+  /// Availability changed mid-session.
   ///
-  /// Closing time is a hard stop: a visitor mid-conversation is moved to the
-  /// offline form too, so nobody can keep sending into a closed workspace.
-  /// Only [ChatPhase.feedback] is spared — it is a post-chat rating screen with
-  /// no composer, so it can't send anything, and replacing it would just lose
-  /// the rating.
-  void _applyAvailabilityChange() {
-    final p = phase.value;
-    if (p == ChatPhase.feedback) return;
-
-    if (_workspaceClosed) {
-      if (p != ChatPhase.offline) _setPhase(ChatPhase.offline);
-      return;
-    }
-    if (p == ChatPhase.offline) _setPhase(_idlePhase());
-  }
+  /// Nothing to do for the phase any more: closing time shows a notice, it does
+  /// not move the visitor anywhere. [isOpen]/[agentsAccepting] have already
+  /// been updated by the caller, and [workspaceClosed] derives from them, so
+  /// any bound UI re-renders on its own. Kept as a named no-op hook so the
+  /// intent is explicit at the call sites rather than looking like an omission.
+  void _applyAvailabilityChange() {}
 
   ChatPhase _idlePhase() {
-    if (_workspaceClosed) return ChatPhase.offline;
     final cfg = widgetConfig.value;
     if (cfg != null && cfg.preChatForm.enabled) return ChatPhase.prechat;
     return ChatPhase.idle;

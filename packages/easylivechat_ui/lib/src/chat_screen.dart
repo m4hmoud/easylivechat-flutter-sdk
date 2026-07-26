@@ -8,7 +8,7 @@ import 'picked_file.dart';
 import 'theme.dart';
 import 'views/composer_bar.dart';
 import 'views/feedback_prompt_view.dart';
-import 'views/offline_form_view.dart';
+import 'views/closed_notice_view.dart';
 import 'views/pre_chat_form_view.dart';
 import 'views/thread_view.dart';
 
@@ -17,7 +17,7 @@ import 'views/thread_view.dart';
 /// Maps each [ChatPhase] to the matching view:
 ///  • `idle` / `loading` / `resuming` → centered spinner (and triggers
 ///    `open()` from `idle` so the bubble can present this directly);
-///  • `offline` → [OfflineFormView];
+///  • `offline` → [ClosedNoticeView];
 ///  • `prechat` → [PreChatFormView];
 ///  • `chat` → a [Column] of [ThreadView] + [ComposerBar];
 ///  • `feedback` → [FeedbackPromptView].
@@ -214,7 +214,7 @@ class _EasyLiveChatScreenState extends State<EasyLiveChatScreen>
         if (config == null) {
           return _error != null ? _buildError(config, theme) : _spinner(theme);
         }
-        return OfflineFormView(config: config, theme: theme);
+        return ClosedNoticeView(config: config, theme: theme);
 
       case ChatPhase.prechat:
         if (config == null) {
@@ -225,6 +225,11 @@ class _EasyLiveChatScreenState extends State<EasyLiveChatScreen>
       case ChatPhase.chat:
         return Column(
           children: [
+            // Closed, but the composer stays live: the message becomes a
+            // PENDING conversation the team picks up when they are back.
+            if (EasyLiveChat.instance.isBooted &&
+                EasyLiveChat.instance.workspaceClosed)
+              ClosedNoticeBanner(config: config, theme: theme),
             Expanded(child: ThreadView(theme: theme)),
             ComposerBar(
               theme: theme,

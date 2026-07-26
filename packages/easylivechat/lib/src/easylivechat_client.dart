@@ -70,6 +70,12 @@ class EasyLiveChat {
   /// Whether any agent is currently accepting chats. Updates live alongside
   /// [isOpen]; only gates the UI for `WHEN_ACCEPTING` tenants.
   ValueListenable<bool> get agentsAccepting => _controller.agentsAccepting;
+
+  /// True when the workspace is closed — outside working hours, or (for
+  /// WHEN_ACCEPTING tenants) nobody accepting. Presentational: show a notice.
+  /// It never blocks writing, because a message sent while closed still becomes
+  /// a real conversation the team picks up when they are back.
+  bool get workspaceClosed => _controller.workspaceClosed;
   ValueListenable<ConnectionState> get connection => _controller.connection;
   ValueListenable<List<ChatMessage>> get messages => _controller.messages;
   ValueListenable<bool> get agentTyping => _controller.agentTyping;
