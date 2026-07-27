@@ -29,8 +29,34 @@ class ElcStrings {
 
   /// Replace the host string overrides (merges over the built-in table). Pass an
   /// empty map to clear.
+  ///
+  /// These apply to EVERY locale. A host whose own copy is multilingual wants
+  /// [overrideByLocale] instead — this one silently shows the same words to a
+  /// Kurdish and an Arabic visitor.
   static void overrideAll(Map<String, String> strings) {
     _overrides = Map<String, String>.unmodifiable(strings);
+  }
+
+  /// Per-locale host overrides: `{'ckb': {'send': 'بنێرە'}, 'ar': {…}}`.
+  ///
+  /// Beats [overrideAll] when both define a key, because it is the more
+  /// specific statement. Locale codes are normalized the same way everything
+  /// else is, so `ku`, `CKB` and `ckb-IQ` all land on `ckb`.
+  ///
+  /// A locale the SDK doesn't ship works too: supply `{'fa': {…}}` and a
+  /// Persian visitor gets those strings, falling back to English for keys the
+  /// host didn't provide. That makes this the way to add a language without
+  /// waiting on an SDK release.
+  static Map<String, Map<String, String>> _localeOverrides = const {};
+
+  static void overrideByLocale(Map<String, Map<String, String>> byLocale) {
+    final out = <String, Map<String, String>>{};
+    for (final entry in byLocale.entries) {
+      final code = _normalize(entry.key);
+      if (code == null) continue;
+      out[code] = Map<String, String>.unmodifiable(entry.value);
+    }
+    _localeOverrides = Map<String, Map<String, String>>.unmodifiable(out);
   }
 
   /// Host-forced chrome locale (e.g. the host app's current locale). Wins over
@@ -49,21 +75,19 @@ class ElcStrings {
   /// device locale → English.
   factory ElcStrings.of(String? localeCode) {
     final host = _normalize(_hostLocale);
-    if (host != null && _table.containsKey(host)) {
-      return ElcStrings._(host);
-    }
+    if (host != null && _known(host)) return ElcStrings._(host);
     final explicit = _normalize(localeCode);
-    if (explicit != null && _table.containsKey(explicit)) {
-      return ElcStrings._(explicit);
-    }
+    if (explicit != null && _known(explicit)) return ElcStrings._(explicit);
     final device = _normalize(
       PlatformDispatcher.instance.locale.languageCode,
     );
-    if (device != null && _table.containsKey(device)) {
-      return ElcStrings._(device);
-    }
+    if (device != null && _known(device)) return ElcStrings._(device);
     return const ElcStrings._('en');
   }
+
+  /// A locale we can render: one we ship, or one the host supplied strings for.
+  static bool _known(String code) =>
+      _table.containsKey(code) || _localeOverrides.containsKey(code);
 
   static String? _normalize(String? code) {
     if (code == null) return null;
@@ -81,8 +105,12 @@ class ElcStrings {
   }
 
   String _t(String key) {
+    // Most specific first: this locale's host override, then the host's
+    // all-locale override, then the shipped table, then English.
+    final perLocale = _localeOverrides[_lang]?[key];
+    if (perLocale != null && perLocale.isNotEmpty) return perLocale;
     final o = _overrides[key];
-    if (o != null) return o;
+    if (o != null && o.isNotEmpty) return o;
     final m = _table[_lang] ?? _table['en']!;
     return m[key] ?? _table['en']![key] ?? key;
   }

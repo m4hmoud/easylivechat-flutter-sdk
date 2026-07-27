@@ -48,6 +48,17 @@ class EasyLiveChatScreen extends StatefulWidget {
   /// chat wording/translation.
   final Map<String, String>? strings;
 
+  /// Per-locale chrome overrides: `{'ckb': {'send': 'بنێرە'}, 'ar': {…}}`.
+  ///
+  /// Prefer this over [strings] when your own copy is multilingual — [strings]
+  /// applies to every locale, so it shows a Kurdish and an Arabic visitor the
+  /// same words. Wins over [strings] key by key; anything you leave out falls
+  /// back to the SDK's own translation.
+  ///
+  /// A locale the SDK doesn't ship works too, which is how you add a language
+  /// without waiting on an SDK release.
+  final Map<String, Map<String, String>>? stringsByLocale;
+
   /// Force the chrome locale (e.g. the host app's current locale code like
   /// `kmr`/`ar`), overriding the server workspace locale — the server returns
   /// its own default (often `en`) regardless of the visitor's app language.
@@ -75,6 +86,7 @@ class EasyLiveChatScreen extends StatefulWidget {
     this.directionOverride,
     this.onPickAttachments,
     this.strings,
+    this.stringsByLocale,
     this.locale,
     this.confirmExit = false,
   });
@@ -99,6 +111,9 @@ class _EasyLiveChatScreenState extends State<EasyLiveChatScreen>
     // Register host locale + string overrides (own translation) before views build.
     if (widget.locale != null) ElcStrings.setLocale(widget.locale);
     if (widget.strings != null) ElcStrings.overrideAll(widget.strings!);
+    if (widget.stringsByLocale != null) {
+      ElcStrings.overrideByLocale(widget.stringsByLocale!);
+    }
     WidgetsBinding.instance.addObserver(this);
     if (EasyLiveChat.instance.isBooted) {
       // Surface a full-screen error only while we're still blocked loading the
