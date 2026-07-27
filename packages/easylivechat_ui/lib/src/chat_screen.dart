@@ -53,6 +53,19 @@ class EasyLiveChatScreen extends StatefulWidget {
   /// its own default (often `en`) regardless of the visitor's app language.
   final String? locale;
 
+  /// Ask before the visitor leaves the chat.
+  ///
+  /// When true, backing out — the host's app-bar back button, the Android back
+  /// button, or the iOS swipe — first shows a confirmation. A stray gesture
+  /// mid-conversation otherwise drops the visitor straight out of the thread.
+  ///
+  /// This confirms LEAVING THE SCREEN, not ending the conversation: the chat
+  /// stays open and reopening resumes it with its history.
+  ///
+  /// Off by default so hosts that already own their own exit flow are
+  /// unaffected.
+  final bool confirmExit;
+
   const EasyLiveChatScreen({
     super.key,
     this.themeOverride,
@@ -60,6 +73,7 @@ class EasyLiveChatScreen extends StatefulWidget {
     this.onPickAttachments,
     this.strings,
     this.locale,
+    this.confirmExit = false,
   });
 
   @override
@@ -200,13 +214,18 @@ class _EasyLiveChatScreenState extends State<EasyLiveChatScreen>
           }
           return Directionality(
             textDirection: theme.direction,
-            child: Material(
-              color: theme.background,
-              child: SafeArea(
-                child: ValueListenableBuilder<ChatPhase>(
-                  valueListenable: EasyLiveChat.instance.phase,
-                  builder: (context, phase, _) =>
-                      _buildPhase(context, phase, config, theme),
+            child: _ExitGuard(
+              enabled: widget.confirmExit,
+              theme: theme,
+              strings: ElcStrings.of(widget.locale ?? config?.locale),
+              child: Material(
+                color: theme.background,
+                child: SafeArea(
+                  child: ValueListenableBuilder<ChatPhase>(
+                    valueListenable: EasyLiveChat.instance.phase,
+                    builder: (context, phase, _) =>
+                        _buildPhase(context, phase, config, theme),
+                  ),
                 ),
               ),
             ),
@@ -308,6 +327,77 @@ class _Centered extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Center(child: child);
+}
+
+/// Confirms before the visitor leaves the chat.
+///
+/// A `PopScope` rather than a wrapper around some close button, because the
+/// host owns the chrome: the rider app supplies its own app-bar back arrow,
+/// and there is still the Android back button and the iOS edge swipe. Guarding
+/// the ROUTE catches all three, so a host needs no changes beyond the flag.
+class _ExitGuard extends StatelessWidget {
+  final bool enabled;
+  final EasyLiveChatTheme theme;
+  final ElcStrings strings;
+  final Widget child;
+
+  const _ExitGuard({
+    required this.enabled,
+    required this.theme,
+    required this.strings,
+    required this.child,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    if (!enabled) return child;
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) async {
+        if (didPop) return;
+        final leave = await _ask(context);
+        if (leave && context.mounted) Navigator.of(context).pop();
+      },
+      child: child,
+    );
+  }
+
+  Future<bool> _ask(BuildContext context) async {
+    final answer = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => Directionality(
+        textDirection: theme.direction,
+        child: AlertDialog(
+          backgroundColor: theme.surface,
+          title: Text(
+            strings.exitChatTitle,
+            style: TextStyle(color: theme.text, fontSize: 16),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: Text(
+                strings.exitChatCancel,
+                style: TextStyle(color: theme.text.withValues(alpha: 0.7)),
+              ),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              child: Text(
+                strings.exitChatConfirm,
+                style: TextStyle(
+                  color: theme.primary,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+    // Dismissing the dialog by tapping outside means "no", not "leave".
+    return answer ?? false;
+  }
 }
 
 /// Full-screen error + retry, shown when config/session loading fails (instead

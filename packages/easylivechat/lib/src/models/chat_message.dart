@@ -60,6 +60,16 @@ class ChatMessage {
   final String? senderAgentId;
   final String? senderName;
 
+  /// The replying agent's photo and job title.
+  ///
+  /// Both are gated server-side by the workspace's "Show agent avatars" /
+  /// "Show agent names" switches — they arrive null when the tenant has turned
+  /// them off, so the UI can render whatever it is given without re-checking.
+  /// [senderAvatarUrl] may be server-relative (`/uploads/...`); resolve it with
+  /// `EasyLiveChat.instance.resolveUrl` before loading.
+  final String? senderAvatarUrl;
+  final String? senderJobTitle;
+
   /// Body text. Note: attachment-only messages come back as the empty string
   /// `''` (not null) — relevant for optimistic reconcile-by-body matching.
   final String? body;
@@ -90,6 +100,8 @@ class ChatMessage {
     this.tenantId,
     this.senderAgentId,
     this.senderName,
+    this.senderAvatarUrl,
+    this.senderJobTitle,
     this.body,
     required this.senderType,
     required this.contentType,
@@ -135,6 +147,9 @@ class ChatMessage {
       tenantId: j['tenantId']?.toString(),
       senderAgentId: j['senderAgentId']?.toString() ?? j['agentId']?.toString(),
       senderName: j['senderName'] as String? ?? j['agentName'] as String?,
+      senderAvatarUrl:
+          j['senderAvatarUrl'] as String? ?? j['agentAvatarUrl'] as String?,
+      senderJobTitle: j['senderJobTitle'] as String?,
       body: j['body'] as String?,
       senderType: SenderType.fromWire(j['senderType']),
       contentType: MessageContentType.fromWire(j['contentType']),
@@ -183,6 +198,8 @@ class ChatMessage {
       tenantId: tenantId,
       senderAgentId: senderAgentId,
       senderName: senderName,
+      senderAvatarUrl: senderAvatarUrl,
+      senderJobTitle: senderJobTitle,
       body: body,
       senderType: senderType,
       contentType: contentType,

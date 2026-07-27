@@ -46,6 +46,9 @@ class _ThreadViewState extends State<ThreadView> {
   bool get _showAgentNames =>
       EasyLiveChat.instance.widgetConfig.value?.showAgentNames ?? true;
 
+  bool get _showAgentAvatars =>
+      EasyLiveChat.instance.widgetConfig.value?.showAgentAvatars ?? true;
+
   @override
   void initState() {
     super.initState();
@@ -169,6 +172,7 @@ class _ThreadViewState extends State<ThreadView> {
                         message: m,
                         theme: t,
                         showAgentName: _showAgentNames,
+                        showAgentAvatar: _showAgentAvatars,
                         strings: _s,
                       );
                     }
@@ -216,6 +220,7 @@ class MessageBubble extends StatelessWidget {
   final ChatMessage message;
   final EasyLiveChatTheme theme;
   final bool showAgentName;
+  final bool showAgentAvatar;
   final ElcStrings strings;
 
   const MessageBubble({
@@ -223,6 +228,7 @@ class MessageBubble extends StatelessWidget {
     required this.message,
     required this.theme,
     required this.showAgentName,
+    this.showAgentAvatar = true,
     required this.strings,
   });
 
@@ -237,17 +243,22 @@ class MessageBubble extends StatelessWidget {
 
     final body = (message.body ?? '').trim();
     final tiles = _attachmentTiles(textColor);
+    // An avatar only ever sits beside an AGENT bubble, and only when the
+    // workspace has the switch on. The server already nulls the URL when it is
+    // off, but a bot/system line has no face either way.
+    final withAvatar = !_isCustomer && showAgentAvatar && !_isBotOrSystem;
+    // Leave room for the face so a narrow phone doesn't overflow the row.
+    final maxBubble =
+        MediaQuery.of(context).size.width * (withAvatar ? 0.68 : 0.78);
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-      child: Column(
+    final column = Column(
         crossAxisAlignment: align,
         children: [
           if (!_isCustomer && showAgentName && _agentName != null)
             Padding(
               padding: const EdgeInsets.only(left: 4, bottom: 2),
               child: Text(
-                _agentName!,
+                _agentLine!,
                 style: TextStyle(
                   color: theme.text.withValues(alpha: 0.6),
                   fontSize: 11,
@@ -257,7 +268,7 @@ class MessageBubble extends StatelessWidget {
             ),
           ConstrainedBox(
             constraints: BoxConstraints(
-              maxWidth: MediaQuery.of(context).size.width * 0.78,
+              maxWidth: maxBubble,
             ),
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
@@ -304,13 +315,43 @@ class MessageBubble extends StatelessWidget {
           const SizedBox(height: 2),
           _meta(textColorMuted: theme.text.withValues(alpha: 0.45)),
         ],
-      ),
+      );
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+      child: withAvatar
+          ? Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _AgentAvatar(
+                  url: message.senderAvatarUrl,
+                  name: _agentName,
+                  theme: theme,
+                ),
+                const SizedBox(width: 8),
+                Flexible(child: column),
+              ],
+            )
+          : column,
     );
   }
+
+  bool get _isBotOrSystem =>
+      message.senderType == SenderType.bot ||
+      message.senderType == SenderType.system;
 
   String? get _agentName {
     final n = message.senderName?.trim();
     return (n != null && n.isNotEmpty) ? n : null;
+  }
+
+  /// Name, plus the job title when the agent has one — matches the web widget,
+  /// which renders "Ava · Support Lead" above the bubble.
+  String? get _agentLine {
+    final n = _agentName;
+    if (n == null) return null;
+    final title = message.senderJobTitle?.trim();
+    return (title != null && title.isNotEmpty) ? '$n · $title' : n;
   }
 
   Widget _meta({required Color textColorMuted}) {
@@ -518,6 +559,64 @@ class MessageBubble extends StatelessWidget {
 }
 
 /// Animated three-dot "agent is typing" row, left-aligned like an agent bubble.
+/// The replying agent's face, beside their bubble.
+///
+/// Falls back to the initial of their name on a tinted circle when there is no
+/// photo — the same fallback the web widget uses, so an agent without an
+/// avatar still reads as a person rather than leaving a hole in the layout.
+class _AgentAvatar extends StatelessWidget {
+  final String? url;
+  final String? name;
+  final EasyLiveChatTheme theme;
+
+  const _AgentAvatar({required this.url, required this.name, required this.theme});
+
+  static const double _size = 28;
+
+  @override
+  Widget build(BuildContext context) {
+    final raw = url?.trim();
+    final initial =
+        (name?.trim().isNotEmpty ?? false) ? name!.trim()[0].toUpperCase() : 'A';
+
+    final fallback = Container(
+      width: _size,
+      height: _size,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: theme.primary.withValues(alpha: 0.15),
+        shape: BoxShape.circle,
+      ),
+      child: Text(
+        initial,
+        style: TextStyle(
+          color: theme.primary,
+          fontSize: 12,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+    );
+
+    if (raw == null || raw.isEmpty) return fallback;
+
+    // Avatars come back server-relative (`/uploads/...`); resolveUrl makes them
+    // absolute against the configured API host.
+    final resolved = EasyLiveChat.instance.resolveUrl(raw);
+    return ClipOval(
+      child: CachedNetworkImage(
+        imageUrl: resolved,
+        width: _size,
+        height: _size,
+        fit: BoxFit.cover,
+        // A broken or slow avatar must never break the thread — degrade to the
+        // initial rather than showing an error glyph mid-conversation.
+        placeholder: (_, __) => fallback,
+        errorWidget: (_, __, ___) => fallback,
+      ),
+    );
+  }
+}
+
 class _TypingRow extends StatefulWidget {
   final EasyLiveChatTheme theme;
   final String label;

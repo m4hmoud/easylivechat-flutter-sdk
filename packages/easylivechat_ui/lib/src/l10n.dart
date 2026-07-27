@@ -142,6 +142,14 @@ class ElcStrings {
   /// know they cannot be helped right now before reading a word of body copy.
   String get unavailableTitle => _t('unavailableTitle');
 
+  // ── leaving the chat ──
+
+  /// Asked before the visitor backs out of the chat, so a stray back gesture
+  /// mid-conversation doesn't drop them out of it.
+  String get exitChatTitle => _t('exitChatTitle');
+  String get exitChatConfirm => _t('exitChatConfirm');
+  String get exitChatCancel => _t('exitChatCancel');
+
   /// Map a server/SDK error code to a human, localized message (best effort).
   String forErrorCode(String code) {
     switch (code) {
@@ -203,6 +211,9 @@ class ElcStrings {
       'closedForLabel': "We're closed for {label}.",
       'unavailableTitle': "We're not available right now",
       'offlineThanks': "Thanks! We'll get back to you.",
+      'exitChatTitle': 'Do you really want to close this chat?',
+      'exitChatConfirm': 'Close chat',
+      'exitChatCancel': 'Cancel',
     },
     'ar': {
       'send': 'إرسال',
@@ -242,6 +253,9 @@ class ElcStrings {
       'closedForLabel': 'نحن مغلقون بمناسبة {label}.',
       'unavailableTitle': 'غير متاحين حالياً',
       'offlineThanks': 'شكرًا! سنعاود التواصل معك.',
+      'exitChatTitle': 'هل تريد حقًا إغلاق هذه الدردشة؟',
+      'exitChatConfirm': 'إغلاق الدردشة',
+      'exitChatCancel': 'إلغاء',
     },
     'de': {
       'send': 'Senden',
@@ -279,6 +293,9 @@ class ElcStrings {
       'closedForLabel': 'Wir haben wegen {label} geschlossen.',
       'unavailableTitle': 'Wir sind gerade nicht erreichbar',
       'offlineThanks': 'Danke! Wir melden uns bei Ihnen.',
+      'exitChatTitle': 'Möchten Sie diesen Chat wirklich schließen?',
+      'exitChatConfirm': 'Chat schließen',
+      'exitChatCancel': 'Abbrechen',
     },
     'es': {
       'send': 'Enviar',
@@ -316,6 +333,9 @@ class ElcStrings {
       'closedForLabel': 'Cerramos por {label}.',
       'unavailableTitle': 'No estamos disponibles ahora',
       'offlineThanks': '¡Gracias! Te responderemos pronto.',
+      'exitChatTitle': '¿Seguro que quieres cerrar este chat?',
+      'exitChatConfirm': 'Cerrar chat',
+      'exitChatCancel': 'Cancelar',
     },
     'fr': {
       'send': 'Envoyer',
@@ -353,6 +373,9 @@ class ElcStrings {
       'closedForLabel': 'Nous sommes fermés pour {label}.',
       'unavailableTitle': 'Nous ne sommes pas disponibles pour le moment',
       'offlineThanks': 'Merci ! Nous reviendrons vers vous.',
+      'exitChatTitle': 'Voulez-vous vraiment fermer cette discussion ?',
+      'exitChatConfirm': 'Fermer la discussion',
+      'exitChatCancel': 'Annuler',
     },
     'hi': {
       'send': 'भेजें',
@@ -390,6 +413,9 @@ class ElcStrings {
       'closedForLabel': 'हम {label} के कारण बंद हैं।',
       'unavailableTitle': 'हम अभी उपलब्ध नहीं हैं',
       'offlineThanks': 'धन्यवाद! हम आपसे जल्द संपर्क करेंगे।',
+      'exitChatTitle': 'क्या आप वाकई यह चैट बंद करना चाहते हैं?',
+      'exitChatConfirm': 'चैट बंद करें',
+      'exitChatCancel': 'रद्द करें',
     },
     'it': {
       'send': 'Invia',
@@ -427,6 +453,9 @@ class ElcStrings {
       'closedForLabel': 'Siamo chiusi per {label}.',
       'unavailableTitle': 'Al momento non siamo disponibili',
       'offlineThanks': 'Grazie! Ti risponderemo presto.',
+      'exitChatTitle': 'Vuoi davvero chiudere questa chat?',
+      'exitChatConfirm': 'Chiudi chat',
+      'exitChatCancel': 'Annulla',
     },
     'ku': {
       'send': 'ناردن',
@@ -467,6 +496,9 @@ class ElcStrings {
       'closedForLabel': 'بەهۆی {label} داخراوین.',
       'unavailableTitle': 'ئێستا بەردەست نین',
       'offlineThanks': 'سوپاس! بەمزووانە پەیوەندیت پێوە دەکەین.',
+      'exitChatTitle': 'بەڕاستی دەتەوێت ئەم گفتوگۆیە دابخەیت؟',
+      'exitChatConfirm': 'داخستنی گفتوگۆ',
+      'exitChatCancel': 'پاشگەزبوونەوە',
     },
     'pt': {
       'send': 'Enviar',
@@ -504,6 +536,9 @@ class ElcStrings {
       'closedForLabel': 'Estamos fechados por {label}.',
       'unavailableTitle': 'Não estamos disponíveis no momento',
       'offlineThanks': 'Obrigado! Entraremos em contato.',
+      'exitChatTitle': 'Tem certeza de que deseja fechar esta conversa?',
+      'exitChatConfirm': 'Fechar conversa',
+      'exitChatCancel': 'Cancelar',
     },
     'tr': {
       'send': 'Gönder',
@@ -541,6 +576,9 @@ class ElcStrings {
       'closedForLabel': '{label} nedeniyle kapalıyız.',
       'unavailableTitle': 'Şu anda müsait değiliz',
       'offlineThanks': 'Teşekkürler! Size geri döneceğiz.',
+      'exitChatTitle': 'Bu sohbeti kapatmak istediğinize emin misiniz?',
+      'exitChatConfirm': 'Sohbeti kapat',
+      'exitChatCancel': 'İptal',
     },
     'ur': {
       'send': 'بھیجیں',
@@ -578,6 +616,9 @@ class ElcStrings {
       'closedForLabel': 'ہم {label} کی وجہ سے بند ہیں۔',
       'unavailableTitle': 'ہم اس وقت دستیاب نہیں ہیں',
       'offlineThanks': 'شکریہ! ہم جلد آپ سے رابطہ کریں گے۔',
+      'exitChatTitle': 'کیا آپ واقعی یہ چیٹ بند کرنا چاہتے ہیں؟',
+      'exitChatConfirm': 'چیٹ بند کریں',
+      'exitChatCancel': 'منسوخ کریں',
     },
     'zh': {
       'send': '发送',
@@ -615,6 +656,9 @@ class ElcStrings {
       'closedForLabel': '我们因{label}休息。',
       'unavailableTitle': '我们现在无法接待',
       'offlineThanks': '谢谢！我们会尽快回复您。',
+      'exitChatTitle': '确定要关闭此对话吗？',
+      'exitChatConfirm': '关闭对话',
+      'exitChatCancel': '取消',
     },
     // Northern Kurdish (Kurmanji / Badini, Arabic script). Zirak's default
     // locale; ckb (Sorani) maps to `ku` above. Core terms verified against the
@@ -658,6 +702,9 @@ class ElcStrings {
       'closedForLabel': 'ئەم ژ بەر {label} گرتی ن.',
       'unavailableTitle': 'ئەم نوکە بەردەست نینن',
       'offlineThanks': 'سوپاس! ئەم دێ ب تە ڤە پەیوەندیێ کەین.',
+      'exitChatTitle': 'ب ڕاستی دڤێت ڤێ چاتێ بگری؟',
+      'exitChatConfirm': 'چاتێ بگرە',
+      'exitChatCancel': 'بەتالکرن',
     },
   };
 }
