@@ -329,34 +329,24 @@ class _PostChatFormViewState extends State<PostChatFormView> {
             return Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Container(
-                  decoration: _fieldDecoration(state.hasError),
-                  padding: const EdgeInsets.symmetric(horizontal: 12),
-                  child: DropdownButtonHideUnderline(
-                    child: DropdownButton<String>(
-                      isExpanded: true,
-                      value: value.isEmpty ? null : value,
-                      hint: Text(
-                        f.placeholder?.isNotEmpty == true
-                            ? f.placeholder!
-                            : _s.selectAnOption,
-                        style: TextStyle(color: t.text.withValues(alpha: 0.5)),
-                      ),
-                      dropdownColor: t.surface,
-                      style: TextStyle(color: t.text, fontSize: 15),
-                      items: [
-                        for (final opt in f.options)
-                          DropdownMenuItem(value: opt, child: Text(opt)),
-                      ],
-                      onChanged: _submitting
-                          ? null
-                          : (v) {
-                              setState(() => _selectValues[f.id] = v ?? '');
-                              state.didChange(v);
-                            },
-                    ),
+                // Radio rows, not a dropdown. A post-chat survey asks two or
+                // three short questions with two or three short answers; a
+                // dropdown hides every option behind a tap, opens a modal
+                // sheet over the thread, and turns a one-tap answer into
+                // three. Laying the options out flat means the visitor can
+                // see and answer the whole survey without a single menu.
+                for (final opt in f.options)
+                  _RadioRow(
+                    label: opt,
+                    selected: value == opt,
+                    enabled: !_submitting,
+                    theme: t,
+                    hasError: state.hasError,
+                    onTap: () {
+                      setState(() => _selectValues[f.id] = opt);
+                      state.didChange(opt);
+                    },
                   ),
-                ),
                 if (state.hasError) _errorText(state.errorText!),
               ],
             );
@@ -447,16 +437,6 @@ class _PostChatFormViewState extends State<PostChatFormView> {
         ),
       );
 
-  BoxDecoration _fieldDecoration(bool hasError) => BoxDecoration(
-        color: _theme.surface,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(
-          color: hasError
-              ? _ErrorColor.color
-              : _theme.text.withValues(alpha: 0.15),
-        ),
-      );
-
   OutlineInputBorder _border(Color color, {double width = 1}) =>
       OutlineInputBorder(
         borderRadius: BorderRadius.circular(10),
@@ -486,4 +466,97 @@ class _PostChatFormViewState extends State<PostChatFormView> {
 /// error colour of its own.
 abstract final class _ErrorColor {
   static const color = Color(0xFFDC2626);
+}
+
+/// One tappable answer in a select question.
+///
+/// The whole row is the target, not just the little circle — on a phone the
+/// circle alone is well under the 44pt minimum, and nobody aims for it when
+/// the label is right there.
+class _RadioRow extends StatelessWidget {
+  final String label;
+  final bool selected;
+  final bool enabled;
+  final bool hasError;
+  final EasyLiveChatTheme theme;
+  final VoidCallback onTap;
+
+  const _RadioRow({
+    required this.label,
+    required this.selected,
+    required this.enabled,
+    required this.hasError,
+    required this.theme,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final border = hasError
+        ? _ErrorColor.color
+        : selected
+            ? theme.primary
+            : theme.text.withValues(alpha: 0.25);
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Material(
+        color: selected
+            ? theme.primary.withValues(alpha: 0.10)
+            : Colors.transparent,
+        borderRadius: BorderRadius.circular(12),
+        child: InkWell(
+          onTap: enabled ? onTap : null,
+          borderRadius: BorderRadius.circular(12),
+          child: Container(
+            constraints: const BoxConstraints(minHeight: 46),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            decoration: BoxDecoration(
+              border: Border.all(color: border, width: selected ? 1.6 : 1),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Row(
+              children: [
+                // Drawn rather than a Radio widget: Radio carries Material
+                // theming that ignores the tenant's colours.
+                Container(
+                  width: 20,
+                  height: 20,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: selected ? theme.primary : theme.text.withValues(alpha: 0.35),
+                      width: 2,
+                    ),
+                  ),
+                  child: selected
+                      ? Center(
+                          child: Container(
+                            width: 10,
+                            height: 10,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: theme.primary,
+                            ),
+                          ),
+                        )
+                      : null,
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    label,
+                    style: TextStyle(
+                      color: theme.text.withValues(alpha: enabled ? 1 : 0.5),
+                      fontSize: 15,
+                      fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }

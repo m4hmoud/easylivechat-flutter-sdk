@@ -145,6 +145,9 @@ class EasyLiveChat {
 
   void setTyping(bool isTyping) => _controller.setTyping(isTyping);
 
+  /// The visitor's name, for resolving `%name%` in tenant copy.
+  String? get visitorName => _controller.visitorName;
+
   /// End the conversation from the visitor's side, the same way the web
   /// widget's × does. A later [open] starts a brand-new conversation rather
   /// than resuming this one.

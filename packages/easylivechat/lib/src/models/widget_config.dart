@@ -28,6 +28,10 @@ class WidgetConfigModel {
   final String welcomeSubtitle;
   final String offlineMessage;
 
+  /// Stands in for `%name%` when the visitor hasn't identified. Set by the
+  /// tenant as "Default customer name".
+  final String? defaultCustomerName;
+
   // Layout / behavior
   final String position; // e.g. bottom-right | bottom-left
   final String locale;
@@ -57,6 +61,7 @@ class WidgetConfigModel {
     required this.welcomeTitle,
     required this.welcomeSubtitle,
     required this.offlineMessage,
+    this.defaultCustomerName,
     required this.position,
     required this.locale,
     required this.direction,
@@ -85,6 +90,7 @@ class WidgetConfigModel {
       welcomeTitle: s('welcomeTitle', 'Chat with us'),
       welcomeSubtitle: s('welcomeSubtitle', "We're here to help"),
       offlineMessage: s('offlineMessage', "We're offline — leave a message"),
+      defaultCustomerName: (j['defaultCustomerName'] as String?)?.trim(),
       position: s('position', 'bottom-right'),
       locale: s('locale', 'en'),
       direction: LocaleDirection.fromWire(j['direction']),
@@ -285,4 +291,34 @@ class ConfigResponse {
       timezone: _trimmedOrNull(j['timezone']),
     );
   }
+}
+
+/// Fill visitor variables into tenant-authored copy.
+///
+/// Mirrors `substituteVisitorVariables` on the server, which resolves the same
+/// tokens for text it PERSISTS (the auto-greeting). Copy the server hands over
+/// unresolved — welcome title, offline notice — is resolved here instead,
+/// because at the moment `GET /config` is served nobody knows who is asking.
+///
+/// Both syntaxes are accepted, matching the server: this codebase shipped
+/// `%number%` in queue text and `{{name}}` in canned responses, and a tenant
+/// shouldn't have to remember which surface takes which.
+///
+/// An unknown name falls back to [defaultName], then to nothing — never to a
+/// literal `%name%` on screen.
+String substituteVisitorVariables(
+  String template, {
+  String? name,
+  String? defaultName,
+}) {
+  final resolved =
+      (name?.trim().isNotEmpty ?? false) ? name!.trim() : (defaultName?.trim() ?? '');
+  final first = resolved.isEmpty ? '' : resolved.split(RegExp(r'\s+')).first;
+  return template.replaceAllMapped(
+    RegExp(r'%(name|first_name)%|\{\{\s*(name|first_name)\s*\}\}',
+        caseSensitive: false),
+    (m) => (m.group(1) ?? m.group(2) ?? '').toLowerCase() == 'first_name'
+        ? first
+        : resolved,
+  );
 }

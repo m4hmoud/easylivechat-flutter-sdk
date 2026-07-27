@@ -104,7 +104,9 @@ class ClosedNoticeView extends StatelessWidget {
   Widget build(BuildContext context) {
     final strings = ElcStrings.of(config.locale);
     final message = config.offlineMessage.trim().isNotEmpty
-        ? config.offlineMessage.trim()
+        ? substituteVisitorVariables(config.offlineMessage.trim(),
+            name: EasyLiveChat.instance.visitorName,
+            defaultName: config.defaultCustomerName)
         : _defaultNotice(strings);
 
     return Center(
@@ -166,7 +168,9 @@ class ClosedNoticeBanner extends StatelessWidget {
     final cfg = config;
     final strings = ElcStrings.of(cfg?.locale ?? 'en');
     final message = (cfg != null && cfg.offlineMessage.trim().isNotEmpty)
-        ? cfg.offlineMessage.trim()
+        ? substituteVisitorVariables(cfg.offlineMessage.trim(),
+            name: EasyLiveChat.instance.visitorName,
+            defaultName: cfg.defaultCustomerName)
         : _defaultNotice(strings);
 
     return Container(

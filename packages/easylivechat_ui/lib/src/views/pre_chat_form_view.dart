@@ -143,7 +143,14 @@ class _PreChatFormViewState extends State<PreChatFormView> {
               padding: const EdgeInsets.fromLTRB(20, 24, 20, 24),
               children: [
                 Text(
-                  widget.config.welcomeTitle,
+                  // Tenant copy can address the visitor by name. The server
+                  // can't fill this in: `GET /config` is answered before
+                  // anyone has identified.
+                  substituteVisitorVariables(
+                    widget.config.welcomeTitle,
+                    name: EasyLiveChat.instance.visitorName,
+                    defaultName: widget.config.defaultCustomerName,
+                  ),
                   style: TextStyle(
                     color: t.text,
                     fontSize: 22,

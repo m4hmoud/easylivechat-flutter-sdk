@@ -95,6 +95,11 @@ class SessionController {
   // skips the pre-chat form and starts the session directly as this person.
   bool _hasIdentity = false;
   String? _identityName;
+
+  /// The visitor's name as the UI should show it — what the host passed to
+  /// [identify], else what the pre-chat form captured. Read by the views to
+  /// resolve `%name%` in tenant copy that arrives unsubstituted.
+  String? get visitorName => _identityName ?? _profile?.name;
   String? _identityEmail;
   String? _phone;
   Map<String, String>? _identityFields;
