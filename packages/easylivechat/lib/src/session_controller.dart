@@ -102,6 +102,11 @@ class SessionController {
   String? _token;
   String? _conversationId;
 
+  /// Which conversation the LIVE socket handshook with. The server binds that
+  /// at connect time, so this is the only way to notice the socket is now
+  /// pointed at a conversation we've since moved on from.
+  String? _socketConversationId;
+
   /// Oldest-message cursor for `loadOlderMessages()` (id of the oldest known
   /// message; null => no more history / not yet loaded).
   String? _oldestCursor;
@@ -660,9 +665,7 @@ class SessionController {
       // a customer message to a CLOSED conversation as re-opening it: the
       // thread came back from the dead, already rated, and could then never
       // be closed again (its post-chat step was spent).
-      _teardownSocket();
-      _conversationId = null;
-      _token = null;
+      _finishEndedSession();
     }
     return willShowPostChat;
   }
@@ -801,13 +804,27 @@ class SessionController {
             locale: config.contentLocale ?? config.locale,
           ));
       _ratedConversations.add(convId);
+      _finishEndedSession();
     } on EasyLiveChatError catch (e) {
       if (e.code == EasyLiveChatErrorCode.alreadySubmitted) {
         _ratedConversations.add(convId);
+        _finishEndedSession();
         return;
       }
       rethrow;
     }
+  }
+
+  /// The conversation is over and its post-chat step is done — let go of it.
+  ///
+  /// Holding the socket open kept the visitor attached to a closed
+  /// conversation: their next message re-opened it server-side instead of
+  /// starting the fresh chat they were looking at.
+  void _finishEndedSession() {
+    _teardownSocket();
+    _socketConversationId = null;
+    _conversationId = null;
+    _token = null;
   }
 
   // ── presence / lifecycle ──
@@ -854,8 +871,21 @@ class SessionController {
     if (_socket != null) {
       // Already wired — just re-supply the token (e.g. after a re-mint).
       _socket!.updateToken(token);
+      // …but a token for a DIFFERENT conversation needs a new handshake, not
+      // just a stored value. The server reads `conversationId` off the token
+      // once, when the socket connects, and routes everything sent on that
+      // socket there forever. `updateToken` only affects the NEXT connect, so
+      // a visitor who ended one chat and started another kept sending into
+      // the old, closed conversation — and ending "this" chat closed the old
+      // one too, whose id no longer matched, so the close echo was ignored
+      // and the exit confirmation appeared to do nothing.
+      if (_socketConversationId != _conversationId) {
+        _socketConversationId = _conversationId;
+        _socket!.reconnectWithFreshAuth();
+      }
       return;
     }
+    _socketConversationId = _conversationId;
     final socket =
         WidgetSocket(apiBase: config.normalizedApiBase, token: token);
     _socket = socket;
