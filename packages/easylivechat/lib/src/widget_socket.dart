@@ -265,6 +265,28 @@ class WidgetSocket {
     _socket?.emit('typing', {'isTyping': isTyping});
   }
 
+  /// Ask the server to close this conversation on the visitor's behalf.
+  ///
+  /// The server marks it CLOSED, tells the agents' inboxes, and echoes
+  /// `conversation:closed` back down this socket — which is what moves the
+  /// visitor to the post-chat step. It echoes even when the thread was already
+  /// closed agent-side, so the survey still appears rather than the visitor
+  /// tapping "end" and seeing nothing happen.
+  Future<SendAck> endChat() async {
+    final socket = _socket;
+    if (socket == null) {
+      return const SendAck(ok: false, error: 'NOT_CONNECTED');
+    }
+    try {
+      final raw = await socket
+          .emitWithAckAsync('conversation:end', <String, dynamic>{})
+          .timeout(const Duration(seconds: 15), onTimeout: () => null);
+      return SendAck.fromAck(raw);
+    } catch (e) {
+      return SendAck(ok: false, error: _describeError(e));
+    }
+  }
+
   Future<void> disconnect() async {
     _socket?.disconnect();
   }

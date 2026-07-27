@@ -53,14 +53,17 @@ class EasyLiveChatScreen extends StatefulWidget {
   /// its own default (often `en`) regardless of the visitor's app language.
   final String? locale;
 
-  /// Ask before the visitor leaves the chat.
+  /// Ask before the visitor closes the chat.
   ///
   /// When true, backing out — the host's app-bar back button, the Android back
   /// button, or the iOS swipe — first shows a confirmation. A stray gesture
   /// mid-conversation otherwise drops the visitor straight out of the thread.
   ///
-  /// This confirms LEAVING THE SCREEN, not ending the conversation: the chat
-  /// stays open and reopening resumes it with its history.
+  /// Confirming ENDS the conversation, exactly as the web widget's × does: the
+  /// tenant's post-chat survey is shown right there, and reopening the chat
+  /// later starts a fresh conversation rather than resuming this one. The
+  /// visitor stays on the screen to answer the survey; backing out again once
+  /// the chat has ended simply leaves.
   ///
   /// Off by default so hosts that already own their own exit flow are
   /// unaffected.
@@ -329,12 +332,18 @@ class _Centered extends StatelessWidget {
   Widget build(BuildContext context) => Center(child: child);
 }
 
-/// Confirms before the visitor leaves the chat.
+/// Confirms before the visitor closes the chat, then ends it.
 ///
 /// A `PopScope` rather than a wrapper around some close button, because the
 /// host owns the chrome: the rider app supplies its own app-bar back arrow,
 /// and there is still the Android back button and the iOS edge swipe. Guarding
-/// the ROUTE catches all three, so a host needs no changes beyond the flag.
+/// the ROUTE catches all three, so a host needs no changes beyond the flag —
+/// though a host whose back button calls `Navigator.pop` DIRECTLY must route
+/// it through `Navigator.maybePop`, since a direct pop bypasses PopScope.
+///
+/// Only a live conversation is guarded. Once the chat has ended the visitor is
+/// answering the post-chat survey, and backing out of that should just leave
+/// rather than ask them again about a conversation that is already over.
 class _ExitGuard extends StatelessWidget {
   final bool enabled;
   final EasyLiveChatTheme theme;
@@ -351,14 +360,26 @@ class _ExitGuard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (!enabled) return child;
-    return PopScope(
-      canPop: false,
-      onPopInvokedWithResult: (didPop, _) async {
-        if (didPop) return;
-        final leave = await _ask(context);
-        if (leave && context.mounted) Navigator.of(context).pop();
+    return ValueListenableBuilder<ChatPhase>(
+      valueListenable: EasyLiveChat.instance.phase,
+      builder: (context, phase, _) {
+        final live = phase == ChatPhase.chat;
+        return PopScope(
+          // Nothing to confirm unless a conversation is actually in progress.
+          canPop: !live,
+          onPopInvokedWithResult: (didPop, _) async {
+            if (didPop) return;
+            final end = await _ask(context);
+            if (!end) return;
+            // Close it and STAY: the server echoes `conversation:closed`,
+            // which moves the phase on to the post-chat survey. Popping here
+            // would take the visitor away from the form we just asked the
+            // server to produce.
+            await EasyLiveChat.instance.endChat();
+          },
+          child: child,
+        );
       },
-      child: child,
     );
   }
 

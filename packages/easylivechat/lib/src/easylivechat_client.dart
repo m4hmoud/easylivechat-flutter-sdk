@@ -144,6 +144,13 @@ class EasyLiveChat {
   SendResult? resend(ChatMessage message) => _controller.resend(message);
 
   void setTyping(bool isTyping) => _controller.setTyping(isTyping);
+
+  /// End the conversation from the visitor's side, the same way the web
+  /// widget's × does. The tenant's post-chat survey (or the CSAT prompt) is
+  /// shown next, driven by the server's `conversation:closed` echo — and a
+  /// later [open] starts a brand-new conversation rather than resuming this
+  /// one. Returns false when there was no live connection to end.
+  Future<bool> endChat() => _controller.endChat();
   Future<MessagePage> loadOlderMessages() => _controller.loadOlderMessages();
   void markRead() => _controller.markRead();
 

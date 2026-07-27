@@ -620,6 +620,28 @@ class SessionController {
     _socket?.setTyping(isTyping);
   }
 
+  /// End this conversation on the visitor's behalf.
+  ///
+  /// The phase is NOT set here: the server echoes `conversation:closed`, and
+  /// the existing handler for that turns it into the post-chat survey (or the
+  /// CSAT prompt when the tenant has no survey). Driving the phase from the
+  /// echo rather than optimistically means the visitor never sees a survey for
+  /// a conversation the server declined to close.
+  ///
+  /// The stored conversation is dropped either way. The server only ever
+  /// resumes an OPEN/PENDING thread, so reopening starts a fresh conversation;
+  /// clearing the local copy keeps the two from disagreeing. The in-memory id
+  /// and token stay put so the post-chat submission below can still reach the
+  /// conversation it belongs to.
+  Future<bool> endChat() async {
+    final socket = _socket;
+    if (socket == null) return false;
+    final ack = await socket.endChat();
+    await storage.delete(StorageKeys.conversationId);
+    await storage.delete(StorageKeys.token);
+    return ack.ok;
+  }
+
   /// Page older history via `GET /messages?cursor=` (walks backward in time).
   Future<MessagePage> loadOlderMessages() async {
     final token = _token;
