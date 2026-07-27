@@ -243,10 +243,12 @@ class MessageBubble extends StatelessWidget {
 
     final body = (message.body ?? '').trim();
     final tiles = _attachmentTiles(textColor);
-    // An avatar only ever sits beside an AGENT bubble, and only when the
-    // workspace has the switch on. The server already nulls the URL when it is
-    // off, but a bot/system line has no face either way.
-    final withAvatar = !_isCustomer && showAgentAvatar && !_isBotOrSystem;
+    // An avatar sits beside an inbound bubble when the workspace has the
+    // switch on AND we know who sent it. The identity check is what keeps a
+    // faceless system line from rendering an anonymous "A" circle — while
+    // still letting the auto-greeting show a face, since the server now
+    // attributes it to the agent the chat was routed to.
+    final withAvatar = !_isCustomer && showAgentAvatar && _hasSenderIdentity;
     // Leave room for the face so a narrow phone doesn't overflow the row.
     final maxBubble =
         MediaQuery.of(context).size.width * (withAvatar ? 0.68 : 0.78);
@@ -336,9 +338,12 @@ class MessageBubble extends StatelessWidget {
     );
   }
 
-  bool get _isBotOrSystem =>
-      message.senderType == SenderType.bot ||
-      message.senderType == SenderType.system;
+  /// Do we know who this came from? Either field is enough — an agent with no
+  /// photo still gets the initial circle, and a photo with the name switch off
+  /// still gets the photo.
+  bool get _hasSenderIdentity =>
+      (message.senderAvatarUrl?.trim().isNotEmpty ?? false) ||
+      _agentName != null;
 
   String? get _agentName {
     final n = message.senderName?.trim();
