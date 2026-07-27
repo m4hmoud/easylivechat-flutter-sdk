@@ -622,24 +622,49 @@ class SessionController {
 
   /// End this conversation on the visitor's behalf.
   ///
-  /// The phase is NOT set here: the server echoes `conversation:closed`, and
-  /// the existing handler for that turns it into the post-chat survey (or the
-  /// CSAT prompt when the tenant has no survey). Driving the phase from the
-  /// echo rather than optimistically means the visitor never sees a survey for
-  /// a conversation the server declined to close.
+  /// Returns whether a POST-CHAT STEP WILL FOLLOW — i.e. whether the caller
+  /// should keep the chat on screen for the survey (or CSAT prompt), or has
+  /// nothing left to show and should just leave.
+  ///
+  /// That answer cannot be inferred from the phase afterwards. The phase is
+  /// driven by the server's `conversation:closed` echo, and
+  /// [_handleConversationClosed] deliberately ignores the echo for a
+  /// conversation that has already been closed or already rated — which is
+  /// right (the server re-emits on any *→CLOSED transition, and nobody should
+  /// be asked to rate the same chat twice) but means "end" can legitimately
+  /// change nothing at all. A caller that waited for a phase change in that
+  /// case waited forever: the visitor confirmed leaving and stayed put.
+  ///
+  /// Decided BEFORE the socket call, because the echo can arrive while we are
+  /// still awaiting it and would otherwise flip the very sets being read.
   ///
   /// The stored conversation is dropped either way. The server only ever
   /// resumes an OPEN/PENDING thread, so reopening starts a fresh conversation;
   /// clearing the local copy keeps the two from disagreeing. The in-memory id
-  /// and token stay put so the post-chat submission below can still reach the
+  /// and token stay put so the post-chat submission can still reach the
   /// conversation it belongs to.
   Future<bool> endChat() async {
     final socket = _socket;
+    final id = _conversationId;
+    final willShowPostChat = id != null &&
+        !_closedHandled.contains(id) &&
+        !_ratedConversations.contains(id);
     if (socket == null) return false;
-    final ack = await socket.endChat();
+    await socket.endChat();
     await storage.delete(StorageKeys.conversationId);
     await storage.delete(StorageKeys.token);
-    return ack.ok;
+    if (!willShowPostChat) {
+      // Nothing left to ask, so the session is genuinely over — drop the
+      // socket and forget the conversation. Leaving them live let a visitor
+      // keep typing into a chat they had already ended, and the server treats
+      // a customer message to a CLOSED conversation as re-opening it: the
+      // thread came back from the dead, already rated, and could then never
+      // be closed again (its post-chat step was spent).
+      _teardownSocket();
+      _conversationId = null;
+      _token = null;
+    }
+    return willShowPostChat;
   }
 
   /// Page older history via `GET /messages?cursor=` (walks backward in time).

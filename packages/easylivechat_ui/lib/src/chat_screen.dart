@@ -371,11 +371,15 @@ class _ExitGuard extends StatelessWidget {
             if (didPop) return;
             final end = await _ask(context);
             if (!end) return;
-            // Close it and STAY: the server echoes `conversation:closed`,
-            // which moves the phase on to the post-chat survey. Popping here
-            // would take the visitor away from the form we just asked the
-            // server to produce.
-            await EasyLiveChat.instance.endChat();
+            // Stay only if there is actually something to stay FOR. endChat()
+            // reports whether a post-chat step follows; it does not when the
+            // visitor already rated this chat (and then kept typing, which
+            // reopens it). Assuming a survey always follows left them
+            // confirming "close" and going nowhere.
+            final showsPostChat = await EasyLiveChat.instance.endChat();
+            if (!showsPostChat && context.mounted) {
+              Navigator.of(context).pop();
+            }
           },
           child: child,
         );

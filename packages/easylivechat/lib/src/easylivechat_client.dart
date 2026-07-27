@@ -146,10 +146,13 @@ class EasyLiveChat {
   void setTyping(bool isTyping) => _controller.setTyping(isTyping);
 
   /// End the conversation from the visitor's side, the same way the web
-  /// widget's × does. The tenant's post-chat survey (or the CSAT prompt) is
-  /// shown next, driven by the server's `conversation:closed` echo — and a
-  /// later [open] starts a brand-new conversation rather than resuming this
-  /// one. Returns false when there was no live connection to end.
+  /// widget's × does. A later [open] starts a brand-new conversation rather
+  /// than resuming this one.
+  ///
+  /// Returns true when a post-chat step (survey or CSAT) will follow and the
+  /// chat should stay on screen for it; false when there is nothing more to
+  /// show — because this chat was already rated, was already closed, or there
+  /// was no live connection — and the caller should close the chat UI.
   Future<bool> endChat() => _controller.endChat();
   Future<MessagePage> loadOlderMessages() => _controller.loadOlderMessages();
   void markRead() => _controller.markRead();
