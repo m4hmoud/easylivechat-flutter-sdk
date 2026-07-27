@@ -1,5 +1,7 @@
 import 'dart:ui' show PlatformDispatcher;
 
+import 'package:flutter/foundation.dart' show visibleForTesting;
+
 /// SDK "chrome" strings for the prebuilt UI (`Send`, `Rate your chat`, …).
 ///
 /// These are the framework's own labels — distinct from tenant-authored copy
@@ -103,6 +105,13 @@ class ElcStrings {
     if (lang == 'ku') return 'ckb';
     return lang;
   }
+
+  /// Raw lookup by key, for the test that proves the compiled table still
+  /// matches `l10n/sdk_strings.json`. The two drifted apart once already —
+  /// the JSON carried edits that were never applied — and the only symptom
+  /// was the app quietly showing the old wording.
+  @visibleForTesting
+  String stringFor(String key) => _t(key);
 
   String _t(String key) {
     // Most specific first: this locale's host override, then the host's
@@ -291,14 +300,14 @@ class ElcStrings {
       'typeAMessage': 'پەیامێک بنووسە',
       'attach': 'هاوپێچکردن',
       'attachImage': 'وێنە',
-      'attachFile': 'پەڕگە',
+      'attachFile': 'فایل',
       'agentTyping': 'دەنووسێت…',
       'loadOlder': 'پەیامە کۆنەکان باربکە',
-      'mediaUnavailable': 'مێدیا بەردەست نییە',
+      'mediaUnavailable': 'میدیا بەردەست نییە',
       'download': 'داگرتن',
       'image': 'وێنە',
       'attachment': 'هاوپێچ',
-      'sendFailedRetry': 'نەنێردرا. بۆ دووبارەکردنەوە دەستبنێ.',
+      'sendFailedRetry': 'نەنێردرا. بۆ دووبارەکردنەوە کلیک بکە.',
       'sending': 'دەنێردرێت…',
       'startChat': 'دەستپێکردنی گفتوگۆ',
       'fieldRequired': 'ئەم خانەیە پێویستە',
@@ -313,18 +322,18 @@ class ElcStrings {
       'rateHint': 'گفتوگۆکەت چۆن بوو؟',
       'addAComment': 'لێدوانێک زیاد بکە (ئارەزوومەندانە)',
       'submit': 'ناردن',
-      'thanksForFeedback': 'سوپاس بۆ ڕاتەکانت!',
+      'thanksForFeedback': 'سوپاس بۆ ڕایەکەت!',
       'yourName': 'ناوت',
       'yourEmail': 'ئیمەیڵەکەت',
       'yourMessage': 'پەیامەکەت',
       'sendMessage': 'ناردنی پەیام',
-      'closedNotice': 'تیمەکەمان ئێستا دەرەوەی کارە. نامەکەت بەجێبهێڵە، هەرکە گەڕاینەوە وەڵامت دەدەینەوە.',
+      'closedNotice': 'تیمەکەمان ئێستا لە دەرەوەی کارە. نامەکەت بەجێبهێڵە، هەرکە گەڕاینەوە وەڵامت دەدەینەوە.',
       'backAt': 'لە {time} دەگەڕێینەوە.',
       'noAgentsNotice': 'ئێستا هەموو خەریکن. نامەیەک بەجێبهێڵە، بەم زووانە وەڵامت دەدەینەوە.',
       'closedForLabel': 'بەهۆی {label} داخراوین.',
       'unavailableTitle': 'ئێستا بەردەست نین',
       'offlineThanks': 'سوپاس! بەمزووانە پەیوەندیت پێوە دەکەین.',
-      'exitChatTitle': 'بەڕاستی دەتەوێت ئەم گفتوگۆیە دابخەیت؟',
+      'exitChatTitle': 'دڵنیایی دەتەوێت ئەم گفتوگۆیە دابخەیت؟',
       'exitChatConfirm': 'داخستنی گفتوگۆ',
       'exitChatCancel': 'پاشگەزبوونەوە',
     },
@@ -529,30 +538,30 @@ class ElcStrings {
       'exitChatCancel': 'Annulla',
     },
     'kmr': {
-      'send': 'فرێکرن',
+      'send': 'هنارتن',
       'typeAMessage': 'نامەکێ بنڤیسە',
       'attach': 'هەڤپێچکرن',
       'attachImage': 'وێنە',
-      'attachFile': 'پەل',
-      'agentTyping': 'د نڤیسینێ دا…',
-      'loadOlder': 'نامەێن کەڤن باربکە',
-      'mediaUnavailable': 'مێدیا بەردەست نینە',
+      'attachFile': 'فایل',
+      'agentTyping': 'دنڤیسیت...',
+      'loadOlder': 'نامەیێن کەڤن باربکە',
+      'mediaUnavailable': 'میدیا بەردەست نینە',
       'download': 'داگرتن',
       'image': 'وێنە',
       'attachment': 'هەڤپێچ',
-      'sendFailedRetry': 'نەهاتە فرێکرن. بۆ دووبارە هەوڵدانێ بکرتە بکە.',
+      'sendFailedRetry': 'نەهاتە فرێکرن. بۆ دووبارە هەوڵدانێ کلیک بکە.',
       'sending': 'د هنێریت…',
       'startChat': 'دەستپێکرنا چاتێ',
       'fieldRequired': 'ئەڤ خانە پێدڤی یە',
       'invalidEmail': 'ئیمەیلەکا دروست بنڤیسە',
       'invalidNumber': 'ژمارەکا دروست بنڤیسە',
-      'invalidOption': 'یەکێ ژ هەلبژارتنان هەلبژێرە',
+      'invalidOption': 'ئێک ژ هەلبژارتنان هەلبژێرە',
       'selectAnOption': 'هەلبژێرە…',
-      'somethingWentWrong': 'چەوتیەک چێبوو. ژکەرەمێ دووبارە هەوڵ بدە.',
+      'somethingWentWrong': 'خەلەتیەک چێبوو. هیڤییە دووبارە هەوڵ بدە.',
       'retry': 'دووبارە هەوڵدان',
-      'couldNotConnect': 'پەیوەندی نەهاتە کرن. پەیوەندیا خۆ ببینە و دووبارە هەوڵ بدە.',
-      'rateYourChat': 'چاتا خۆ هەلسەنگێنە',
-      'rateHint': 'ئاخڤتنا تە چاوا بوو؟',
+      'couldNotConnect': 'پەیوەندی نەهاتە کرن. پەیوەندیا خۆ بپشکنە و دووبارە هەوڵ بدە.',
+      'rateYourChat': 'گفتووگۆ هەلسەنگینە',
+      'rateHint': 'گفتووگۆ چاوا بوو؟',
       'addAComment': 'تێبینیەکێ زێدە بکە (هەلبژارتی)',
       'submit': 'پێشکێش بکە',
       'thanksForFeedback': 'سوپاس بۆ بۆچوونا تە!',
@@ -566,9 +575,9 @@ class ElcStrings {
       'closedForLabel': 'ئەم ژ بەر {label} گرتی ن.',
       'unavailableTitle': 'ئەم نوکە بەردەست نینن',
       'offlineThanks': 'سوپاس! ئەم دێ ب تە ڤە پەیوەندیێ کەین.',
-      'exitChatTitle': 'ب ڕاستی دڤێت ڤێ چاتێ بگری؟',
+      'exitChatTitle': 'پشتراستی تە دڤێت ڤێ چاتێ بگری؟',
       'exitChatConfirm': 'چاتێ بگرە',
-      'exitChatCancel': 'بەتالکرن',
+      'exitChatCancel': 'ڤەگەریان',
     },
     'pt': {
       'send': 'Enviar',

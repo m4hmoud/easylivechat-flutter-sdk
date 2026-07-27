@@ -369,9 +369,9 @@
     "selectAnOption": "هەلبژێرە…",
     "somethingWentWrong": "خەلەتیەک چێبوو. هیڤییە دووبارە هەوڵ بدە.",
     "retry": "دووبارە هەوڵدان",
-    "couldNotConnect": "پەیوەندی نەهاتە کرن. پەیوەندیا خۆ  و دووبارە هەوڵ بدە.",
-    "rateYourChat": "چاتا خۆ هەلسەنگێنە",
-    "rateHint": "ئاخڤتنا تە چاوا بوو؟",
+    "couldNotConnect": "پەیوەندی نەهاتە کرن. پەیوەندیا خۆ بپشکنە و دووبارە هەوڵ بدە.",
+    "rateYourChat": "گفتووگۆ هەلسەنگینە",
+    "rateHint": "گفتووگۆ چاوا بوو؟",
     "addAComment": "تێبینیەکێ زێدە بکە (هەلبژارتی)",
     "submit": "پێشکێش بکە",
     "thanksForFeedback": "سوپاس بۆ بۆچوونا تە!",
@@ -385,9 +385,9 @@
     "closedForLabel": "ئەم ژ بەر {label} گرتی ن.",
     "unavailableTitle": "ئەم نوکە بەردەست نینن",
     "offlineThanks": "سوپاس! ئەم دێ ب تە ڤە پەیوەندیێ کەین.",
-    "exitChatTitle": "ب ڕاستی دڤێت ڤێ چاتێ بگری؟",
+    "exitChatTitle": "پشتراستی تە دڤێت ڤێ چاتێ بگری؟",
     "exitChatConfirm": "چاتێ بگرە",
-    "exitChatCancel": "بەتالکرن"
+    "exitChatCancel": "ڤەگەریان"
   },
   "pt": {
     "send": "Enviar",
