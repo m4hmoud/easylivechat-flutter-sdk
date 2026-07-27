@@ -39,7 +39,15 @@ class EasyLiveChat {
   /// (e.g. the one in `easylivechat_ui`).
   Future<void> boot(EasyLiveChatConfig config,
       {EasyLiveChatStorage? storage}) async {
-    if (_c != null) return;
+    // Already booted: adopt whatever changed rather than ignoring the new
+    // config. The host rebuilds it from the CURRENT app language on every
+    // open, and returning early here left the chat fetching tenant copy in
+    // the language the app happened to be in the first time.
+    if (_c != null) {
+      config.validate();
+      _c!.applyConfig(config);
+      return;
+    }
     // Fail fast on a misconfigured apiBase/tenantSlug rather than deep in the
     // transport with an opaque error.
     config.validate();

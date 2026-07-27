@@ -56,9 +56,11 @@ enum EasyLiveChatLifecycle { resumed, paused }
 ///    overlaps known ids (gap-safe beyond one 50-msg page), merge by id.
 ///  • heartbeat: only while EasyLiveChatLifecycle.resumed; pause on background.
 class SessionController {
-  final EasyLiveChatConfig config;
+  /// Not final: the host re-boots with a fresh config whenever the app
+  /// language changes, and [applyConfig] swaps it in. See that method.
+  EasyLiveChatConfig config;
   final EasyLiveChatStorage storage;
-  late final RestClient rest;
+  late RestClient rest;
 
   SessionController({required this.config, required this.storage}) {
     rest = RestClient(config);
@@ -166,6 +168,29 @@ class SessionController {
   String? get conversationId => _conversationId;
 
   // ── lifecycle ──
+
+  /// Adopt a fresh [EasyLiveChatConfig] on an already-booted controller.
+  ///
+  /// The host builds a config from its CURRENT app language every time it
+  /// opens the chat, but `boot()` is a singleton and returned early once
+  /// booted — so `contentLocale` stayed at whatever it was the first time.
+  /// A visitor who opened the chat in Kurdish, switched the app to Arabic and
+  /// came back got Arabic SDK chrome wrapped around Kurdish tenant copy: a
+  /// Kurdish greeting, and a post-chat survey whose questions were still
+  /// Kurdish, because both are fetched with that stale locale.
+  ///
+  /// The Dio client is rebuilt because it bakes the base URL and headers in.
+  void applyConfig(EasyLiveChatConfig next) {
+    if (next.apiBase == config.apiBase &&
+        next.tenantSlug == config.tenantSlug &&
+        next.locale == config.locale &&
+        next.contentLocale == config.contentLocale &&
+        next.channel == config.channel) {
+      return;
+    }
+    config = next;
+    rest = RestClient(next);
+  }
 
   /// Load (or generate) the durable visitorId + cached profile. No network.
   Future<void> boot() async {
