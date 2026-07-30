@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../l10n.dart';
 import '../theme.dart';
+import 'linkified_text.dart';
 
 /// The message thread (native analog of the web `Thread.tsx`).
 ///
@@ -248,10 +249,15 @@ class MessageBubble extends StatelessWidget {
                     if (body.isNotEmpty) const SizedBox(height: 8),
                   ],
                   if (body.isNotEmpty)
-                    Text(
-                      body,
+                    LinkifiedText(
+                      text: body,
                       style: TextStyle(
                           color: textColor, fontSize: 15, height: 1.35),
+                      // On the accent-colored customer bubble the accent is the
+                      // background, so a link there keeps the bubble's own
+                      // foreground and relies on the underline; agent bubbles
+                      // sit on `surface`, where the accent reads correctly.
+                      linkColor: _isCustomer ? textColor : theme.primary,
                     ),
                   // Attachment-only message with no resolvable media still
                   // needs *something* visible so it never renders empty.

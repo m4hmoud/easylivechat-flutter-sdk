@@ -63,6 +63,13 @@ management you like.
 
 - ✅ **Foreground chat, pre-chat, attachments, CSAT, typing, RTL/theming** —
   zero server changes.
+- ✅ **Tappable links in message bodies** — URLs, email addresses and phone
+  numbers are auto-detected and open the browser / mail app / dialer. Message
+  text is still rendered verbatim (never parsed as markup); see
+  `lib/src/views/linkified_text.dart`. Uses `url_launcher` without
+  `canLaunchUrl`, so **no host `Info.plist` / manifest entries are needed**.
+  Scheme-less domains only link for the TLDs in `_bareLinkTlds` — `main.py` and
+  `photo.png` stay plain text. Extend that set if a tenant needs more.
 - ⛔ **Background push** ("agent replied while the app was closed") needs a
   server-side visitor push registry + fan-out (the backend currently pushes to
   agents only). The `EasyLiveChatPush` hook is stubbed until then.
@@ -71,9 +78,12 @@ management you like.
 
 ## Status
 
-`0.1.0` — Phase 1 (headless core) + Phase 2 (UI kit) implemented. Not yet
-`pub get`/compiled in CI (no Flutter toolchain on the authoring machine); treat
-as a reviewed first cut. Pin `socket_io_client` to a 3.x release (Engine.IO v4)
+`0.1.0` — Phase 1 (headless core) + Phase 2 (UI kit) implemented. `easylivechat_ui`
+resolves and its `test/` suite passes under Flutter 3.41 (`flutter pub get &&
+flutter test`); the rest is still a reviewed first cut with no CI compile. Note
+`dart analyze --fatal-infos` (the `melos analyze` script) currently fails on
+pre-existing `Color.withOpacity` deprecations in `thread_view.dart` on Flutter
+3.41. Pin `socket_io_client` to a 3.x release (Engine.IO v4)
 to match the server's `socket.io@4.8.x` and add an integration test against a
 live `/widgets` namespace — a protocol mismatch fails the handshake silently.
 
@@ -91,5 +101,6 @@ flutter-sdk/
     easylivechat_ui/     # prebuilt widgets
       lib/easylivechat_ui.dart
       lib/src/{theme,storage_impl,launcher,chat_screen,l10n}.dart
-      lib/src/views/{pre_chat_form_view,thread_view,composer_bar,feedback_prompt_view,offline_form_view}.dart
+      lib/src/views/{pre_chat_form_view,thread_view,composer_bar,feedback_prompt_view,offline_form_view,linkified_text}.dart
+      test/{linkified_text_test,linkified_text_widget_test}.dart
 ```

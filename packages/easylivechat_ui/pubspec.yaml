@@ -22,8 +22,10 @@ dependencies:
   image_picker: ^1.1.2
   file_picker: ^8.1.0
   cached_network_image: ^3.4.0
+  url_launcher: ^6.3.0             # tap-to-open links / emails / phone numbers
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^4.0.0
+  url_launcher_platform_interface: ^2.3.0   # fake launcher for the link tests
