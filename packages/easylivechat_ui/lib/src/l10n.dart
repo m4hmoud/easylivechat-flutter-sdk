@@ -168,6 +168,12 @@ class ElcStrings {
   /// the message waits for the team — so this informs rather than blocks.
   String get closedNotice => _t('closedNotice');
 
+  /// Shown as the composer hint when the composer is READ-ONLY
+  /// (`NOTICE_ONLY`). Deliberately does not say "leave a message": in that
+  /// mode the visitor cannot, and inviting an action the UI then refuses is
+  /// worse than saying nothing.
+  String get closedReadOnly => _t('closedReadOnly');
+
   /// Appended to [closedNotice] when the server tells us when we reopen.
   String get backAt => _t('backAt');
 
@@ -244,6 +250,7 @@ class ElcStrings {
       'yourMessage': 'Your message',
       'sendMessage': 'Send message',
       'closedNotice': "Our team is offline right now. Leave your message and we'll reply as soon as we're back.",
+      'closedReadOnly': "Our team is offline right now. We'll be back soon.",
       'backAt': "We're back at {time}.",
       'noAgentsNotice': "Everyone's busy right now. Leave a message and we'll reply shortly.",
       'closedForLabel': "We're closed for {label}.",
@@ -286,6 +293,7 @@ class ElcStrings {
       'yourMessage': 'رسالتك',
       'sendMessage': 'إرسال الرسالة',
       'closedNotice': 'فريقنا غير متاح حالياً. اترك رسالتك وسنرد عليك فور عودتنا.',
+      'closedReadOnly': 'فريقنا غير متاح حالياً. سنعود قريباً.',
       'backAt': 'نعود الساعة {time}.',
       'noAgentsNotice': 'الجميع مشغول حالياً. اترك رسالة وسنرد قريباً.',
       'closedForLabel': 'نحن مغلقون بمناسبة {label}.',
@@ -328,6 +336,7 @@ class ElcStrings {
       'yourMessage': 'پەیامەکەت',
       'sendMessage': 'ناردنی پەیام',
       'closedNotice': 'تیمەکەمان ئێستا لە دەرەوەی کارە. نامەکەت بەجێبهێڵە، هەرکە گەڕاینەوە وەڵامت دەدەینەوە.',
+      'closedReadOnly': 'تیمەکەمان ئێستا دەرەوەی کارە. بەم زووانە دەگەڕێینەوە.',
       'backAt': 'لە {time} دەگەڕێینەوە.',
       'noAgentsNotice': 'ئێستا هەموو خەریکن. نامەیەک بەجێبهێڵە، بەم زووانە وەڵامت دەدەینەوە.',
       'closedForLabel': 'بەهۆی {label} داخراوین.',
@@ -370,6 +379,7 @@ class ElcStrings {
       'yourMessage': 'Ihre Nachricht',
       'sendMessage': 'Nachricht senden',
       'closedNotice': 'Unser Team ist gerade offline. Hinterlassen Sie Ihre Nachricht — wir antworten, sobald wir zurück sind.',
+      'closedReadOnly': 'Unser Team ist gerade offline. Wir sind bald zurück.',
       'backAt': 'Wir sind ab {time} wieder da.',
       'noAgentsNotice': 'Gerade sind alle beschäftigt. Hinterlassen Sie eine Nachricht — wir melden uns gleich.',
       'closedForLabel': 'Wir haben wegen {label} geschlossen.',
@@ -412,6 +422,7 @@ class ElcStrings {
       'yourMessage': 'Tu mensaje',
       'sendMessage': 'Enviar mensaje',
       'closedNotice': 'Nuestro equipo no está disponible ahora. Deja tu mensaje y te responderemos en cuanto volvamos.',
+      'closedReadOnly': 'Nuestro equipo no está disponible ahora. Volvemos pronto.',
       'backAt': 'Volvemos a las {time}.',
       'noAgentsNotice': 'Ahora mismo todos están ocupados. Deja un mensaje y te responderemos en breve.',
       'closedForLabel': 'Cerramos por {label}.',
@@ -454,6 +465,7 @@ class ElcStrings {
       'yourMessage': 'Votre message',
       'sendMessage': 'Envoyer le message',
       'closedNotice': 'Notre équipe est hors ligne pour le moment. Laissez votre message, nous répondrons dès notre retour.',
+      'closedReadOnly': 'Notre équipe est hors ligne pour le moment. Nous revenons bientôt.',
       'backAt': 'Nous revenons à {time}.',
       'noAgentsNotice': "Tout le monde est occupé pour l'instant. Laissez un message, nous répondrons vite.",
       'closedForLabel': 'Nous sommes fermés pour {label}.',
@@ -496,6 +508,7 @@ class ElcStrings {
       'yourMessage': 'आपका संदेश',
       'sendMessage': 'संदेश भेजें',
       'closedNotice': 'हमारी टीम अभी ऑफ़लाइन है। अपना संदेश छोड़ें, लौटते ही हम उत्तर देंगे।',
+      'closedReadOnly': 'हमारी टीम अभी ऑफ़लाइन है। हम जल्द लौटेंगे।',
       'backAt': 'हम {time} बजे लौटते हैं।',
       'noAgentsNotice': 'अभी सभी व्यस्त हैं। संदेश छोड़ें, हम जल्द उत्तर देंगे।',
       'closedForLabel': 'हम {label} के कारण बंद हैं।',
@@ -538,6 +551,7 @@ class ElcStrings {
       'yourMessage': 'Il tuo messaggio',
       'sendMessage': 'Invia messaggio',
       'closedNotice': 'Il nostro team non è disponibile al momento. Lascia il tuo messaggio e ti risponderemo appena torniamo.',
+      'closedReadOnly': 'Il nostro team non è disponibile al momento. Torniamo presto.',
       'backAt': 'Torniamo alle {time}.',
       'noAgentsNotice': 'Al momento sono tutti occupati. Lascia un messaggio e ti risponderemo a breve.',
       'closedForLabel': 'Siamo chiusi per {label}.',
@@ -580,6 +594,7 @@ class ElcStrings {
       'yourMessage': 'نامەیا تە',
       'sendMessage': 'نامەیێ فرێکە',
       'closedNotice': 'تیمێ مە نوکە نە ل سەر خەتێ یە. پەیاما خۆ بهێلە، گاڤا ئەم ڤەگەڕین دێ بەرسڤا تە دەین.',
+      'closedReadOnly': 'Tîma me niha negirêdayî ye. Em ê zû vegerin.',
       'backAt': 'ئەم د {time} دا ڤەدگەڕین.',
       'noAgentsNotice': 'نوکە هەمی مژویل ن. پەیامەکێ بهێلە، دێ زوی بەرسڤ دەین.',
       'closedForLabel': 'ئەم ژ بەر {label} گرتی ن.',
@@ -622,6 +637,7 @@ class ElcStrings {
       'yourMessage': 'Sua mensagem',
       'sendMessage': 'Enviar mensagem',
       'closedNotice': 'A nossa equipa está offline neste momento. Deixe a sua mensagem e responderemos assim que voltarmos.',
+      'closedReadOnly': 'A nossa equipa está offline neste momento. Voltamos em breve.',
       'backAt': 'Voltamos às {time}.',
       'noAgentsNotice': 'Estamos todos ocupados neste momento. Deixe uma mensagem e responderemos em breve.',
       'closedForLabel': 'Estamos fechados por {label}.',
@@ -664,6 +680,7 @@ class ElcStrings {
       'yourMessage': 'Mesajınız',
       'sendMessage': 'Mesaj gönder',
       'closedNotice': 'Ekibimiz şu anda çevrimdışı. Mesajınızı bırakın, döndüğümüzde hemen yanıtlayalım.',
+      'closedReadOnly': 'Ekibimiz şu anda çevrimdışı. Kısa süre içinde döneceğiz.',
       'backAt': '{time} itibarıyla döneriz.',
       'noAgentsNotice': 'Şu anda herkes meşgul. Mesaj bırakın, kısa sürede dönelim.',
       'closedForLabel': '{label} nedeniyle kapalıyız.',
@@ -706,6 +723,7 @@ class ElcStrings {
       'yourMessage': 'آپ کا پیغام',
       'sendMessage': 'پیغام بھیجیں',
       'closedNotice': 'ہماری ٹیم اس وقت آف لائن ہے۔ اپنا پیغام چھوڑ دیں، واپس آتے ہی جواب دیں گے۔',
+      'closedReadOnly': 'ہماری ٹیم اس وقت آف لائن ہے۔ ہم جلد واپس آئیں گے۔',
       'backAt': 'ہم {time} بجے واپس آتے ہیں۔',
       'noAgentsNotice': 'اس وقت سب مصروف ہیں۔ پیغام چھوڑیں، ہم جلد جواب دیں گے۔',
       'closedForLabel': 'ہم {label} کی وجہ سے بند ہیں۔',
@@ -748,6 +766,7 @@ class ElcStrings {
       'yourMessage': '您的留言',
       'sendMessage': '发送留言',
       'closedNotice': '我们的团队当前不在线。请留言，我们回来后会尽快回复。',
+      'closedReadOnly': '我们的团队当前不在线。我们很快回来。',
       'backAt': '我们将于 {time} 回来。',
       'noAgentsNotice': '目前大家都在忙。请留言，我们会尽快回复。',
       'closedForLabel': '我们因{label}休息。',

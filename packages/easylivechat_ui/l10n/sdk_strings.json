@@ -51,7 +51,8 @@
     "offlineThanks": "Thanks! We'll get back to you.",
     "exitChatTitle": "Do you really want to close this chat?",
     "exitChatConfirm": "Close chat",
-    "exitChatCancel": "Cancel"
+    "exitChatCancel": "Cancel",
+    "closedReadOnly": "Our team is offline right now. We'll be back soon."
   },
   "ar": {
     "send": "إرسال",
@@ -93,7 +94,8 @@
     "offlineThanks": "شكرًا! سنعاود التواصل معك.",
     "exitChatTitle": "هل تريد حقًا إغلاق هذه الدردشة؟",
     "exitChatConfirm": "إغلاق الدردشة",
-    "exitChatCancel": "إلغاء"
+    "exitChatCancel": "إلغاء",
+    "closedReadOnly": "فريقنا غير متاح حالياً. سنعود قريباً."
   },
   "ckb": {
     "send": "ناردن",
@@ -135,7 +137,8 @@
     "offlineThanks": "سوپاس! بەمزووانە پەیوەندیت پێوە دەکەین.",
     "exitChatTitle": "دڵنیایی دەتەوێت ئەم گفتوگۆیە دابخەیت؟",
     "exitChatConfirm": "داخستنی گفتوگۆ",
-    "exitChatCancel": "پاشگەزبوونەوە"
+    "exitChatCancel": "پاشگەزبوونەوە",
+    "closedReadOnly": "تیمەکەمان ئێستا دەرەوەی کارە. بەم زووانە دەگەڕێینەوە."
   },
   "de": {
     "send": "Senden",
@@ -177,7 +180,8 @@
     "offlineThanks": "Danke! Wir melden uns bei Ihnen.",
     "exitChatTitle": "Möchten Sie diesen Chat wirklich schließen?",
     "exitChatConfirm": "Chat schließen",
-    "exitChatCancel": "Abbrechen"
+    "exitChatCancel": "Abbrechen",
+    "closedReadOnly": "Unser Team ist gerade offline. Wir sind bald zurück."
   },
   "es": {
     "send": "Enviar",
@@ -219,7 +223,8 @@
     "offlineThanks": "¡Gracias! Te responderemos pronto.",
     "exitChatTitle": "¿Seguro que quieres cerrar este chat?",
     "exitChatConfirm": "Cerrar chat",
-    "exitChatCancel": "Cancelar"
+    "exitChatCancel": "Cancelar",
+    "closedReadOnly": "Nuestro equipo no está disponible ahora. Volvemos pronto."
   },
   "fr": {
     "send": "Envoyer",
@@ -261,7 +266,8 @@
     "offlineThanks": "Merci ! Nous reviendrons vers vous.",
     "exitChatTitle": "Voulez-vous vraiment fermer cette discussion ?",
     "exitChatConfirm": "Fermer la discussion",
-    "exitChatCancel": "Annuler"
+    "exitChatCancel": "Annuler",
+    "closedReadOnly": "Notre équipe est hors ligne pour le moment. Nous revenons bientôt."
   },
   "hi": {
     "send": "भेजें",
@@ -303,7 +309,8 @@
     "offlineThanks": "धन्यवाद! हम आपसे जल्द संपर्क करेंगे।",
     "exitChatTitle": "क्या आप वाकई यह चैट बंद करना चाहते हैं?",
     "exitChatConfirm": "चैट बंद करें",
-    "exitChatCancel": "रद्द करें"
+    "exitChatCancel": "रद्द करें",
+    "closedReadOnly": "हमारी टीम अभी ऑफ़लाइन है। हम जल्द लौटेंगे।"
   },
   "it": {
     "send": "Invia",
@@ -345,7 +352,8 @@
     "offlineThanks": "Grazie! Ti risponderemo presto.",
     "exitChatTitle": "Vuoi davvero chiudere questa chat?",
     "exitChatConfirm": "Chiudi chat",
-    "exitChatCancel": "Annulla"
+    "exitChatCancel": "Annulla",
+    "closedReadOnly": "Il nostro team non è disponibile al momento. Torniamo presto."
   },
   "kmr": {
     "send": "هنارتن",
@@ -387,7 +395,8 @@
     "offlineThanks": "سوپاس! ئەم دێ ب تە ڤە پەیوەندیێ کەین.",
     "exitChatTitle": "پشتراستی تە دڤێت ڤێ چاتێ بگری؟",
     "exitChatConfirm": "چاتێ بگرە",
-    "exitChatCancel": "ڤەگەریان"
+    "exitChatCancel": "ڤەگەریان",
+    "closedReadOnly": "Tîma me niha negirêdayî ye. Em ê zû vegerin."
   },
   "pt": {
     "send": "Enviar",
@@ -429,7 +438,8 @@
     "offlineThanks": "Obrigado! Entraremos em contato.",
     "exitChatTitle": "Tem certeza de que deseja fechar esta conversa?",
     "exitChatConfirm": "Fechar conversa",
-    "exitChatCancel": "Cancelar"
+    "exitChatCancel": "Cancelar",
+    "closedReadOnly": "A nossa equipa está offline neste momento. Voltamos em breve."
   },
   "tr": {
     "send": "Gönder",
@@ -471,7 +481,8 @@
     "offlineThanks": "Teşekkürler! Size geri döneceğiz.",
     "exitChatTitle": "Bu sohbeti kapatmak istediğinize emin misiniz?",
     "exitChatConfirm": "Sohbeti kapat",
-    "exitChatCancel": "İptal"
+    "exitChatCancel": "İptal",
+    "closedReadOnly": "Ekibimiz şu anda çevrimdışı. Kısa süre içinde döneceğiz."
   },
   "ur": {
     "send": "بھیجیں",
@@ -513,7 +524,8 @@
     "offlineThanks": "شکریہ! ہم جلد آپ سے رابطہ کریں گے۔",
     "exitChatTitle": "کیا آپ واقعی یہ چیٹ بند کرنا چاہتے ہیں؟",
     "exitChatConfirm": "چیٹ بند کریں",
-    "exitChatCancel": "منسوخ کریں"
+    "exitChatCancel": "منسوخ کریں",
+    "closedReadOnly": "ہماری ٹیم اس وقت آف لائن ہے۔ ہم جلد واپس آئیں گے۔"
   },
   "zh": {
     "send": "发送",
@@ -555,6 +567,7 @@
     "offlineThanks": "谢谢！我们会尽快回复您。",
     "exitChatTitle": "确定要关闭此对话吗？",
     "exitChatConfirm": "关闭对话",
-    "exitChatCancel": "取消"
+    "exitChatCancel": "取消",
+    "closedReadOnly": "我们的团队当前不在线。我们很快回来。"
   }
 }

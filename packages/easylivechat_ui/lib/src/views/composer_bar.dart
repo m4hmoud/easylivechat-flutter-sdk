@@ -301,8 +301,13 @@ class _ComposerBarState extends State<ComposerBar> {
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
-                    _attachButton(),
-                    const SizedBox(width: 4),
+                    // Hidden rather than dimmed while locked: a greyed
+                    // paperclip still reads as "attach something", and there
+                    // is nothing to attach to a composer that cannot send.
+                    if (!_locked) ...[
+                      _attachButton(),
+                      const SizedBox(width: 4),
+                    ],
                     Expanded(child: _textField()),
                     const SizedBox(width: 8),
                     _sendButton(),
@@ -355,6 +360,11 @@ class _ComposerBarState extends State<ComposerBar> {
         // NOTICE_ONLY tenants take nothing while closed. Disabled rather than
         // hidden: an input that vanishes reads as breakage, whereas a greyed
         // one carrying the notice as its hint explains itself.
+        //
+        // The hint is `closedReadOnly`, not `closedNotice`. The latter says
+        // "leave your message", which is written for the banner where they
+        // still can — as a hint on a disabled field, beside a send button, it
+        // asked for something the composer would then refuse.
         enabled: !_locked,
         textInputAction: TextInputAction.send,
         onSubmitted: (_) => _send(),
@@ -362,7 +372,7 @@ class _ComposerBarState extends State<ComposerBar> {
         decoration: InputDecoration(
           isCollapsed: true,
           border: InputBorder.none,
-          hintText: _locked ? _s.closedNotice : _s.typeAMessage,
+          hintText: _locked ? _s.closedReadOnly : _s.typeAMessage,
           hintStyle: TextStyle(color: t.text.withValues(alpha: 0.4)),
         ),
       ),
