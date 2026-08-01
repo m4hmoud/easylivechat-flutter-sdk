@@ -53,7 +53,8 @@ enum MessageDeliveryStatus {
   failed,
   unknown;
 
-  static MessageDeliveryStatus fromWire(Object? w) => _parse(values, w, unknown);
+  static MessageDeliveryStatus fromWire(Object? w) =>
+      _parse(values, w, unknown);
 }
 
 /// Conversation lifecycle. Server (Prisma `ConversationStatus`).
@@ -100,6 +101,22 @@ enum PreChatFieldType {
   select;
 
   static PreChatFieldType fromWire(Object? w) => _parse(values, w, text);
+}
+
+/// Post-chat form field types. A superset of [PreChatFieldType]: the survey
+/// shown after a conversation ends can also ask for a CSAT `rating` and a
+/// yes/no `checkbox`.
+enum PostChatFieldType {
+  text,
+  email,
+  phone,
+  number,
+  textarea,
+  select,
+  checkbox,
+  rating;
+
+  static PostChatFieldType fromWire(Object? w) => _parse(values, w, text);
 }
 
 /// Coarse kind of a rehosted attachment, for choosing a renderer.

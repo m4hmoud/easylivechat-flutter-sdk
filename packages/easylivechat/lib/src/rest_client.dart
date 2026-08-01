@@ -29,7 +29,8 @@ class RestClient {
 
   /// Future-proof protocol version header sent on every request. The server
   /// currently ignores it (harmless); it lets us negotiate wire changes later.
-  static const String _protocolVersionHeader = 'X-EasyLiveChat-Protocol-Version';
+  static const String _protocolVersionHeader =
+      'X-EasyLiveChat-Protocol-Version';
   static const String _protocolVersion = '1';
 
   /// Base headers attached to every request, optionally adding a Bearer token.
@@ -56,6 +57,8 @@ class RestClient {
         queryParameters: {
           if (config.originHeader != null && config.originHeader!.isNotEmpty)
             'origin': config.originHeader,
+          if (config.contentLocale != null && config.contentLocale!.isNotEmpty)
+            'locale': config.contentLocale,
         },
         options: Options(headers: _headers()),
       );
@@ -67,7 +70,7 @@ class RestClient {
   }
 
   /// `POST /:slug/session` — public; MINTS the widget JWT.
-  /// Body keys: visitorId (required), name?, email?, page?, locale?,
+  /// Body keys: visitorId (required), name?, email?, phone?, page?, locale?,
   /// resumeOnly?, fields? (keyed by PreChatField.id). On pre-chat failure the
   /// server returns 400 `{ error, fieldId }` => throw [EasyLiveChatError].
   /// On `resumeOnly:true` with no active conversation the response has no
@@ -76,6 +79,7 @@ class RestClient {
     required String visitorId,
     String? name,
     String? email,
+    String? phone,
     String? page,
     String? locale,
     bool resumeOnly = false,
@@ -88,9 +92,23 @@ class RestClient {
           'visitorId': visitorId,
           if (name != null) 'name': name,
           if (email != null) 'email': email,
+          if (phone != null && phone.trim().isNotEmpty) 'phone': phone,
           if (page != null) 'page': page,
           // Prefer the explicit per-call locale, fall back to config.locale.
-          if ((locale ?? config.locale) != null) 'locale': locale ?? config.locale,
+          if ((locale ?? config.locale) != null)
+            'locale': locale ?? config.locale,
+          // The locale CODE. `locale` above is free-form — hosts put a readable
+          // language name there because it is what agents see — so the server
+          // cannot match it against anything. This is what picks the visitor's
+          // language for the auto-greeting.
+          if (config.contentLocale != null && config.contentLocale!.isNotEmpty)
+            'contentLocale': config.contentLocale,
+          // Channel/inbox routing key — omitted when null (server => default).
+          if (config.channel != null) 'channel': config.channel,
+          // Client-provided custom attributes (device/app info). Stored as-is
+          // by the server; not validated like pre-chat fields.
+          if (config.attributes != null && config.attributes!.isNotEmpty)
+            'attributes': config.attributes,
           if (resumeOnly) 'resumeOnly': true,
           if (fields != null && fields.isNotEmpty) 'fields': fields,
         },
@@ -177,6 +195,33 @@ class RestClient {
     }
   }
 
+  /// `POST /:slug/conversations/:id/post-chat` — Bearer [token]; the token's
+  /// conversationId must equal [conversationId]. One-shot, like feedback, but
+  /// the server answers 409 `ALREADY_SUBMITTED` rather than `ALREADY_RATED`.
+  ///
+  /// [fields] is keyed by field **id**, never label — the same contract the
+  /// pre-chat form submits under, and what the dashboard reads back.
+  Future<void> postChat({
+    required String token,
+    required String conversationId,
+    required Map<String, String> fields,
+    String? locale,
+  }) async {
+    try {
+      final res = await _dio.post<dynamic>(
+        '$_base/$_slug/conversations/$conversationId/post-chat',
+        data: {
+          'fields': fields,
+          if (locale != null && locale.isNotEmpty) 'locale': locale,
+        },
+        options: Options(headers: _headers(token)),
+      );
+      if (!_ok(res.statusCode)) throwFor(res);
+    } on DioException catch (e) {
+      throw _networkError(e);
+    }
+  }
+
   /// `POST /visitor/heartbeat` — public; tenant from body.tenantSlug (NOTE: no
   /// `:slug` path segment). Always tolerant/2xx. Keep cadence modest — first
   /// arrival / re-arrival after idle notifies agents.
@@ -228,15 +273,21 @@ class RestClient {
         'file': MultipartFile.fromBytes(
           bytes,
           filename: filename,
-          contentType: contentType != null
-              ? DioMediaType.parse(contentType)
-              : null,
+          contentType:
+              contentType != null ? DioMediaType.parse(contentType) : null,
         ),
       });
       final res = await _dio.post<dynamic>(
         '${config.normalizedApiBase}/api/uploads',
         data: form,
-        options: Options(headers: _headers(token)),
+        options: Options(
+          headers: _headers(token),
+          // Uploads run up to 25 MB; the default connect-sized timeout (20s)
+          // aborts a large file on a slow cellular link. Give the request body
+          // a generous window, independent of the connect/receive defaults.
+          sendTimeout: const Duration(minutes: 2),
+          receiveTimeout: const Duration(minutes: 2),
+        ),
         onSendProgress: onProgress == null
             ? null
             : (sent, total) {

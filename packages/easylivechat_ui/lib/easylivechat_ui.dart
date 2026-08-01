@@ -18,3 +18,6 @@ export 'src/theme.dart';
 export 'src/storage_impl.dart';
 export 'src/launcher.dart';
 export 'src/chat_screen.dart';
+export 'src/picked_file.dart' show ElcPickedFile, ElcAttachmentPicker;
+// ElcStrings.overrideAll(...) lets a host fully own the chrome translations.
+export 'src/l10n.dart' show ElcStrings;

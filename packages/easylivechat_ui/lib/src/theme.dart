@@ -48,9 +48,13 @@ class EasyLiveChatTheme {
 
   /// Build a theme from the server [WidgetConfigModel].
   ///
-  /// When [override] is supplied its (non-defaulted) fields take precedence:
-  /// colors and direction are taken from the override as-is, and `logoUrl` /
+  /// When [override] is supplied its colors take precedence, and `logoUrl` /
   /// `bubbleIconUrl` use the override value when present, otherwise the config.
+  ///
+  /// [direction] is intentionally NOT taken from the override: layout direction
+  /// is a function of locale/content, not branding, and always follows the
+  /// server/locale-resolved config. Otherwise a colors-only override (whose
+  /// `direction` defaults to LTR) would silently force a RTL workspace to LTR.
   factory EasyLiveChatTheme.fromConfig(
     WidgetConfigModel c, {
     EasyLiveChatTheme? override,
@@ -77,16 +81,40 @@ class EasyLiveChatTheme {
       background: override.background,
       surface: override.surface,
       text: override.text,
-      direction: override.direction,
+      // Direction follows the server/locale config, never the branding override.
+      direction: base.direction,
       logoUrl: override.logoUrl ?? base.logoUrl,
       bubbleIconUrl: override.bubbleIconUrl ?? base.bubbleIconUrl,
+    );
+  }
+
+  /// Copy with selective overrides (e.g. force [direction] from the host's
+  /// app locale, independent of the server workspace direction).
+  EasyLiveChatTheme copyWith({
+    Color? primary,
+    Color? background,
+    Color? surface,
+    Color? text,
+    TextDirection? direction,
+    String? logoUrl,
+    String? bubbleIconUrl,
+  }) {
+    return EasyLiveChatTheme(
+      primary: primary ?? this.primary,
+      background: background ?? this.background,
+      surface: surface ?? this.surface,
+      text: text ?? this.text,
+      direction: direction ?? this.direction,
+      logoUrl: logoUrl ?? this.logoUrl,
+      bubbleIconUrl: bubbleIconUrl ?? this.bubbleIconUrl,
     );
   }
 
   /// Parse a CSS-style hex string (`#RGB`, `#RRGGBB`, `#AARRGGBB`, with or
   /// without the leading `#`) into a [Color]. Returns [fallback] (default
   /// opaque black) on any malformed input — theming must never crash the UI.
-  static Color parseHexColor(String? hex, {Color fallback = const Color(0xFF000000)}) {
+  static Color parseHexColor(String? hex,
+      {Color fallback = const Color(0xFF000000)}) {
     if (hex == null) return fallback;
     var h = hex.trim();
     if (h.isEmpty) return fallback;
@@ -121,10 +149,11 @@ class EasyLiveChatTheme {
     );
   }
 
-  // Channel accessors using the 32-bit packed ARGB value (stable across the
-  // declared SDK range, >=3.19).
-  static int _alpha(Color c) => (c.value >> 24) & 0xFF;
-  static int _red(Color c) => (c.value >> 16) & 0xFF;
-  static int _green(Color c) => (c.value >> 8) & 0xFF;
-  static int _blue(Color c) => c.value & 0xFF;
+  // Channel accessors using the 32-bit packed ARGB value. `toARGB32()` replaces
+  // the deprecated `Color.value` (removed-in-future) and is available since
+  // Flutter 3.27 (the SDK's declared floor).
+  static int _alpha(Color c) => (c.toARGB32() >> 24) & 0xFF;
+  static int _red(Color c) => (c.toARGB32() >> 16) & 0xFF;
+  static int _green(Color c) => (c.toARGB32() >> 8) & 0xFF;
+  static int _blue(Color c) => c.toARGB32() & 0xFF;
 }

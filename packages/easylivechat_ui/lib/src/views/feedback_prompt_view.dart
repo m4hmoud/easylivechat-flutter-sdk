@@ -124,7 +124,7 @@ class _FeedbackPromptViewState extends State<FeedbackPromptView> {
         Text(
           _s.rateHint,
           textAlign: TextAlign.center,
-          style: TextStyle(color: t.text.withOpacity(0.7), fontSize: 14),
+          style: TextStyle(color: t.text.withValues(alpha: 0.7), fontSize: 14),
         ),
         const SizedBox(height: 20),
         Row(
@@ -142,7 +142,7 @@ class _FeedbackPromptViewState extends State<FeedbackPromptView> {
               iconSize: 40,
               icon: Icon(
                 filled ? Icons.star_rounded : Icons.star_border_rounded,
-                color: filled ? t.primary : t.text.withOpacity(0.3),
+                color: filled ? t.primary : t.text.withValues(alpha: 0.3),
               ),
             );
           }),
@@ -156,18 +156,18 @@ class _FeedbackPromptViewState extends State<FeedbackPromptView> {
           style: TextStyle(color: t.text, fontSize: 15),
           decoration: InputDecoration(
             hintText: _s.addAComment,
-            hintStyle: TextStyle(color: t.text.withOpacity(0.4)),
+            hintStyle: TextStyle(color: t.text.withValues(alpha: 0.4)),
             filled: true,
             fillColor: t.surface,
             contentPadding:
                 const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(color: t.text.withOpacity(0.15)),
+              borderSide: BorderSide(color: t.text.withValues(alpha: 0.15)),
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(color: t.text.withOpacity(0.15)),
+              borderSide: BorderSide(color: t.text.withValues(alpha: 0.15)),
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
@@ -191,8 +191,9 @@ class _FeedbackPromptViewState extends State<FeedbackPromptView> {
             style: ElevatedButton.styleFrom(
               backgroundColor: t.primary,
               foregroundColor: _onColor(t.primary),
-              disabledBackgroundColor: t.primary.withOpacity(0.4),
+              disabledBackgroundColor: t.primary.withValues(alpha: 0.4),
               elevation: 0,
+              padding: EdgeInsets.zero,
               shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12)),
             ),

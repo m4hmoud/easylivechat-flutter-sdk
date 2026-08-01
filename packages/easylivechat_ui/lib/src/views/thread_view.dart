@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:easylivechat/easylivechat.dart';
 import 'package:flutter/material.dart';
@@ -45,17 +47,28 @@ class _ThreadViewState extends State<ThreadView> {
   bool get _showAgentNames =>
       EasyLiveChat.instance.widgetConfig.value?.showAgentNames ?? true;
 
+  bool get _showAgentAvatars =>
+      EasyLiveChat.instance.widgetConfig.value?.showAgentAvatars ?? true;
+
   @override
   void initState() {
     super.initState();
     _lastCount = EasyLiveChat.instance.messages.value.length;
     EasyLiveChat.instance.messages.addListener(_onMessages);
-    WidgetsBinding.instance.addPostFrameCallback((_) => _jumpToBottom());
+    // History loads itself: one page as soon as the thread appears, then more
+    // as the visitor scrolls up. Making them find and tap "load earlier" to
+    // see their own conversation was busywork.
+    _scroll.addListener(_onScroll);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _jumpToBottom();
+      unawaited(_loadOlder());
+    });
   }
 
   @override
   void dispose() {
     EasyLiveChat.instance.messages.removeListener(_onMessages);
+    _scroll.removeListener(_onScroll);
     _scroll.dispose();
     super.dispose();
   }
@@ -63,12 +76,20 @@ class _ThreadViewState extends State<ThreadView> {
   void _onMessages() {
     final count = EasyLiveChat.instance.messages.value.length;
     // Auto-scroll only when a *new* (appended) message arrives, not when
-    // older history is prepended.
+    // older history is prepended — and only if the user is already near the
+    // bottom, so an incoming reply doesn't yank them away from history they're
+    // reading. (Their own send is from the bottom, so it still scrolls.)
     final appended = count > _lastCount && !_loadingOlder;
     _lastCount = count;
-    if (appended) {
+    if (appended && _isNearBottom()) {
       WidgetsBinding.instance.addPostFrameCallback((_) => _animateToBottom());
     }
+  }
+
+  bool _isNearBottom() {
+    if (!_scroll.hasClients) return true;
+    final pos = _scroll.position;
+    return pos.maxScrollExtent - pos.pixels <= 160;
   }
 
   void _jumpToBottom() {
@@ -85,12 +106,33 @@ class _ThreadViewState extends State<ThreadView> {
     );
   }
 
+  /// Pull the next page in as the visitor approaches the top of the thread.
+  void _onScroll() {
+    if (!_scroll.hasClients || _loadingOlder || !_hasMoreOlder) return;
+    // Oldest first, so the top of the list is offset 0 — start fetching a
+    // little before the visitor actually reaches it.
+    const triggerPx = 240.0;
+    if (_scroll.position.pixels <= triggerPx) unawaited(_loadOlder());
+  }
+
   Future<void> _loadOlder() async {
     if (_loadingOlder || !_hasMoreOlder) return;
     setState(() => _loadingOlder = true);
+    // Capture the viewport so we can keep the user on the same content after
+    // older history is prepended (which grows maxScrollExtent from the top).
+    final beforeExtent =
+        _scroll.hasClients ? _scroll.position.maxScrollExtent : 0.0;
+    final beforePixels = _scroll.hasClients ? _scroll.position.pixels : 0.0;
     try {
       final page = await EasyLiveChat.instance.loadOlderMessages();
       if (mounted && page.nextCursor == null) _hasMoreOlder = false;
+      if (mounted && page.messages.isNotEmpty) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!_scroll.hasClients) return;
+          final delta = _scroll.position.maxScrollExtent - beforeExtent;
+          if (delta > 0) _scroll.jumpTo(beforePixels + delta);
+        });
+      }
     } on EasyLiveChatError {
       // Swallow — the load-older affordance simply stays available to retry.
     } finally {
@@ -125,10 +167,13 @@ class _ThreadViewState extends State<ThreadView> {
                     if (index == 0) return _buildLoadOlder();
                     final msgIndex = index - 1;
                     if (msgIndex < messages.length) {
+                      final m = messages[msgIndex];
                       return MessageBubble(
-                        message: messages[msgIndex],
+                        key: ValueKey(m.id),
+                        message: m,
                         theme: t,
                         showAgentName: _showAgentNames,
+                        showAgentAvatar: _showAgentAvatars,
                         strings: _s,
                       );
                     }
@@ -158,20 +203,12 @@ class _ThreadViewState extends State<ThreadView> {
                 child: CircularProgressIndicator(
                   strokeWidth: 2,
                   valueColor: AlwaysStoppedAnimation<Color>(
-                      _theme.text.withOpacity(0.4)),
+                      _theme.text.withValues(alpha: 0.4)),
                 ),
               )
-            : TextButton(
-                onPressed: _loadOlder,
-                child: Text(
-                  _s.loadOlder,
-                  style: TextStyle(
-                    color: _theme.primary,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
+            // No affordance: loading is automatic, so an idle moment shows
+            // nothing rather than a button that would do what already happens.
+            : const SizedBox.shrink(),
       ),
     );
   }
@@ -184,6 +221,7 @@ class MessageBubble extends StatelessWidget {
   final ChatMessage message;
   final EasyLiveChatTheme theme;
   final bool showAgentName;
+  final bool showAgentAvatar;
   final ElcStrings strings;
 
   const MessageBubble({
@@ -191,6 +229,7 @@ class MessageBubble extends StatelessWidget {
     required this.message,
     required this.theme,
     required this.showAgentName,
+    this.showAgentAvatar = true,
     required this.strings,
   });
 
@@ -200,23 +239,31 @@ class MessageBubble extends StatelessWidget {
   Widget build(BuildContext context) {
     final bubbleColor = _isCustomer ? theme.primary : theme.surface;
     final textColor = _isCustomer ? _onColor(theme.primary) : theme.text;
-    final align = _isCustomer ? CrossAxisAlignment.end : CrossAxisAlignment.start;
+    final align =
+        _isCustomer ? CrossAxisAlignment.end : CrossAxisAlignment.start;
 
     final body = (message.body ?? '').trim();
     final tiles = _attachmentTiles(textColor);
+    // An avatar sits beside an inbound bubble when the workspace has the
+    // switch on AND we know who sent it. The identity check is what keeps a
+    // faceless system line from rendering an anonymous "A" circle — while
+    // still letting the auto-greeting show a face, since the server now
+    // attributes it to the agent the chat was routed to.
+    final withAvatar = !_isCustomer && showAgentAvatar && _hasSenderIdentity;
+    // Leave room for the face so a narrow phone doesn't overflow the row.
+    final maxBubble =
+        MediaQuery.of(context).size.width * (withAvatar ? 0.68 : 0.78);
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-      child: Column(
+    final column = Column(
         crossAxisAlignment: align,
         children: [
           if (!_isCustomer && showAgentName && _agentName != null)
             Padding(
               padding: const EdgeInsets.only(left: 4, bottom: 2),
               child: Text(
-                _agentName!,
+                _agentLine!,
                 style: TextStyle(
-                  color: theme.text.withOpacity(0.6),
+                  color: theme.text.withValues(alpha: 0.6),
                   fontSize: 11,
                   fontWeight: FontWeight.w600,
                 ),
@@ -224,7 +271,7 @@ class MessageBubble extends StatelessWidget {
             ),
           ConstrainedBox(
             constraints: BoxConstraints(
-              maxWidth: MediaQuery.of(context).size.width * 0.78,
+              maxWidth: maxBubble,
             ),
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
@@ -238,7 +285,7 @@ class MessageBubble extends StatelessWidget {
                 ),
                 border: _isCustomer
                     ? null
-                    : Border.all(color: theme.text.withOpacity(0.08)),
+                    : Border.all(color: theme.text.withValues(alpha: 0.08)),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -265,7 +312,7 @@ class MessageBubble extends StatelessWidget {
                     Text(
                       strings.attachment,
                       style: TextStyle(
-                          color: textColor.withOpacity(0.7),
+                          color: textColor.withValues(alpha: 0.7),
                           fontSize: 14,
                           fontStyle: FontStyle.italic),
                     ),
@@ -274,30 +321,76 @@ class MessageBubble extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 2),
-          _meta(textColorMuted: theme.text.withOpacity(0.45)),
+          _meta(textColorMuted: theme.text.withValues(alpha: 0.45)),
         ],
-      ),
+      );
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+      child: withAvatar
+          ? Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _AgentAvatar(
+                  url: message.senderAvatarUrl,
+                  name: _agentName,
+                  theme: theme,
+                ),
+                const SizedBox(width: 8),
+                Flexible(child: column),
+              ],
+            )
+          : column,
     );
   }
+
+  /// Do we know who this came from? Either field is enough — an agent with no
+  /// photo still gets the initial circle, and a photo with the name switch off
+  /// still gets the photo.
+  bool get _hasSenderIdentity =>
+      (message.senderAvatarUrl?.trim().isNotEmpty ?? false) ||
+      _agentName != null;
 
   String? get _agentName {
     final n = message.senderName?.trim();
     return (n != null && n.isNotEmpty) ? n : null;
   }
 
+  /// Name, plus the job title when the agent has one — matches the web widget,
+  /// which renders "Ava · Support Lead" above the bubble.
+  String? get _agentLine {
+    final n = _agentName;
+    if (n == null) return null;
+    final title = message.senderJobTitle?.trim();
+    return (title != null && title.isNotEmpty) ? '$n · $title' : n;
+  }
+
   Widget _meta({required Color textColorMuted}) {
     final time = _formatTime(message.createdAt);
     final parts = <Widget>[
-      Text(time,
-          style: TextStyle(color: textColorMuted, fontSize: 10)),
+      Text(time, style: TextStyle(color: textColorMuted, fontSize: 10)),
     ];
     if (_isCustomer) {
       if (message.failed) {
         parts
           ..add(const SizedBox(width: 6))
-          ..add(Text(strings.sendFailedRetry,
-              style: const TextStyle(
-                  color: _ThreadErrorColor.color, fontSize: 10)));
+          ..add(GestureDetector(
+            onTap: () {
+              // Re-send and swallow the (already UI-reflected) failure future
+              // so a second failure isn't an unhandled async error.
+              EasyLiveChat.instance
+                  .resend(message)
+                  ?.serverMessageId
+                  .catchError((_) => '');
+            },
+            child: Text(strings.sendFailedRetry,
+                style: const TextStyle(
+                  color: _ThreadErrorColor.color,
+                  fontSize: 10,
+                  decoration: TextDecoration.underline,
+                  decorationColor: _ThreadErrorColor.color,
+                )),
+          ));
       } else if (message.isOptimistic ||
           message.deliveryStatus == MessageDeliveryStatus.pending) {
         parts
@@ -365,7 +458,7 @@ class MessageBubble extends StatelessWidget {
             placeholder: (context, _) => Container(
               width: 200,
               height: 140,
-              color: fg.withOpacity(0.08),
+              color: fg.withValues(alpha: 0.08),
               alignment: Alignment.center,
               child: SizedBox(
                 width: 18,
@@ -373,7 +466,7 @@ class MessageBubble extends StatelessWidget {
                 child: CircularProgressIndicator(
                   strokeWidth: 2,
                   valueColor:
-                      AlwaysStoppedAnimation<Color>(fg.withOpacity(0.4)),
+                      AlwaysStoppedAnimation<Color>(fg.withValues(alpha: 0.4)),
                 ),
               ),
             ),
@@ -391,7 +484,7 @@ class MessageBubble extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
         decoration: BoxDecoration(
-          color: fg.withOpacity(0.08),
+          color: fg.withValues(alpha: 0.08),
           borderRadius: BorderRadius.circular(10),
         ),
         child: Row(
@@ -407,7 +500,8 @@ class MessageBubble extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 8),
-            Icon(Icons.download_rounded, size: 16, color: fg.withOpacity(0.7)),
+            Icon(Icons.download_rounded,
+                size: 16, color: fg.withValues(alpha: 0.7)),
           ],
         ),
       ),
@@ -420,20 +514,19 @@ class MessageBubble extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
         decoration: BoxDecoration(
-          color: fg.withOpacity(0.06),
+          color: fg.withValues(alpha: 0.06),
           borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: fg.withOpacity(0.15)),
+          border: Border.all(color: fg.withValues(alpha: 0.15)),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(Icons.broken_image_outlined,
-                size: 18, color: fg.withOpacity(0.6)),
+                size: 18, color: fg.withValues(alpha: 0.6)),
             const SizedBox(width: 8),
             Text(
               strings.mediaUnavailable,
-              style: TextStyle(
-                  color: fg.withOpacity(0.6), fontSize: 13),
+              style: TextStyle(color: fg.withValues(alpha: 0.6), fontSize: 13),
             ),
           ],
         ),
@@ -477,6 +570,64 @@ class MessageBubble extends StatelessWidget {
 }
 
 /// Animated three-dot "agent is typing" row, left-aligned like an agent bubble.
+/// The replying agent's face, beside their bubble.
+///
+/// Falls back to the initial of their name on a tinted circle when there is no
+/// photo — the same fallback the web widget uses, so an agent without an
+/// avatar still reads as a person rather than leaving a hole in the layout.
+class _AgentAvatar extends StatelessWidget {
+  final String? url;
+  final String? name;
+  final EasyLiveChatTheme theme;
+
+  const _AgentAvatar({required this.url, required this.name, required this.theme});
+
+  static const double _size = 28;
+
+  @override
+  Widget build(BuildContext context) {
+    final raw = url?.trim();
+    final initial =
+        (name?.trim().isNotEmpty ?? false) ? name!.trim()[0].toUpperCase() : 'A';
+
+    final fallback = Container(
+      width: _size,
+      height: _size,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: theme.primary.withValues(alpha: 0.15),
+        shape: BoxShape.circle,
+      ),
+      child: Text(
+        initial,
+        style: TextStyle(
+          color: theme.primary,
+          fontSize: 12,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+    );
+
+    if (raw == null || raw.isEmpty) return fallback;
+
+    // Avatars come back server-relative (`/uploads/...`); resolveUrl makes them
+    // absolute against the configured API host.
+    final resolved = EasyLiveChat.instance.resolveUrl(raw);
+    return ClipOval(
+      child: CachedNetworkImage(
+        imageUrl: resolved,
+        width: _size,
+        height: _size,
+        fit: BoxFit.cover,
+        // A broken or slow avatar must never break the thread — degrade to the
+        // initial rather than showing an error glyph mid-conversation.
+        placeholder: (_, __) => fallback,
+        errorWidget: (_, __, ___) => fallback,
+      ),
+    );
+  }
+}
+
 class _TypingRow extends StatefulWidget {
   final EasyLiveChatTheme theme;
   final String label;
@@ -488,9 +639,9 @@ class _TypingRow extends StatefulWidget {
 
 class _TypingRowState extends State<_TypingRow>
     with SingleTickerProviderStateMixin {
-  late final AnimationController _c =
-      AnimationController(vsync: this, duration: const Duration(milliseconds: 900))
-        ..repeat();
+  late final AnimationController _c = AnimationController(
+      vsync: this, duration: const Duration(milliseconds: 900))
+    ..repeat();
 
   @override
   void dispose() {
@@ -505,49 +656,50 @@ class _TypingRowState extends State<_TypingRow>
       label: widget.label,
       liveRegion: true,
       child: Align(
-      alignment: AlignmentDirectional.centerStart,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-          decoration: BoxDecoration(
-            color: t.surface,
-            borderRadius: const BorderRadius.only(
-              topLeft: Radius.circular(16),
-              topRight: Radius.circular(16),
-              bottomRight: Radius.circular(16),
-              bottomLeft: Radius.circular(4),
+        alignment: AlignmentDirectional.centerStart,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            decoration: BoxDecoration(
+              color: t.surface,
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(16),
+                topRight: Radius.circular(16),
+                bottomRight: Radius.circular(16),
+                bottomLeft: Radius.circular(4),
+              ),
+              border: Border.all(color: t.text.withValues(alpha: 0.08)),
             ),
-            border: Border.all(color: t.text.withOpacity(0.08)),
-          ),
-          child: AnimatedBuilder(
-            animation: _c,
-            builder: (context, _) {
-              return Row(
-                mainAxisSize: MainAxisSize.min,
-                children: List.generate(3, (i) {
-                  final phase = (_c.value + i * 0.33) % 1.0;
-                  final opacity = 0.3 + 0.7 * (1 - (phase - 0.5).abs() * 2).clamp(0.0, 1.0);
-                  return Padding(
-                    padding: EdgeInsets.only(right: i < 2 ? 4 : 0),
-                    child: Opacity(
-                      opacity: opacity,
-                      child: Container(
-                        width: 7,
-                        height: 7,
-                        decoration: BoxDecoration(
-                          color: t.text.withOpacity(0.5),
-                          shape: BoxShape.circle,
+            child: AnimatedBuilder(
+              animation: _c,
+              builder: (context, _) {
+                return Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: List.generate(3, (i) {
+                    final phase = (_c.value + i * 0.33) % 1.0;
+                    final opacity = 0.3 +
+                        0.7 * (1 - (phase - 0.5).abs() * 2).clamp(0.0, 1.0);
+                    return Padding(
+                      padding: EdgeInsets.only(right: i < 2 ? 4 : 0),
+                      child: Opacity(
+                        opacity: opacity,
+                        child: Container(
+                          width: 7,
+                          height: 7,
+                          decoration: BoxDecoration(
+                            color: t.text.withValues(alpha: 0.5),
+                            shape: BoxShape.circle,
+                          ),
                         ),
                       ),
-                    ),
-                  );
-                }),
-              );
-            },
+                    );
+                  }),
+                );
+              },
+            ),
           ),
         ),
-      ),
       ),
     );
   }

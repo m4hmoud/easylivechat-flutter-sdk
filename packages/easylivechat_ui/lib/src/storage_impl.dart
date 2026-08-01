@@ -5,12 +5,13 @@ import 'package:shared_preferences/shared_preferences.dart';
 /// Durable [EasyLiveChatStorage] for production apps.
 ///
 /// Splits persistence by sensitivity:
-///  • the widget **JWT** ([StorageKeys.token]) → `flutter_secure_storage`
-///    (Keychain / EncryptedSharedPreferences) so the bearer credential is kept
-///    out of plain prefs;
-///  • the durable **visitorId**, cached **profile**, and **conversationId**
-///    ([StorageKeys.visitorId], [StorageKeys.profile],
-///    [StorageKeys.conversationId]) → `shared_preferences`.
+///  • the widget **JWT** ([StorageKeys.token]) and the cached **profile**
+///    ([StorageKeys.profile], which holds the visitor's name / email / pre-chat
+///    answers — PII) → `flutter_secure_storage` (Keychain /
+///    EncryptedSharedPreferences), kept out of plain prefs;
+///  • the durable **visitorId** and **conversationId**
+///    ([StorageKeys.visitorId], [StorageKeys.conversationId] — opaque,
+///    non-sensitive) → `shared_preferences`.
 ///
 /// The visitorId MUST survive cold starts — `shared_preferences` is durable, so
 /// a relaunch reuses the same server-side Contact instead of orphaning prior
@@ -20,8 +21,10 @@ class SecurePrefsStorage implements EasyLiveChatStorage {
   /// with Android `encryptedSharedPreferences` enabled.
   final FlutterSecureStorage _secure;
 
-  /// Lazily-opened `shared_preferences` instance for the non-secret values.
-  SharedPreferences? _prefs;
+  /// Lazily-opened `shared_preferences` for the non-secret values. Cache the
+  /// FUTURE (not the resolved value) so concurrent first reads/writes share a
+  /// single `getInstance()` rather than racing two.
+  Future<SharedPreferences>? _prefsFuture;
 
   SecurePrefsStorage({FlutterSecureStorage? secureStorage})
       : _secure = secureStorage ??
@@ -29,11 +32,13 @@ class SecurePrefsStorage implements EasyLiveChatStorage {
               aOptions: AndroidOptions(encryptedSharedPreferences: true),
             );
 
-  /// True for keys that must live in secure storage (currently just the JWT).
-  bool _isSecure(String key) => key == StorageKeys.token;
+  /// True for keys that must live in secure storage: the bearer JWT and the
+  /// PII-bearing profile blob.
+  bool _isSecure(String key) =>
+      key == StorageKeys.token || key == StorageKeys.profile;
 
-  Future<SharedPreferences> _ensurePrefs() async =>
-      _prefs ??= await SharedPreferences.getInstance();
+  Future<SharedPreferences> _ensurePrefs() =>
+      _prefsFuture ??= SharedPreferences.getInstance();
 
   @override
   Future<String?> read(String key) async {

@@ -1,11 +1,13 @@
 import 'dart:ui' show PlatformDispatcher;
 
+import 'package:flutter/foundation.dart' show visibleForTesting;
+
 /// SDK "chrome" strings for the prebuilt UI (`Send`, `Rate your chat`, …).
 ///
 /// These are the framework's own labels — distinct from tenant-authored copy
 /// (`welcomeTitle`, pre-chat field labels, `offlineMessage`) which is rendered
 /// **verbatim** and never localized. We ship all 12 product locales to match
-/// the dashboard (`ar de en es fr hi it ku pt tr ur zh`) and fall back to
+/// the dashboard (`ar ckb de en es fr hi it kmr pt tr ur zh`) and fall back to
 /// English for any missing key/locale — never hardcode English at the call
 /// site (project i18n rule).
 ///
@@ -16,21 +18,78 @@ class ElcStrings {
   final String _lang;
   const ElcStrings._(this._lang);
 
-  /// Resolve strings for [localeCode] (e.g. `en`, `ar`, `pt-BR`). Null/unknown
-  /// falls back to the device locale, then English.
-  factory ElcStrings.of(String? localeCode) {
-    final explicit = _normalize(localeCode);
-    if (explicit != null && _table.containsKey(explicit)) {
-      return ElcStrings._(explicit);
+  /// Host-provided overrides keyed by string key (e.g. `'send'`,
+  /// `'typeAMessage'`). When a key is present here it wins over the built-in
+  /// localized table for EVERY locale — lets a host fully own the chrome
+  /// wording/translation. Keys not provided fall back to the built-in tables.
+  ///
+  /// Set once (e.g. via `EasyLiveChatScreen(strings: {...})`, or directly):
+  /// ```dart
+  /// ElcStrings.overrideAll({'send': 'بنێرە', 'typeAMessage': 'پەیامێک بنووسە'});
+  /// ```
+  static Map<String, String> _overrides = const {};
+
+  /// Replace the host string overrides (merges over the built-in table). Pass an
+  /// empty map to clear.
+  ///
+  /// These apply to EVERY locale. A host whose own copy is multilingual wants
+  /// [overrideByLocale] instead — this one silently shows the same words to a
+  /// Kurdish and an Arabic visitor.
+  static void overrideAll(Map<String, String> strings) {
+    _overrides = Map<String, String>.unmodifiable(strings);
+  }
+
+  /// Per-locale host overrides: `{'ckb': {'send': 'بنێرە'}, 'ar': {…}}`.
+  ///
+  /// Beats [overrideAll] when both define a key, because it is the more
+  /// specific statement. Locale codes are normalized the same way everything
+  /// else is, so `ku`, `CKB` and `ckb-IQ` all land on `ckb`.
+  ///
+  /// A locale the SDK doesn't ship works too: supply `{'fa': {…}}` and a
+  /// Persian visitor gets those strings, falling back to English for keys the
+  /// host didn't provide. That makes this the way to add a language without
+  /// waiting on an SDK release.
+  static Map<String, Map<String, String>> _localeOverrides = const {};
+
+  static void overrideByLocale(Map<String, Map<String, String>> byLocale) {
+    final out = <String, Map<String, String>>{};
+    for (final entry in byLocale.entries) {
+      final code = _normalize(entry.key);
+      if (code == null) continue;
+      out[code] = Map<String, String>.unmodifiable(entry.value);
     }
+    _localeOverrides = Map<String, Map<String, String>>.unmodifiable(out);
+  }
+
+  /// Host-forced chrome locale (e.g. the host app's current locale). Wins over
+  /// both the passed locale and the server workspace locale — the server often
+  /// returns its own default (e.g. `en`) regardless of the visitor's app
+  /// language, so a host that knows its locale should set this.
+  static String? _hostLocale;
+
+  /// Force the chrome locale from the host app. Pass null to clear and fall back
+  /// to the server/device locale.
+  static void setLocale(String? code) {
+    _hostLocale = code;
+  }
+
+  /// Resolve strings: host-forced locale → [localeCode] (server/config) →
+  /// device locale → English.
+  factory ElcStrings.of(String? localeCode) {
+    final host = _normalize(_hostLocale);
+    if (host != null && _known(host)) return ElcStrings._(host);
+    final explicit = _normalize(localeCode);
+    if (explicit != null && _known(explicit)) return ElcStrings._(explicit);
     final device = _normalize(
       PlatformDispatcher.instance.locale.languageCode,
     );
-    if (device != null && _table.containsKey(device)) {
-      return ElcStrings._(device);
-    }
+    if (device != null && _known(device)) return ElcStrings._(device);
     return const ElcStrings._('en');
   }
+
+  /// A locale we can render: one we ship, or one the host supplied strings for.
+  static bool _known(String code) =>
+      _table.containsKey(code) || _localeOverrides.containsKey(code);
 
   static String? _normalize(String? code) {
     if (code == null) return null;
@@ -38,10 +97,29 @@ class ElcStrings {
     if (c.isEmpty) return null;
     // language subtag only: pt-BR / pt_br / zh-Hans → pt / zh
     final lang = c.split(RegExp(r'[-_]')).first;
-    return lang.isEmpty ? null : lang;
+    if (lang.isEmpty) return null;
+    // Kurdish: `ckb` (Central Kurdish / Sorani) and `kmr` (Northern Kurdish /
+    // Kurmanji / Badini) each have their own table. `ku` is the deprecated
+    // macrolanguage code the platform used for Sorani; still accepted here so
+    // an older host, or a server row not yet migrated, keeps working.
+    if (lang == 'ku') return 'ckb';
+    return lang;
   }
 
+  /// Raw lookup by key, for the test that proves the compiled table still
+  /// matches `l10n/sdk_strings.json`. The two drifted apart once already —
+  /// the JSON carried edits that were never applied — and the only symptom
+  /// was the app quietly showing the old wording.
+  @visibleForTesting
+  String stringFor(String key) => _t(key);
+
   String _t(String key) {
+    // Most specific first: this locale's host override, then the host's
+    // all-locale override, then the shipped table, then English.
+    final perLocale = _localeOverrides[_lang]?[key];
+    if (perLocale != null && perLocale.isNotEmpty) return perLocale;
+    final o = _overrides[key];
+    if (o != null && o.isNotEmpty) return o;
     final m = _table[_lang] ?? _table['en']!;
     return m[key] ?? _table['en']![key] ?? key;
   }
@@ -69,6 +147,8 @@ class ElcStrings {
   String get invalidOption => _t('invalidOption');
   String get selectAnOption => _t('selectAnOption');
   String get somethingWentWrong => _t('somethingWentWrong');
+  String get retry => _t('retry');
+  String get couldNotConnect => _t('couldNotConnect');
 
   // ── feedback (CSAT) ──
   String get rateYourChat => _t('rateYourChat');
@@ -84,6 +164,31 @@ class ElcStrings {
   String get sendMessage => _t('sendMessage');
   String get offlineThanks => _t('offlineThanks');
 
+  /// Banner shown while the workspace is closed. The visitor can still write —
+  /// the message waits for the team — so this informs rather than blocks.
+  String get closedNotice => _t('closedNotice');
+
+  /// Appended to [closedNotice] when the server tells us when we reopen.
+  String get backAt => _t('backAt');
+
+  /// Distinct from [closedNotice]: we ARE open, there's just nobody free.
+  String get noAgentsNotice => _t('noAgentsNotice');
+
+  /// Used instead of [closedNotice] when the closure has a name.
+  String get closedForLabel => _t('closedForLabel');
+
+  /// Headline on the closed screen. Short and unambiguous — the visitor should
+  /// know they cannot be helped right now before reading a word of body copy.
+  String get unavailableTitle => _t('unavailableTitle');
+
+  // ── leaving the chat ──
+
+  /// Asked before the visitor backs out of the chat, so a stray back gesture
+  /// mid-conversation doesn't drop them out of it.
+  String get exitChatTitle => _t('exitChatTitle');
+  String get exitChatConfirm => _t('exitChatConfirm');
+  String get exitChatCancel => _t('exitChatCancel');
+
   /// Map a server/SDK error code to a human, localized message (best effort).
   String forErrorCode(String code) {
     switch (code) {
@@ -95,6 +200,11 @@ class ElcStrings {
         return invalidNumber;
       case 'INVALID_OPTION':
         return invalidOption;
+      case 'INVALID_RATING':
+        // The post-chat survey's rating field. "Please pick a rating" and
+        // "this field is required" are the same instruction to a visitor
+        // staring at an unset row of stars.
+        return fieldRequired;
       default:
         return somethingWentWrong;
     }
@@ -122,6 +232,8 @@ class ElcStrings {
       'invalidOption': 'Choose one of the options',
       'selectAnOption': 'Select…',
       'somethingWentWrong': 'Something went wrong. Please try again.',
+      'retry': 'Retry',
+      'couldNotConnect': "Couldn't connect. Check your connection and try again.",
       'rateYourChat': 'Rate your chat',
       'rateHint': 'How was your conversation?',
       'addAComment': 'Add a comment (optional)',
@@ -131,7 +243,15 @@ class ElcStrings {
       'yourEmail': 'Your email',
       'yourMessage': 'Your message',
       'sendMessage': 'Send message',
+      'closedNotice': "Our team is offline right now. Leave your message and we'll reply as soon as we're back.",
+      'backAt': "We're back at {time}.",
+      'noAgentsNotice': "Everyone's busy right now. Leave a message and we'll reply shortly.",
+      'closedForLabel': "We're closed for {label}.",
+      'unavailableTitle': "We're not available right now",
       'offlineThanks': "Thanks! We'll get back to you.",
+      'exitChatTitle': 'Do you really want to close this chat?',
+      'exitChatConfirm': 'Close chat',
+      'exitChatCancel': 'Cancel',
     },
     'ar': {
       'send': 'إرسال',
@@ -154,6 +274,8 @@ class ElcStrings {
       'invalidOption': 'اختر أحد الخيارات',
       'selectAnOption': 'اختر…',
       'somethingWentWrong': 'حدث خطأ ما. حاول مرة أخرى.',
+      'retry': 'إعادة المحاولة',
+      'couldNotConnect': 'تعذّر الاتصال. تحقق من اتصالك وحاول مرة أخرى.',
       'rateYourChat': 'قيّم محادثتك',
       'rateHint': 'كيف كانت محادثتك؟',
       'addAComment': 'أضف تعليقًا (اختياري)',
@@ -163,7 +285,57 @@ class ElcStrings {
       'yourEmail': 'بريدك الإلكتروني',
       'yourMessage': 'رسالتك',
       'sendMessage': 'إرسال الرسالة',
+      'closedNotice': 'فريقنا غير متاح حالياً. اترك رسالتك وسنرد عليك فور عودتنا.',
+      'backAt': 'نعود الساعة {time}.',
+      'noAgentsNotice': 'الجميع مشغول حالياً. اترك رسالة وسنرد قريباً.',
+      'closedForLabel': 'نحن مغلقون بمناسبة {label}.',
+      'unavailableTitle': 'غير متاحين حالياً',
       'offlineThanks': 'شكرًا! سنعاود التواصل معك.',
+      'exitChatTitle': 'هل تريد حقًا إغلاق هذه الدردشة؟',
+      'exitChatConfirm': 'إغلاق الدردشة',
+      'exitChatCancel': 'إلغاء',
+    },
+    'ckb': {
+      'send': 'ناردن',
+      'typeAMessage': 'پەیامێک بنووسە',
+      'attach': 'هاوپێچکردن',
+      'attachImage': 'وێنە',
+      'attachFile': 'فایل',
+      'agentTyping': 'دەنووسێت…',
+      'loadOlder': 'پەیامە کۆنەکان باربکە',
+      'mediaUnavailable': 'میدیا بەردەست نییە',
+      'download': 'داگرتن',
+      'image': 'وێنە',
+      'attachment': 'هاوپێچ',
+      'sendFailedRetry': 'نەنێردرا. بۆ دووبارەکردنەوە کلیک بکە.',
+      'sending': 'دەنێردرێت…',
+      'startChat': 'دەستپێکردنی گفتوگۆ',
+      'fieldRequired': 'ئەم خانەیە پێویستە',
+      'invalidEmail': 'ئیمەیڵێکی دروست بنووسە',
+      'invalidNumber': 'ژمارەیەکی دروست بنووسە',
+      'invalidOption': 'یەکێک لە هەڵبژاردەکان هەڵبژێرە',
+      'selectAnOption': 'هەڵبژێرە…',
+      'somethingWentWrong': 'هەڵەیەک ڕوویدا. تکایە دووبارە هەوڵبدەرەوە.',
+      'retry': 'دووبارە هەوڵبدەرەوە',
+      'couldNotConnect': 'پەیوەندی نەکرا. لە پەیوەندیەکەت بڕوانە و دووبارە هەوڵبدەرەوە.',
+      'rateYourChat': 'گفتوگۆکەت هەڵبسەنگێنە',
+      'rateHint': 'گفتوگۆکەت چۆن بوو؟',
+      'addAComment': 'لێدوانێک زیاد بکە (ئارەزوومەندانە)',
+      'submit': 'ناردن',
+      'thanksForFeedback': 'سوپاس بۆ ڕایەکەت!',
+      'yourName': 'ناوت',
+      'yourEmail': 'ئیمەیڵەکەت',
+      'yourMessage': 'پەیامەکەت',
+      'sendMessage': 'ناردنی پەیام',
+      'closedNotice': 'تیمەکەمان ئێستا لە دەرەوەی کارە. نامەکەت بەجێبهێڵە، هەرکە گەڕاینەوە وەڵامت دەدەینەوە.',
+      'backAt': 'لە {time} دەگەڕێینەوە.',
+      'noAgentsNotice': 'ئێستا هەموو خەریکن. نامەیەک بەجێبهێڵە، بەم زووانە وەڵامت دەدەینەوە.',
+      'closedForLabel': 'بەهۆی {label} داخراوین.',
+      'unavailableTitle': 'ئێستا بەردەست نین',
+      'offlineThanks': 'سوپاس! بەمزووانە پەیوەندیت پێوە دەکەین.',
+      'exitChatTitle': 'دڵنیایی دەتەوێت ئەم گفتوگۆیە دابخەیت؟',
+      'exitChatConfirm': 'داخستنی گفتوگۆ',
+      'exitChatCancel': 'پاشگەزبوونەوە',
     },
     'de': {
       'send': 'Senden',
@@ -186,6 +358,8 @@ class ElcStrings {
       'invalidOption': 'Eine der Optionen wählen',
       'selectAnOption': 'Auswählen…',
       'somethingWentWrong': 'Etwas ist schiefgelaufen. Bitte erneut versuchen.',
+      'retry': 'Erneut versuchen',
+      'couldNotConnect': 'Keine Verbindung. Bitte Verbindung prüfen und erneut versuchen.',
       'rateYourChat': 'Chat bewerten',
       'rateHint': 'Wie war Ihr Gespräch?',
       'addAComment': 'Kommentar hinzufügen (optional)',
@@ -195,7 +369,15 @@ class ElcStrings {
       'yourEmail': 'Ihre E-Mail',
       'yourMessage': 'Ihre Nachricht',
       'sendMessage': 'Nachricht senden',
+      'closedNotice': 'Unser Team ist gerade offline. Hinterlassen Sie Ihre Nachricht — wir antworten, sobald wir zurück sind.',
+      'backAt': 'Wir sind ab {time} wieder da.',
+      'noAgentsNotice': 'Gerade sind alle beschäftigt. Hinterlassen Sie eine Nachricht — wir melden uns gleich.',
+      'closedForLabel': 'Wir haben wegen {label} geschlossen.',
+      'unavailableTitle': 'Wir sind gerade nicht erreichbar',
       'offlineThanks': 'Danke! Wir melden uns bei Ihnen.',
+      'exitChatTitle': 'Möchten Sie diesen Chat wirklich schließen?',
+      'exitChatConfirm': 'Chat schließen',
+      'exitChatCancel': 'Abbrechen',
     },
     'es': {
       'send': 'Enviar',
@@ -218,6 +400,8 @@ class ElcStrings {
       'invalidOption': 'Elige una de las opciones',
       'selectAnOption': 'Selecciona…',
       'somethingWentWrong': 'Algo salió mal. Inténtalo de nuevo.',
+      'retry': 'Reintentar',
+      'couldNotConnect': 'No se pudo conectar. Comprueba tu conexión e inténtalo de nuevo.',
       'rateYourChat': 'Valora tu chat',
       'rateHint': '¿Qué tal fue tu conversación?',
       'addAComment': 'Añade un comentario (opcional)',
@@ -227,7 +411,15 @@ class ElcStrings {
       'yourEmail': 'Tu correo',
       'yourMessage': 'Tu mensaje',
       'sendMessage': 'Enviar mensaje',
+      'closedNotice': 'Nuestro equipo no está disponible ahora. Deja tu mensaje y te responderemos en cuanto volvamos.',
+      'backAt': 'Volvemos a las {time}.',
+      'noAgentsNotice': 'Ahora mismo todos están ocupados. Deja un mensaje y te responderemos en breve.',
+      'closedForLabel': 'Cerramos por {label}.',
+      'unavailableTitle': 'No estamos disponibles ahora',
       'offlineThanks': '¡Gracias! Te responderemos pronto.',
+      'exitChatTitle': '¿Seguro que quieres cerrar este chat?',
+      'exitChatConfirm': 'Cerrar chat',
+      'exitChatCancel': 'Cancelar',
     },
     'fr': {
       'send': 'Envoyer',
@@ -250,6 +442,8 @@ class ElcStrings {
       'invalidOption': 'Choisissez l’une des options',
       'selectAnOption': 'Sélectionner…',
       'somethingWentWrong': 'Une erreur est survenue. Réessayez.',
+      'retry': 'Réessayer',
+      'couldNotConnect': 'Connexion impossible. Vérifiez votre connexion et réessayez.',
       'rateYourChat': 'Évaluez votre chat',
       'rateHint': 'Comment s’est passée votre conversation ?',
       'addAComment': 'Ajoutez un commentaire (facultatif)',
@@ -259,7 +453,15 @@ class ElcStrings {
       'yourEmail': 'Votre e-mail',
       'yourMessage': 'Votre message',
       'sendMessage': 'Envoyer le message',
+      'closedNotice': 'Notre équipe est hors ligne pour le moment. Laissez votre message, nous répondrons dès notre retour.',
+      'backAt': 'Nous revenons à {time}.',
+      'noAgentsNotice': "Tout le monde est occupé pour l'instant. Laissez un message, nous répondrons vite.",
+      'closedForLabel': 'Nous sommes fermés pour {label}.',
+      'unavailableTitle': 'Nous ne sommes pas disponibles pour le moment',
       'offlineThanks': 'Merci ! Nous reviendrons vers vous.',
+      'exitChatTitle': 'Voulez-vous vraiment fermer cette discussion ?',
+      'exitChatConfirm': 'Fermer la discussion',
+      'exitChatCancel': 'Annuler',
     },
     'hi': {
       'send': 'भेजें',
@@ -282,6 +484,8 @@ class ElcStrings {
       'invalidOption': 'किसी एक विकल्प को चुनें',
       'selectAnOption': 'चुनें…',
       'somethingWentWrong': 'कुछ गड़बड़ हो गई। कृपया पुनः प्रयास करें।',
+      'retry': 'पुनः प्रयास करें',
+      'couldNotConnect': 'कनेक्ट नहीं हो सका। कृपया अपना कनेक्शन जाँचें और पुनः प्रयास करें।',
       'rateYourChat': 'अपनी चैट को रेट करें',
       'rateHint': 'आपकी बातचीत कैसी रही?',
       'addAComment': 'टिप्पणी जोड़ें (वैकल्पिक)',
@@ -291,7 +495,15 @@ class ElcStrings {
       'yourEmail': 'आपका ईमेल',
       'yourMessage': 'आपका संदेश',
       'sendMessage': 'संदेश भेजें',
+      'closedNotice': 'हमारी टीम अभी ऑफ़लाइन है। अपना संदेश छोड़ें, लौटते ही हम उत्तर देंगे।',
+      'backAt': 'हम {time} बजे लौटते हैं।',
+      'noAgentsNotice': 'अभी सभी व्यस्त हैं। संदेश छोड़ें, हम जल्द उत्तर देंगे।',
+      'closedForLabel': 'हम {label} के कारण बंद हैं।',
+      'unavailableTitle': 'हम अभी उपलब्ध नहीं हैं',
       'offlineThanks': 'धन्यवाद! हम आपसे जल्द संपर्क करेंगे।',
+      'exitChatTitle': 'क्या आप वाकई यह चैट बंद करना चाहते हैं?',
+      'exitChatConfirm': 'चैट बंद करें',
+      'exitChatCancel': 'रद्द करें',
     },
     'it': {
       'send': 'Invia',
@@ -314,6 +526,8 @@ class ElcStrings {
       'invalidOption': 'Scegli una delle opzioni',
       'selectAnOption': 'Seleziona…',
       'somethingWentWrong': 'Qualcosa è andato storto. Riprova.',
+      'retry': 'Riprova',
+      'couldNotConnect': 'Impossibile connettersi. Controlla la connessione e riprova.',
       'rateYourChat': 'Valuta la tua chat',
       'rateHint': 'Com’è andata la conversazione?',
       'addAComment': 'Aggiungi un commento (facoltativo)',
@@ -323,39 +537,57 @@ class ElcStrings {
       'yourEmail': 'La tua email',
       'yourMessage': 'Il tuo messaggio',
       'sendMessage': 'Invia messaggio',
+      'closedNotice': 'Il nostro team non è disponibile al momento. Lascia il tuo messaggio e ti risponderemo appena torniamo.',
+      'backAt': 'Torniamo alle {time}.',
+      'noAgentsNotice': 'Al momento sono tutti occupati. Lascia un messaggio e ti risponderemo a breve.',
+      'closedForLabel': 'Siamo chiusi per {label}.',
+      'unavailableTitle': 'Al momento non siamo disponibili',
       'offlineThanks': 'Grazie! Ti risponderemo presto.',
+      'exitChatTitle': 'Vuoi davvero chiudere questa chat?',
+      'exitChatConfirm': 'Chiudi chat',
+      'exitChatCancel': 'Annulla',
     },
-    'ku': {
-      'send': 'ناردن',
-      'typeAMessage': 'پەیامێک بنووسە',
-      'attach': 'هاوپێچکردن',
+    'kmr': {
+      'send': 'هنارتن',
+      'typeAMessage': 'نامەکێ بنڤیسە',
+      'attach': 'هەڤپێچکرن',
       'attachImage': 'وێنە',
-      'attachFile': 'پەڕگە',
-      'agentTyping': 'دەنووسێت…',
-      'loadOlder': 'پەیامە کۆنەکان باربکە',
-      'mediaUnavailable': 'مێدیا بەردەست نییە',
+      'attachFile': 'فایل',
+      'agentTyping': 'دنڤیسیت...',
+      'loadOlder': 'نامەیێن کەڤن باربکە',
+      'mediaUnavailable': 'میدیا بەردەست نینە',
       'download': 'داگرتن',
       'image': 'وێنە',
-      'attachment': 'هاوپێچ',
-      'sendFailedRetry': 'نەنێردرا. بۆ دووبارەکردنەوە دەستبنێ.',
-      'sending': 'دەنێردرێت…',
-      'startChat': 'دەستپێکردنی گفتوگۆ',
-      'fieldRequired': 'ئەم خانەیە پێویستە',
-      'invalidEmail': 'ئیمەیڵێکی دروست بنووسە',
-      'invalidNumber': 'ژمارەیەکی دروست بنووسە',
-      'invalidOption': 'یەکێک لە هەڵبژاردەکان هەڵبژێرە',
-      'selectAnOption': 'هەڵبژێرە…',
-      'somethingWentWrong': 'هەڵەیەک ڕوویدا. تکایە دووبارە هەوڵبدەرەوە.',
-      'rateYourChat': 'گفتوگۆکەت هەڵبسەنگێنە',
-      'rateHint': 'گفتوگۆکەت چۆن بوو؟',
-      'addAComment': 'لێدوانێک زیاد بکە (ئارەزوومەندانە)',
-      'submit': 'ناردن',
-      'thanksForFeedback': 'سوپاس بۆ ڕاتەکانت!',
-      'yourName': 'ناوت',
-      'yourEmail': 'ئیمەیڵەکەت',
-      'yourMessage': 'پەیامەکەت',
-      'sendMessage': 'ناردنی پەیام',
-      'offlineThanks': 'سوپاس! بەمزووانە پەیوەندیت پێوە دەکەین.',
+      'attachment': 'هەڤپێچ',
+      'sendFailedRetry': 'نەهاتە فرێکرن. بۆ دووبارە هەوڵدانێ کلیک بکە.',
+      'sending': 'د هنێریت…',
+      'startChat': 'دەستپێکرنا چاتێ',
+      'fieldRequired': 'ئەڤ خانە پێدڤی یە',
+      'invalidEmail': 'ئیمەیلەکا دروست بنڤیسە',
+      'invalidNumber': 'ژمارەکا دروست بنڤیسە',
+      'invalidOption': 'ئێک ژ هەلبژارتنان هەلبژێرە',
+      'selectAnOption': 'هەلبژێرە…',
+      'somethingWentWrong': 'خەلەتیەک چێبوو. هیڤییە دووبارە هەوڵ بدە.',
+      'retry': 'دووبارە هەوڵدان',
+      'couldNotConnect': 'پەیوەندی نەهاتە کرن. پەیوەندیا خۆ بپشکنە و دووبارە هەوڵ بدە.',
+      'rateYourChat': 'گفتووگۆ هەلسەنگینە',
+      'rateHint': 'گفتووگۆ چاوا بوو؟',
+      'addAComment': 'تێبینیەکێ زێدە بکە (هەلبژارتی)',
+      'submit': 'پێشکێش بکە',
+      'thanksForFeedback': 'سوپاس بۆ بۆچوونا تە!',
+      'yourName': 'ناڤێ تە',
+      'yourEmail': 'ئیمەیلا تە',
+      'yourMessage': 'نامەیا تە',
+      'sendMessage': 'نامەیێ فرێکە',
+      'closedNotice': 'تیمێ مە نوکە نە ل سەر خەتێ یە. پەیاما خۆ بهێلە، گاڤا ئەم ڤەگەڕین دێ بەرسڤا تە دەین.',
+      'backAt': 'ئەم د {time} دا ڤەدگەڕین.',
+      'noAgentsNotice': 'نوکە هەمی مژویل ن. پەیامەکێ بهێلە، دێ زوی بەرسڤ دەین.',
+      'closedForLabel': 'ئەم ژ بەر {label} گرتی ن.',
+      'unavailableTitle': 'ئەم نوکە بەردەست نینن',
+      'offlineThanks': 'سوپاس! ئەم دێ ب تە ڤە پەیوەندیێ کەین.',
+      'exitChatTitle': 'پشتراستی تە دڤێت ڤێ چاتێ بگری؟',
+      'exitChatConfirm': 'چاتێ بگرە',
+      'exitChatCancel': 'ڤەگەریان',
     },
     'pt': {
       'send': 'Enviar',
@@ -378,6 +610,8 @@ class ElcStrings {
       'invalidOption': 'Escolha uma das opções',
       'selectAnOption': 'Selecionar…',
       'somethingWentWrong': 'Algo deu errado. Tente novamente.',
+      'retry': 'Tentar novamente',
+      'couldNotConnect': 'Não foi possível conectar. Verifique sua conexão e tente novamente.',
       'rateYourChat': 'Avalie sua conversa',
       'rateHint': 'Como foi sua conversa?',
       'addAComment': 'Adicione um comentário (opcional)',
@@ -387,7 +621,15 @@ class ElcStrings {
       'yourEmail': 'Seu e-mail',
       'yourMessage': 'Sua mensagem',
       'sendMessage': 'Enviar mensagem',
+      'closedNotice': 'A nossa equipa está offline neste momento. Deixe a sua mensagem e responderemos assim que voltarmos.',
+      'backAt': 'Voltamos às {time}.',
+      'noAgentsNotice': 'Estamos todos ocupados neste momento. Deixe uma mensagem e responderemos em breve.',
+      'closedForLabel': 'Estamos fechados por {label}.',
+      'unavailableTitle': 'Não estamos disponíveis no momento',
       'offlineThanks': 'Obrigado! Entraremos em contato.',
+      'exitChatTitle': 'Tem certeza de que deseja fechar esta conversa?',
+      'exitChatConfirm': 'Fechar conversa',
+      'exitChatCancel': 'Cancelar',
     },
     'tr': {
       'send': 'Gönder',
@@ -410,6 +652,8 @@ class ElcStrings {
       'invalidOption': 'Seçeneklerden birini seçin',
       'selectAnOption': 'Seçin…',
       'somethingWentWrong': 'Bir şeyler ters gitti. Tekrar deneyin.',
+      'retry': 'Yeniden deneyin',
+      'couldNotConnect': 'Bağlanılamadı. Bağlantınızı kontrol edip tekrar deneyin.',
       'rateYourChat': 'Sohbetinizi değerlendirin',
       'rateHint': 'Görüşmeniz nasıldı?',
       'addAComment': 'Yorum ekleyin (isteğe bağlı)',
@@ -419,7 +663,15 @@ class ElcStrings {
       'yourEmail': 'E-postanız',
       'yourMessage': 'Mesajınız',
       'sendMessage': 'Mesaj gönder',
+      'closedNotice': 'Ekibimiz şu anda çevrimdışı. Mesajınızı bırakın, döndüğümüzde hemen yanıtlayalım.',
+      'backAt': '{time} itibarıyla döneriz.',
+      'noAgentsNotice': 'Şu anda herkes meşgul. Mesaj bırakın, kısa sürede dönelim.',
+      'closedForLabel': '{label} nedeniyle kapalıyız.',
+      'unavailableTitle': 'Şu anda müsait değiliz',
       'offlineThanks': 'Teşekkürler! Size geri döneceğiz.',
+      'exitChatTitle': 'Bu sohbeti kapatmak istediğinize emin misiniz?',
+      'exitChatConfirm': 'Sohbeti kapat',
+      'exitChatCancel': 'İptal',
     },
     'ur': {
       'send': 'بھیجیں',
@@ -442,6 +694,8 @@ class ElcStrings {
       'invalidOption': 'کسی ایک آپشن کا انتخاب کریں',
       'selectAnOption': 'منتخب کریں…',
       'somethingWentWrong': 'کچھ غلط ہو گیا۔ دوبارہ کوشش کریں۔',
+      'retry': 'دوبارہ کوشش کریں',
+      'couldNotConnect': 'کنکشن نہیں ہو سکا۔ اپنا کنکشن چیک کریں اور دوبارہ کوشش کریں۔',
       'rateYourChat': 'اپنی چیٹ کو ریٹ کریں',
       'rateHint': 'آپ کی گفتگو کیسی رہی؟',
       'addAComment': 'تبصرہ شامل کریں (اختیاری)',
@@ -451,7 +705,15 @@ class ElcStrings {
       'yourEmail': 'آپ کا ای میل',
       'yourMessage': 'آپ کا پیغام',
       'sendMessage': 'پیغام بھیجیں',
+      'closedNotice': 'ہماری ٹیم اس وقت آف لائن ہے۔ اپنا پیغام چھوڑ دیں، واپس آتے ہی جواب دیں گے۔',
+      'backAt': 'ہم {time} بجے واپس آتے ہیں۔',
+      'noAgentsNotice': 'اس وقت سب مصروف ہیں۔ پیغام چھوڑیں، ہم جلد جواب دیں گے۔',
+      'closedForLabel': 'ہم {label} کی وجہ سے بند ہیں۔',
+      'unavailableTitle': 'ہم اس وقت دستیاب نہیں ہیں',
       'offlineThanks': 'شکریہ! ہم جلد آپ سے رابطہ کریں گے۔',
+      'exitChatTitle': 'کیا آپ واقعی یہ چیٹ بند کرنا چاہتے ہیں؟',
+      'exitChatConfirm': 'چیٹ بند کریں',
+      'exitChatCancel': 'منسوخ کریں',
     },
     'zh': {
       'send': '发送',
@@ -474,6 +736,8 @@ class ElcStrings {
       'invalidOption': '请选择其中一个选项',
       'selectAnOption': '请选择…',
       'somethingWentWrong': '出错了，请重试。',
+      'retry': '重试',
+      'couldNotConnect': '无法连接。请检查网络后重试。',
       'rateYourChat': '为您的聊天评分',
       'rateHint': '您的对话体验如何？',
       'addAComment': '添加评论（可选）',
@@ -483,7 +747,15 @@ class ElcStrings {
       'yourEmail': '您的邮箱',
       'yourMessage': '您的留言',
       'sendMessage': '发送留言',
+      'closedNotice': '我们的团队当前不在线。请留言，我们回来后会尽快回复。',
+      'backAt': '我们将于 {time} 回来。',
+      'noAgentsNotice': '目前大家都在忙。请留言，我们会尽快回复。',
+      'closedForLabel': '我们因{label}休息。',
+      'unavailableTitle': '我们现在无法接待',
       'offlineThanks': '谢谢！我们会尽快回复您。',
+      'exitChatTitle': '确定要关闭此对话吗？',
+      'exitChatConfirm': '关闭对话',
+      'exitChatCancel': '取消',
     },
   };
 }

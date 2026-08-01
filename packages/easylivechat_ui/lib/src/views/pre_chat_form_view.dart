@@ -143,7 +143,14 @@ class _PreChatFormViewState extends State<PreChatFormView> {
               padding: const EdgeInsets.fromLTRB(20, 24, 20, 24),
               children: [
                 Text(
-                  widget.config.welcomeTitle,
+                  // Tenant copy can address the visitor by name. The server
+                  // can't fill this in: `GET /config` is answered before
+                  // anyone has identified.
+                  substituteVisitorVariables(
+                    widget.config.welcomeTitle,
+                    name: EasyLiveChat.instance.visitorName,
+                    defaultName: widget.config.defaultCustomerName,
+                  ),
                   style: TextStyle(
                     color: t.text,
                     fontSize: 22,
@@ -155,7 +162,7 @@ class _PreChatFormViewState extends State<PreChatFormView> {
                   Text(
                     widget.config.welcomeSubtitle,
                     style: TextStyle(
-                      color: t.text.withOpacity(0.7),
+                      color: t.text.withValues(alpha: 0.7),
                       fontSize: 15,
                       height: 1.4,
                     ),
@@ -223,7 +230,8 @@ class _PreChatFormViewState extends State<PreChatFormView> {
                           f.placeholder?.isNotEmpty == true
                               ? f.placeholder!
                               : _s.selectAnOption,
-                          style: TextStyle(color: t.text.withOpacity(0.5)),
+                          style:
+                              TextStyle(color: t.text.withValues(alpha: 0.5)),
                         ),
                         dropdownColor: t.surface,
                         style: TextStyle(color: t.text, fontSize: 15),
@@ -269,12 +277,12 @@ class _PreChatFormViewState extends State<PreChatFormView> {
           decoration: InputDecoration(
             isDense: true,
             hintText: f.placeholder,
-            hintStyle: TextStyle(color: t.text.withOpacity(0.4)),
+            hintStyle: TextStyle(color: t.text.withValues(alpha: 0.4)),
             filled: true,
             fillColor: t.surface,
             contentPadding:
                 const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-            enabledBorder: _border(t.text.withOpacity(0.15)),
+            enabledBorder: _border(t.text.withValues(alpha: 0.15)),
             focusedBorder: _border(t.primary, width: 1.5),
             errorBorder: _border(_FormErrorColor.color),
             focusedErrorBorder: _border(_FormErrorColor.color, width: 1.5),
@@ -294,8 +302,11 @@ class _PreChatFormViewState extends State<PreChatFormView> {
         style: ElevatedButton.styleFrom(
           backgroundColor: t.primary,
           foregroundColor: _onColor(t.primary),
-          disabledBackgroundColor: t.primary.withOpacity(0.5),
+          disabledBackgroundColor: t.primary.withValues(alpha: 0.5),
           elevation: 0,
+          // Let the text center in the full 50px height (default button padding
+          // squeezes it and clips descenders).
+          padding: EdgeInsets.zero,
           shape:
               RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         ),
@@ -311,8 +322,8 @@ class _PreChatFormViewState extends State<PreChatFormView> {
               )
             : Text(
                 _s.startChat,
-                style: const TextStyle(
-                    fontSize: 16, fontWeight: FontWeight.w600),
+                style:
+                    const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
               ),
       ),
     );
@@ -322,8 +333,7 @@ class _PreChatFormViewState extends State<PreChatFormView> {
         padding: const EdgeInsets.only(top: 6, left: 4),
         child: Text(
           msg,
-          style: const TextStyle(
-              color: _FormErrorColor.color, fontSize: 12),
+          style: const TextStyle(color: _FormErrorColor.color, fontSize: 12),
         ),
       );
 
@@ -333,7 +343,7 @@ class _PreChatFormViewState extends State<PreChatFormView> {
         border: Border.all(
           color: hasError
               ? _FormErrorColor.color
-              : _theme.text.withOpacity(0.15),
+              : _theme.text.withValues(alpha: 0.15),
         ),
       );
 

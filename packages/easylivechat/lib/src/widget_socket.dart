@@ -4,6 +4,7 @@ import 'package:socket_io_client/socket_io_client.dart' as IO;
 
 import 'models/chat_message.dart';
 import 'models/results.dart';
+import 'models/widget_config.dart';
 
 /// Socket.IO client for the `/widgets` namespace (full chat; JWT required).
 ///
@@ -23,6 +24,7 @@ class WidgetSocket {
   WidgetSocket({required this.apiBase, required String token}) : _token = token;
 
   IO.Socket? _socket;
+  bool _disposed = false;
 
   // ── inbound streams (broadcast) ──
   final _onMessageNew = StreamController<ChatMessage>.broadcast();
@@ -30,6 +32,8 @@ class WidgetSocket {
   final _onAgentTyping = StreamController<bool>.broadcast();
   final _onAvailability = StreamController<bool>.broadcast();
   final _onAgentsAccepting = StreamController<bool>.broadcast();
+  final _onWorkspaceMode =
+      StreamController<WorkspaceAvailability>.broadcast();
   final _onConversationClosed = StreamController<String>.broadcast();
   final _onProactive = StreamController<ProactiveMessage>.broadcast();
   final _onConnectionChange = StreamController<bool>.broadcast();
@@ -55,6 +59,11 @@ class WidgetSocket {
   /// `chatAvailabilityMode = WHEN_ACCEPTING`; emits `true` against servers that
   /// don't send the field.
   Stream<bool> get onAgentsAccepting => _onAgentsAccepting.stream;
+
+  /// The server's whole verdict from the same event — what the visitor may do
+  /// and why. [onAvailability] and [onAgentsAccepting] are the raw gates that
+  /// feed it; this is the answer they add up to, and it is the one to render.
+  Stream<WorkspaceAvailability> get onWorkspaceMode => _onWorkspaceMode.stream;
 
   /// `conversation:closed` — `{ conversationId }`. NOTE: the server emits on
   /// ANY *→CLOSED PATCH (not only OPEN→CLOSED) — consumers must guard against
@@ -139,11 +148,11 @@ class WidgetSocket {
     });
 
     socket.on('agent:typing', (data) {
-      // Payload is `{ isTyping }` only; never an explicit false. The controller
-      // arms a ~4s auto-clear. We surface whatever the server sent (defaulting
-      // to true) and let the controller own the timeout.
+      // Payload is `{ isTyping }`; the server only ever sends true and lets the
+      // controller's ~4s timer clear it. Require an explicit true so a malformed
+      // or empty payload can't show a phantom "agent is typing".
       final m = _asMap(data);
-      final isTyping = m?['isTyping'] != false;
+      final isTyping = m?['isTyping'] == true;
       if (!_onAgentTyping.isClosed) _onAgentTyping.add(isTyping);
     });
 
@@ -151,11 +160,15 @@ class WidgetSocket {
       final m = _asMap(data);
       final isOpen = m?['isOpen'] == true;
       if (!_onAvailability.isClosed) _onAvailability.add(isOpen);
-      // `agentsAccepting` is the second availability gate (WHEN_ACCEPTING
-      // tenants). Older servers omit it; absent means "don't let this gate
-      // close the widget", hence the `!= false` default rather than `== true`.
+      // Older servers omit `agentsAccepting`; absent means "don't let this gate
+      // close the widget", hence `!= false` rather than `== true`.
       final accepting = m?['agentsAccepting'] != false;
       if (!_onAgentsAccepting.isClosed) _onAgentsAccepting.add(accepting);
+      // Older servers send only the two booleans above; absent fields fall back
+      // to the permissive defaults inside WorkspaceAvailability.
+      if (m != null && !_onWorkspaceMode.isClosed) {
+        _onWorkspaceMode.add(WorkspaceAvailability.fromJson(m));
+      }
     });
 
     socket.on('conversation:closed', (data) {
@@ -179,6 +192,22 @@ class WidgetSocket {
     _token = token;
     // Update the live socket so the NEXT (re)connect uses the fresh token.
     _applyAuth();
+  }
+
+  /// Force a fresh handshake carrying the current (re-minted) token. A LIVE
+  /// socket does NOT re-read its handshake auth on a no-op connect(), so a
+  /// stale token would keep flowing until the next natural drop — we disconnect
+  /// first, then connect re-handshakes with [_token]. onDisconnect/onConnect
+  /// fire as usual (the controller backfills the gap on connect).
+  void reconnectWithFreshAuth() {
+    final socket = _socket;
+    if (socket == null) {
+      connect();
+      return;
+    }
+    _applyAuth();
+    socket.disconnect();
+    socket.connect();
   }
 
   /// Push [_token] into both the live socket auth and the underlying manager
@@ -236,11 +265,38 @@ class WidgetSocket {
     _socket?.emit('typing', {'isTyping': isTyping});
   }
 
+  /// Ask the server to close this conversation on the visitor's behalf.
+  ///
+  /// The server marks it CLOSED, tells the agents' inboxes, and echoes
+  /// `conversation:closed` back down this socket — which is what moves the
+  /// visitor to the post-chat step. It echoes even when the thread was already
+  /// closed agent-side, so the survey still appears rather than the visitor
+  /// tapping "end" and seeing nothing happen.
+  Future<SendAck> endChat() async {
+    final socket = _socket;
+    if (socket == null) {
+      return const SendAck(ok: false, error: 'NOT_CONNECTED');
+    }
+    try {
+      final raw = await socket
+          .emitWithAckAsync('conversation:end', <String, dynamic>{})
+          .timeout(const Duration(seconds: 15), onTimeout: () => null);
+      return SendAck.fromAck(raw);
+    } catch (e) {
+      return SendAck(ok: false, error: _describeError(e));
+    }
+  }
+
   Future<void> disconnect() async {
     _socket?.disconnect();
   }
 
   void dispose() {
+    // Idempotent: teardown can race (controller _teardownSocket's whenComplete
+    // + a re-mint failure path + controller dispose). Closing an already-closed
+    // StreamController throws, so guard the whole thing.
+    if (_disposed) return;
+    _disposed = true;
     final socket = _socket;
     _socket = null;
     if (socket != null) {
@@ -252,6 +308,7 @@ class WidgetSocket {
     _onAgentTyping.close();
     _onAvailability.close();
     _onAgentsAccepting.close();
+    _onWorkspaceMode.close();
     _onConversationClosed.close();
     _onProactive.close();
     _onConnectionChange.close();

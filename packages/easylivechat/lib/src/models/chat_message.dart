@@ -60,6 +60,16 @@ class ChatMessage {
   final String? senderAgentId;
   final String? senderName;
 
+  /// The replying agent's photo and job title.
+  ///
+  /// Both are gated server-side by the workspace's "Show agent avatars" /
+  /// "Show agent names" switches — they arrive null when the tenant has turned
+  /// them off, so the UI can render whatever it is given without re-checking.
+  /// [senderAvatarUrl] may be server-relative (`/uploads/...`); resolve it with
+  /// `EasyLiveChat.instance.resolveUrl` before loading.
+  final String? senderAvatarUrl;
+  final String? senderJobTitle;
+
   /// Body text. Note: attachment-only messages come back as the empty string
   /// `''` (not null) — relevant for optimistic reconcile-by-body matching.
   final String? body;
@@ -90,6 +100,8 @@ class ChatMessage {
     this.tenantId,
     this.senderAgentId,
     this.senderName,
+    this.senderAvatarUrl,
+    this.senderJobTitle,
     this.body,
     required this.senderType,
     required this.contentType,
@@ -103,7 +115,15 @@ class ChatMessage {
 
   bool get isFromCustomer => senderType == SenderType.customer;
   bool get isFromAgent => senderType == SenderType.agent;
-  bool get hasAttachments => attachments.isNotEmpty || attachmentUrls.isNotEmpty;
+
+  /// True while this row still carries its local `tmp-` id — an optimistic send
+  /// not yet reconciled to a server id (even if already ack'd via `_markSent`,
+  /// which clears [isOptimistic] but keeps the temp id). Used to reconcile the
+  /// server echo in place instead of appending a duplicate.
+  bool get isLocalTemp => id.startsWith('tmp-');
+
+  bool get hasAttachments =>
+      attachments.isNotEmpty || attachmentUrls.isNotEmpty;
 
   factory ChatMessage.fromAny(Map<String, dynamic> j) {
     final rawAttachments = j['attachments'];
@@ -111,7 +131,8 @@ class ChatMessage {
     if (rawAttachments is List) {
       for (final a in rawAttachments) {
         if (a is Map) {
-          attachments.add(RehostedAttachment.fromJson(a.cast<String, dynamic>()));
+          attachments
+              .add(RehostedAttachment.fromJson(a.cast<String, dynamic>()));
         }
       }
     }
@@ -121,16 +142,21 @@ class ChatMessage {
     ];
     return ChatMessage(
       id: (j['id'] ?? '').toString(),
-      conversationId: (j['conversationId'] ?? j['conversation_id'] ?? '').toString(),
+      conversationId:
+          (j['conversationId'] ?? j['conversation_id'] ?? '').toString(),
       tenantId: j['tenantId']?.toString(),
       senderAgentId: j['senderAgentId']?.toString() ?? j['agentId']?.toString(),
       senderName: j['senderName'] as String? ?? j['agentName'] as String?,
+      senderAvatarUrl:
+          j['senderAvatarUrl'] as String? ?? j['agentAvatarUrl'] as String?,
+      senderJobTitle: j['senderJobTitle'] as String?,
       body: j['body'] as String?,
       senderType: SenderType.fromWire(j['senderType']),
       contentType: MessageContentType.fromWire(j['contentType']),
       attachmentUrls: urls,
       attachments: attachments,
-      deliveryStatus: MessageDeliveryStatus.fromWire(j['deliveryStatus'] ?? j['status']),
+      deliveryStatus:
+          MessageDeliveryStatus.fromWire(j['deliveryStatus'] ?? j['status']),
       createdAt: _parseDate(j['createdAt'] ?? j['created_at']),
       isOptimistic: false,
     );
@@ -172,6 +198,8 @@ class ChatMessage {
       tenantId: tenantId,
       senderAgentId: senderAgentId,
       senderName: senderName,
+      senderAvatarUrl: senderAvatarUrl,
+      senderJobTitle: senderJobTitle,
       body: body,
       senderType: senderType,
       contentType: contentType,
@@ -185,8 +213,14 @@ class ChatMessage {
   }
 
   static DateTime _parseDate(Object? v) {
-    if (v is String) return DateTime.tryParse(v)?.toLocal() ?? DateTime.now();
+    if (v is String) {
+      final parsed = DateTime.tryParse(v);
+      if (parsed != null) return parsed.toLocal();
+    }
     if (v is int) return DateTime.fromMillisecondsSinceEpoch(v).toLocal();
-    return DateTime.now();
+    // Deterministic fallback for malformed/missing timestamps: the epoch (sorts
+    // to the top and stays put on re-parse). NEVER DateTime.now() — that is
+    // non-deterministic and would re-order the row on every message:updated.
+    return DateTime.fromMillisecondsSinceEpoch(0);
   }
 }

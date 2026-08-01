@@ -4,13 +4,17 @@ description: >-
   chat screen (pre-chat form, thread, composer, attachments, CSAT, offline
   form) driven by the server widget config. Built on the headless easylivechat
   core. Embed live support in a few lines.
-version: 0.1.0
+version: 0.1.10
+# Consumed via git dependency (not pub.dev); `none` also allows the path dep on
+# the sibling `easylivechat` core without an invalid_dependency warning.
+publish_to: 'none'
 homepage: https://livechattools.com
 repository: https://github.com/nullsam/easylivechat
 
 environment:
-  sdk: ">=3.3.0 <4.0.0"
-  flutter: ">=3.19.0"
+  # toARGB32()/withValues() require Flutter 3.27+ (Dart 3.6+).
+  sdk: ">=3.6.0 <4.0.0"
+  flutter: ">=3.27.0"
 
 dependencies:
   flutter:

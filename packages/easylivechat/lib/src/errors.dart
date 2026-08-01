@@ -15,6 +15,8 @@ abstract final class EasyLiveChatErrorCode {
   // Feedback
   static const invalidRating = 'INVALID_RATING';
   static const alreadyRated = 'ALREADY_RATED';
+  // Post-chat survey — the same one-shot rule, under its own server code.
+  static const alreadySubmitted = 'ALREADY_SUBMITTED';
   // Uploads
   static const fileTooLarge = 'FILE_TOO_LARGE';
   static const unsupportedType = 'UNSUPPORTED_TYPE';

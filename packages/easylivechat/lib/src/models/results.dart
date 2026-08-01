@@ -85,7 +85,10 @@ class FeedbackResult {
         ok: j['ok'] != false,
         rating: (j['rating'] as num?)?.toInt() ?? 0,
         comment: j['comment'] as String?,
-        ratedAt: j['ratedAt'] is String ? DateTime.tryParse(j['ratedAt']) : null,
+        // Localize for display consistency with ChatMessage timestamps.
+        ratedAt: j['ratedAt'] is String
+            ? DateTime.tryParse(j['ratedAt'] as String)?.toLocal()
+            : null,
       );
 }
 
@@ -100,14 +103,6 @@ class ProactiveMessage {
         conversationId: (j['conversationId'] ?? '').toString(),
         message: (j['message'] ?? '').toString(),
       );
-}
-
-/// Working-hours availability (`workspace:availability`).
-class WorkspaceAvailability {
-  final bool isOpen;
-  const WorkspaceAvailability(this.isOpen);
-  factory WorkspaceAvailability.fromJson(Map<String, dynamic> j) =>
-      WorkspaceAvailability(j['isOpen'] == true);
 }
 
 /// The visitor's locally-cached identity/profile, persisted across launches.

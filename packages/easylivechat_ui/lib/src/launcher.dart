@@ -1,9 +1,9 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:easylivechat/easylivechat.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import 'chat_screen.dart';
+import 'picked_file.dart';
 import 'theme.dart';
 
 /// Floating launcher bubble — the native replacement for the web widget loader.
@@ -30,11 +30,28 @@ class EasyLiveChatLauncher extends StatefulWidget {
   /// Present the chat screen as a modal bottom sheet instead of a full route.
   final bool useBottomSheet;
 
+  /// Force the chat layout direction (e.g. from the host app locale),
+  /// independent of the server workspace direction.
+  final TextDirection? directionOverride;
+
+  /// Host hook that fully owns attachment picking (passed to the chat screen).
+  final ElcAttachmentPicker? onPickAttachments;
+
+  /// Host overrides for the SDK chrome strings (passed to the chat screen).
+  final Map<String, String>? strings;
+
+  /// Force the chrome locale from the host app (passed to the chat screen).
+  final String? locale;
+
   const EasyLiveChatLauncher({
     super.key,
     this.themeOverride,
     this.alignment,
     this.useBottomSheet = false,
+    this.directionOverride,
+    this.onPickAttachments,
+    this.strings,
+    this.locale,
   });
 
   @override
@@ -43,6 +60,7 @@ class EasyLiveChatLauncher extends StatefulWidget {
 
 class _EasyLiveChatLauncherState extends State<EasyLiveChatLauncher> {
   bool _opening = false;
+  bool _presented = false;
 
   Alignment _alignmentFromConfig(WidgetConfigModel? config) {
     if (widget.alignment != null) return widget.alignment!;
@@ -68,7 +86,11 @@ class _EasyLiveChatLauncherState extends State<EasyLiveChatLauncher> {
   }
 
   Future<void> _onTap() async {
-    if (_opening) return;
+    // Re-entrancy guard: `_opening` covers the boot window, `_presented` covers
+    // the whole time the screen/sheet is on top — the bubble stays mounted
+    // behind a non-fullscreen route/sheet and a second tap would otherwise
+    // boot again and stack a duplicate chat surface.
+    if (_opening || _presented) return;
     setState(() => _opening = true);
     try {
       // Lazily boot the session machine (config → resume → prechat/anonymous).
@@ -78,49 +100,74 @@ class _EasyLiveChatLauncherState extends State<EasyLiveChatLauncher> {
       // still present the screen so the error/offline state is visible.
     }
     if (!mounted) return;
-    setState(() => _opening = false);
+    // Capture the navigator before the present-await so we never touch a stale
+    // BuildContext across the async gap.
+    final navigator = Navigator.of(context);
+    setState(() {
+      _opening = false;
+      _presented = true;
+    });
 
-    final screen = EasyLiveChatScreen(themeOverride: widget.themeOverride);
-    if (widget.useBottomSheet) {
-      await showModalBottomSheet<void>(
-        context: context,
-        isScrollControlled: true,
-        useSafeArea: true,
-        backgroundColor: Colors.transparent,
-        builder: (_) => FractionallySizedBox(
-          heightFactor: 0.92,
-          child: screen,
-        ),
-      );
-    } else {
-      await Navigator.of(context).push(
-        MaterialPageRoute<void>(builder: (_) => screen),
-      );
+    final screen = EasyLiveChatScreen(
+      themeOverride: widget.themeOverride,
+      directionOverride: widget.directionOverride,
+      onPickAttachments: widget.onPickAttachments,
+      strings: widget.strings,
+      locale: widget.locale,
+    );
+    try {
+      if (widget.useBottomSheet) {
+        await showModalBottomSheet<void>(
+          context: context,
+          isScrollControlled: true,
+          useSafeArea: true,
+          backgroundColor: Colors.transparent,
+          builder: (_) => FractionallySizedBox(
+            heightFactor: 0.92,
+            child: screen,
+          ),
+        );
+      } else {
+        await navigator.push(
+          MaterialPageRoute<void>(builder: (_) => screen),
+        );
+      }
+    } finally {
+      // Returning from the screen clears local unread and re-arms the bubble.
+      EasyLiveChat.instance.markRead();
+      if (mounted) {
+        setState(() => _presented = false);
+      } else {
+        _presented = false;
+      }
     }
-    // Returning from the screen clears local unread.
-    EasyLiveChat.instance.markRead();
   }
 
   @override
   Widget build(BuildContext context) {
-    // Config drives both alignment and theme; rebuild when it arrives.
+    // Config drives both alignment and theme; rebuild when it arrives. Before
+    // boot there is no config notifier to listen to, so paint the fallback
+    // bubble directly (a later rebuild re-reads `isBooted`).
+    if (!EasyLiveChat.instance.isBooted) {
+      return _buildScaffold(null);
+    }
     return ValueListenableBuilder<WidgetConfigModel?>(
-      valueListenable: EasyLiveChat.instance.isBooted
-          ? EasyLiveChat.instance.widgetConfig
-          : const _NeverNotifier<WidgetConfigModel?>(null),
-      builder: (context, config, _) {
-        final theme = _resolveTheme(config);
-        final alignment = _alignmentFromConfig(config);
-        return SafeArea(
-          child: Align(
-            alignment: alignment,
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: _buildBubble(theme),
-            ),
-          ),
-        );
-      },
+      valueListenable: EasyLiveChat.instance.widgetConfig,
+      builder: (context, config, _) => _buildScaffold(config),
+    );
+  }
+
+  Widget _buildScaffold(WidgetConfigModel? config) {
+    final theme = _resolveTheme(config);
+    final alignment = _alignmentFromConfig(config);
+    return SafeArea(
+      child: Align(
+        alignment: alignment,
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: _buildBubble(theme),
+        ),
+      ),
     );
   }
 
@@ -225,20 +272,4 @@ class _UnreadBadge extends StatelessWidget {
       },
     );
   }
-}
-
-/// A [ValueListenable] that holds a fixed value and never notifies — used as a
-/// safe placeholder before [EasyLiveChat] is booted.
-class _NeverNotifier<T> implements ValueListenable<T> {
-  final T _value;
-  const _NeverNotifier(this._value);
-
-  @override
-  T get value => _value;
-
-  @override
-  void addListener(VoidCallback listener) {}
-
-  @override
-  void removeListener(VoidCallback listener) {}
 }

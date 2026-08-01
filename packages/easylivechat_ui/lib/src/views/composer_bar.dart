@@ -1,11 +1,13 @@
 import 'dart:async';
 
 import 'package:easylivechat/easylivechat.dart';
+import 'package:flutter/foundation.dart' show ValueListenable;
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../l10n.dart';
+import '../picked_file.dart';
 import '../theme.dart';
 
 /// The message composer (native analog of the web `Composer.tsx`).
@@ -22,7 +24,12 @@ import '../theme.dart';
 class ComposerBar extends StatefulWidget {
   final EasyLiveChatTheme theme;
 
-  const ComposerBar({super.key, required this.theme});
+  /// Host hook that fully owns attachment picking (e.g. the app's own
+  /// camera/gallery bottom sheet). When set, the attach button calls this and
+  /// uploads whatever it returns, instead of the built-in image/file pickers.
+  final ElcAttachmentPicker? onPickAttachments;
+
+  const ComposerBar({super.key, required this.theme, this.onPickAttachments});
 
   @override
   State<ComposerBar> createState() => _ComposerBarState();
@@ -90,6 +97,19 @@ class _ComposerBarState extends State<ComposerBar> {
 
   // ── send ──
 
+  /// True while the workspace is shut AND the tenant chose to take no message.
+  ///
+  /// Read through [_lockListenable] rather than once at build time: a visitor
+  /// already sitting on the chat screen when closing time arrives has to see
+  /// the composer lock, and a plain getter never rebuilds.
+  bool get _locked => EasyLiveChat.instance.isBooted &&
+      EasyLiveChat.instance.composerLocked;
+
+  /// Rebuild trigger for [_locked] — the server pushes visitorMode on every
+  /// availability change.
+  ValueListenable<String>? get _lockListenable =>
+      EasyLiveChat.instance.isBooted ? EasyLiveChat.instance.visitorMode : null;
+
   void _send() {
     final text = _controller.text.trim();
     final urls = _pending.map((f) => f.url).toList(growable: false);
@@ -97,8 +117,12 @@ class _ComposerBarState extends State<ComposerBar> {
 
     _stopTyping();
     // Fire-and-forget optimistic send; the controller surfaces ack/echo via
-    // `messages`. We don't await the server id here.
-    EasyLiveChat.instance.sendMessage(text, attachmentUrls: urls);
+    // `messages` (a failure shows as a failed bubble). Swallow the serverId
+    // future so a no-socket/rejected send isn't an unhandled async error.
+    EasyLiveChat.instance
+        .sendMessage(text, attachmentUrls: urls)
+        .serverMessageId
+        .catchError((_) => '');
 
     _controller.clear();
     setState(() {
@@ -108,6 +132,29 @@ class _ComposerBarState extends State<ComposerBar> {
   }
 
   // ── attachments ──
+
+  /// Attach tapped: defer to the host picker when provided, else the built-in
+  /// image/file menu.
+  Future<void> _onAttach() async {
+    if (_uploading) return;
+    final picker = widget.onPickAttachments;
+    if (picker == null) {
+      _showAttachMenu();
+      return;
+    }
+    try {
+      final files = await picker(context);
+      for (final f in files) {
+        await _upload(
+          bytes: f.bytes,
+          filename: f.filename,
+          contentType: f.contentType,
+        );
+      }
+    } catch (_) {
+      _showAttachError();
+    }
+  }
 
   Future<void> _pickImage() async {
     try {
@@ -192,18 +239,17 @@ class _ComposerBarState extends State<ComposerBar> {
             children: [
               ListTile(
                 leading: Icon(Icons.image_outlined, color: _theme.text),
-                title: Text(_s.attachImage,
-                    style: TextStyle(color: _theme.text)),
+                title:
+                    Text(_s.attachImage, style: TextStyle(color: _theme.text)),
                 onTap: () {
                   Navigator.of(sheetCtx).pop();
                   _pickImage();
                 },
               ),
               ListTile(
-                leading:
-                    Icon(Icons.attach_file_outlined, color: _theme.text),
-                title: Text(_s.attachFile,
-                    style: TextStyle(color: _theme.text)),
+                leading: Icon(Icons.attach_file_outlined, color: _theme.text),
+                title:
+                    Text(_s.attachFile, style: TextStyle(color: _theme.text)),
                 onTap: () {
                   Navigator.of(sheetCtx).pop();
                   _pickFile();
@@ -222,6 +268,17 @@ class _ComposerBarState extends State<ComposerBar> {
 
   @override
   Widget build(BuildContext context) {
+    final listenable = _lockListenable;
+    if (listenable == null) return _build(context);
+    // Rebuild whenever the server pushes a new visitorMode, so closing time
+    // locks a composer the visitor is already looking at.
+    return ValueListenableBuilder<String>(
+      valueListenable: listenable,
+      builder: (context, _, __) => _build(context),
+    );
+  }
+
+  Widget _build(BuildContext context) {
     final t = _theme;
     return Directionality(
       textDirection: t.direction,
@@ -229,7 +286,7 @@ class _ComposerBarState extends State<ComposerBar> {
         decoration: BoxDecoration(
           color: t.background,
           border: Border(
-            top: BorderSide(color: t.text.withOpacity(0.08)),
+            top: BorderSide(color: t.text.withValues(alpha: 0.08)),
           ),
         ),
         child: SafeArea(
@@ -242,7 +299,7 @@ class _ComposerBarState extends State<ComposerBar> {
               Padding(
                 padding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
                 child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.end,
+                  crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
                     _attachButton(),
                     const SizedBox(width: 4),
@@ -262,8 +319,11 @@ class _ComposerBarState extends State<ComposerBar> {
   Widget _attachButton() {
     final t = _theme;
     return IconButton(
-      onPressed: _uploading ? null : _showAttachMenu,
+      onPressed: _uploading ? null : _onAttach,
       tooltip: _s.attach,
+      // Match the send button's box so the row centers cleanly.
+      padding: EdgeInsets.zero,
+      constraints: const BoxConstraints.tightFor(width: 44, height: 44),
       icon: _uploading
           ? SizedBox(
               width: 20,
@@ -271,35 +331,39 @@ class _ComposerBarState extends State<ComposerBar> {
               child: CircularProgressIndicator(
                 strokeWidth: 2,
                 valueColor: AlwaysStoppedAnimation<Color>(
-                    t.text.withOpacity(0.5)),
+                    t.text.withValues(alpha: 0.5)),
               ),
             )
           : Icon(Icons.add_circle_outline,
-              color: t.text.withOpacity(0.7)),
+              color: t.text.withValues(alpha: 0.7)),
     );
   }
 
   Widget _textField() {
     final t = _theme;
-    return TextField(
-      controller: _controller,
-      focusNode: _focus,
-      minLines: 1,
-      maxLines: 5,
-      textInputAction: TextInputAction.send,
-      onSubmitted: (_) => _send(),
-      style: TextStyle(color: t.text, fontSize: 15),
-      decoration: InputDecoration(
-        hintText: _s.typeAMessage,
-        hintStyle: TextStyle(color: t.text.withOpacity(0.4)),
-        filled: true,
-        fillColor: t.surface,
-        isDense: true,
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(22),
-          borderSide: BorderSide.none,
+    // Fixed-height (44, matching the round buttons) TRANSPARENT box so the text
+    // centres on the same line as the attach/send buttons — no fill, no border.
+    return Container(
+      constraints: const BoxConstraints(minHeight: 44),
+      alignment: Alignment.center,
+      padding: const EdgeInsets.symmetric(horizontal: 8),
+      child: TextField(
+        controller: _controller,
+        focusNode: _focus,
+        minLines: 1,
+        maxLines: 5,
+        // NOTICE_ONLY tenants take nothing while closed. Disabled rather than
+        // hidden: an input that vanishes reads as breakage, whereas a greyed
+        // one carrying the notice as its hint explains itself.
+        enabled: !_locked,
+        textInputAction: TextInputAction.send,
+        onSubmitted: (_) => _send(),
+        style: TextStyle(color: t.text, fontSize: 15),
+        decoration: InputDecoration(
+          isCollapsed: true,
+          border: InputBorder.none,
+          hintText: _locked ? _s.closedNotice : _s.typeAMessage,
+          hintStyle: TextStyle(color: t.text.withValues(alpha: 0.4)),
         ),
       ),
     );
@@ -307,8 +371,9 @@ class _ComposerBarState extends State<ComposerBar> {
 
   Widget _sendButton() {
     final t = _theme;
-    final onPrimary =
-        t.primary.computeLuminance() > 0.5 ? const Color(0xFF0F172A) : Colors.white;
+    final onPrimary = t.primary.computeLuminance() > 0.5
+        ? const Color(0xFF0F172A)
+        : Colors.white;
     return Material(
       color: t.primary,
       shape: const CircleBorder(),
@@ -339,13 +404,13 @@ class _ComposerBarState extends State<ComposerBar> {
             decoration: BoxDecoration(
               color: t.surface,
               borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: t.text.withOpacity(0.12)),
+              border: Border.all(color: t.text.withValues(alpha: 0.12)),
             ),
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
                 Icon(Icons.insert_drive_file_outlined,
-                    size: 16, color: t.text.withOpacity(0.7)),
+                    size: 16, color: t.text.withValues(alpha: 0.7)),
                 const SizedBox(width: 6),
                 ConstrainedBox(
                   constraints: const BoxConstraints(maxWidth: 120),
@@ -361,8 +426,7 @@ class _ComposerBarState extends State<ComposerBar> {
                   padding: EdgeInsets.zero,
                   constraints: const BoxConstraints(),
                   onPressed: () => _removePending(i),
-                  icon: Icon(Icons.close,
-                      color: t.text.withOpacity(0.6)),
+                  icon: Icon(Icons.close, color: t.text.withValues(alpha: 0.6)),
                 ),
               ],
             ),
@@ -376,7 +440,7 @@ class _ComposerBarState extends State<ComposerBar> {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      color: const Color(0xFFDC2626).withOpacity(0.1),
+      color: const Color(0xFFDC2626).withValues(alpha: 0.1),
       child: Text(
         msg,
         style: const TextStyle(color: Color(0xFFDC2626), fontSize: 12),
