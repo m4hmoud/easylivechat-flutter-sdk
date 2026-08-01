@@ -54,7 +54,8 @@ class _EasyLiveChatLauncherState extends State<EasyLiveChatLauncher> {
 
   EasyLiveChatTheme _resolveTheme(WidgetConfigModel? config) {
     if (config != null) {
-      return EasyLiveChatTheme.fromConfig(config, override: widget.themeOverride);
+      return EasyLiveChatTheme.fromConfig(config,
+          override: widget.themeOverride);
     }
     // Pre-boot fallback so the bubble can paint before config loads.
     return widget.themeOverride ??
