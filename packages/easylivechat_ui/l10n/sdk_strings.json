@@ -52,7 +52,9 @@
     "exitChatTitle": "Do you really want to close this chat?",
     "exitChatConfirm": "Close chat",
     "exitChatCancel": "Cancel",
-    "closedReadOnly": "Our team is offline right now. We'll be back soon."
+    "closedReadOnly": "Our team is offline right now. We'll be back soon.",
+    "skipSurvey": "Skip",
+    "closeChat": "Close"
   },
   "ar": {
     "send": "إرسال",
@@ -95,7 +97,9 @@
     "exitChatTitle": "هل تريد حقًا إغلاق هذه الدردشة؟",
     "exitChatConfirm": "إغلاق الدردشة",
     "exitChatCancel": "إلغاء",
-    "closedReadOnly": "فريقنا غير متاح حالياً. سنعود قريباً."
+    "closedReadOnly": "فريقنا غير متاح حالياً. سنعود قريباً.",
+    "skipSurvey": "تخطٍّ",
+    "closeChat": "إغلاق"
   },
   "ckb": {
     "send": "ناردن",
@@ -138,7 +142,9 @@
     "exitChatTitle": "دڵنیایی دەتەوێت ئەم گفتوگۆیە دابخەیت؟",
     "exitChatConfirm": "داخستنی گفتوگۆ",
     "exitChatCancel": "پاشگەزبوونەوە",
-    "closedReadOnly": "تیمەکەمان ئێستا دەرەوەی کارە. بەم زووانە دەگەڕێینەوە."
+    "closedReadOnly": "تیمەکەمان ئێستا دەرەوەی کارە. بەم زووانە دەگەڕێینەوە.",
+    "skipSurvey": "بازدان",
+    "closeChat": "داخستن"
   },
   "de": {
     "send": "Senden",
@@ -181,7 +187,9 @@
     "exitChatTitle": "Möchten Sie diesen Chat wirklich schließen?",
     "exitChatConfirm": "Chat schließen",
     "exitChatCancel": "Abbrechen",
-    "closedReadOnly": "Unser Team ist gerade offline. Wir sind bald zurück."
+    "closedReadOnly": "Unser Team ist gerade offline. Wir sind bald zurück.",
+    "skipSurvey": "Überspringen",
+    "closeChat": "Schließen"
   },
   "es": {
     "send": "Enviar",
@@ -224,7 +232,9 @@
     "exitChatTitle": "¿Seguro que quieres cerrar este chat?",
     "exitChatConfirm": "Cerrar chat",
     "exitChatCancel": "Cancelar",
-    "closedReadOnly": "Nuestro equipo no está disponible ahora. Volvemos pronto."
+    "closedReadOnly": "Nuestro equipo no está disponible ahora. Volvemos pronto.",
+    "skipSurvey": "Omitir",
+    "closeChat": "Cerrar"
   },
   "fr": {
     "send": "Envoyer",
@@ -267,7 +277,9 @@
     "exitChatTitle": "Voulez-vous vraiment fermer cette discussion ?",
     "exitChatConfirm": "Fermer la discussion",
     "exitChatCancel": "Annuler",
-    "closedReadOnly": "Notre équipe est hors ligne pour le moment. Nous revenons bientôt."
+    "closedReadOnly": "Notre équipe est hors ligne pour le moment. Nous revenons bientôt.",
+    "skipSurvey": "Passer",
+    "closeChat": "Fermer"
   },
   "hi": {
     "send": "भेजें",
@@ -310,7 +322,9 @@
     "exitChatTitle": "क्या आप वाकई यह चैट बंद करना चाहते हैं?",
     "exitChatConfirm": "चैट बंद करें",
     "exitChatCancel": "रद्द करें",
-    "closedReadOnly": "हमारी टीम अभी ऑफ़लाइन है। हम जल्द लौटेंगे।"
+    "closedReadOnly": "हमारी टीम अभी ऑफ़लाइन है। हम जल्द लौटेंगे।",
+    "skipSurvey": "छोड़ें",
+    "closeChat": "बंद करें"
   },
   "it": {
     "send": "Invia",
@@ -353,7 +367,9 @@
     "exitChatTitle": "Vuoi davvero chiudere questa chat?",
     "exitChatConfirm": "Chiudi chat",
     "exitChatCancel": "Annulla",
-    "closedReadOnly": "Il nostro team non è disponibile al momento. Torniamo presto."
+    "closedReadOnly": "Il nostro team non è disponibile al momento. Torniamo presto.",
+    "skipSurvey": "Salta",
+    "closeChat": "Chiudi"
   },
   "kmr": {
     "send": "هنارتن",
@@ -396,7 +412,9 @@
     "exitChatTitle": "پشتراستی تە دڤێت ڤێ چاتێ بگری؟",
     "exitChatConfirm": "چاتێ بگرە",
     "exitChatCancel": "ڤەگەریان",
-    "closedReadOnly": "Tîma me niha negirêdayî ye. Em ê zû vegerin."
+    "closedReadOnly": "Tîma me niha negirêdayî ye. Em ê zû vegerin.",
+    "skipSurvey": "Bibuhurîne",
+    "closeChat": "Bigire"
   },
   "pt": {
     "send": "Enviar",
@@ -439,7 +457,9 @@
     "exitChatTitle": "Tem certeza de que deseja fechar esta conversa?",
     "exitChatConfirm": "Fechar conversa",
     "exitChatCancel": "Cancelar",
-    "closedReadOnly": "A nossa equipa está offline neste momento. Voltamos em breve."
+    "closedReadOnly": "A nossa equipa está offline neste momento. Voltamos em breve.",
+    "skipSurvey": "Ignorar",
+    "closeChat": "Fechar"
   },
   "tr": {
     "send": "Gönder",
@@ -482,7 +502,9 @@
     "exitChatTitle": "Bu sohbeti kapatmak istediğinize emin misiniz?",
     "exitChatConfirm": "Sohbeti kapat",
     "exitChatCancel": "İptal",
-    "closedReadOnly": "Ekibimiz şu anda çevrimdışı. Kısa süre içinde döneceğiz."
+    "closedReadOnly": "Ekibimiz şu anda çevrimdışı. Kısa süre içinde döneceğiz.",
+    "skipSurvey": "Atla",
+    "closeChat": "Kapat"
   },
   "ur": {
     "send": "بھیجیں",
@@ -525,7 +547,9 @@
     "exitChatTitle": "کیا آپ واقعی یہ چیٹ بند کرنا چاہتے ہیں؟",
     "exitChatConfirm": "چیٹ بند کریں",
     "exitChatCancel": "منسوخ کریں",
-    "closedReadOnly": "ہماری ٹیم اس وقت آف لائن ہے۔ ہم جلد واپس آئیں گے۔"
+    "closedReadOnly": "ہماری ٹیم اس وقت آف لائن ہے۔ ہم جلد واپس آئیں گے۔",
+    "skipSurvey": "چھوڑیں",
+    "closeChat": "بند کریں"
   },
   "zh": {
     "send": "发送",
@@ -568,6 +592,8 @@
     "exitChatTitle": "确定要关闭此对话吗？",
     "exitChatConfirm": "关闭对话",
     "exitChatCancel": "取消",
-    "closedReadOnly": "我们的团队当前不在线。我们很快回来。"
+    "closedReadOnly": "我们的团队当前不在线。我们很快回来。",
+    "skipSurvey": "跳过",
+    "closeChat": "关闭"
   }
 }

@@ -195,6 +195,14 @@ class ElcStrings {
   String get exitChatConfirm => _t('exitChatConfirm');
   String get exitChatCancel => _t('exitChatCancel');
 
+  /// Leave the post-chat survey without answering it. A survey with no way
+  /// out is a trap: the conversation is already over, and the visitor owes
+  /// nobody an answer to keep their own app usable.
+  String get skipSurvey => _t('skipSurvey');
+
+  /// Dismiss the survey once it has been answered (or skipped).
+  String get closeChat => _t('closeChat');
+
   /// Map a server/SDK error code to a human, localized message (best effort).
   String forErrorCode(String code) {
     switch (code) {
@@ -250,7 +258,6 @@ class ElcStrings {
       'yourMessage': 'Your message',
       'sendMessage': 'Send message',
       'closedNotice': "Our team is offline right now. Leave your message and we'll reply as soon as we're back.",
-      'closedReadOnly': "Our team is offline right now. We'll be back soon.",
       'backAt': "We're back at {time}.",
       'noAgentsNotice': "Everyone's busy right now. Leave a message and we'll reply shortly.",
       'closedForLabel': "We're closed for {label}.",
@@ -259,6 +266,9 @@ class ElcStrings {
       'exitChatTitle': 'Do you really want to close this chat?',
       'exitChatConfirm': 'Close chat',
       'exitChatCancel': 'Cancel',
+      'closedReadOnly': "Our team is offline right now. We'll be back soon.",
+      'skipSurvey': 'Skip',
+      'closeChat': 'Close',
     },
     'ar': {
       'send': 'إرسال',
@@ -293,7 +303,6 @@ class ElcStrings {
       'yourMessage': 'رسالتك',
       'sendMessage': 'إرسال الرسالة',
       'closedNotice': 'فريقنا غير متاح حالياً. اترك رسالتك وسنرد عليك فور عودتنا.',
-      'closedReadOnly': 'فريقنا غير متاح حالياً. سنعود قريباً.',
       'backAt': 'نعود الساعة {time}.',
       'noAgentsNotice': 'الجميع مشغول حالياً. اترك رسالة وسنرد قريباً.',
       'closedForLabel': 'نحن مغلقون بمناسبة {label}.',
@@ -302,6 +311,9 @@ class ElcStrings {
       'exitChatTitle': 'هل تريد حقًا إغلاق هذه الدردشة؟',
       'exitChatConfirm': 'إغلاق الدردشة',
       'exitChatCancel': 'إلغاء',
+      'closedReadOnly': 'فريقنا غير متاح حالياً. سنعود قريباً.',
+      'skipSurvey': 'تخطٍّ',
+      'closeChat': 'إغلاق',
     },
     'ckb': {
       'send': 'ناردن',
@@ -336,7 +348,6 @@ class ElcStrings {
       'yourMessage': 'پەیامەکەت',
       'sendMessage': 'ناردنی پەیام',
       'closedNotice': 'تیمەکەمان ئێستا لە دەرەوەی کارە. نامەکەت بەجێبهێڵە، هەرکە گەڕاینەوە وەڵامت دەدەینەوە.',
-      'closedReadOnly': 'تیمەکەمان ئێستا دەرەوەی کارە. بەم زووانە دەگەڕێینەوە.',
       'backAt': 'لە {time} دەگەڕێینەوە.',
       'noAgentsNotice': 'ئێستا هەموو خەریکن. نامەیەک بەجێبهێڵە، بەم زووانە وەڵامت دەدەینەوە.',
       'closedForLabel': 'بەهۆی {label} داخراوین.',
@@ -345,6 +356,9 @@ class ElcStrings {
       'exitChatTitle': 'دڵنیایی دەتەوێت ئەم گفتوگۆیە دابخەیت؟',
       'exitChatConfirm': 'داخستنی گفتوگۆ',
       'exitChatCancel': 'پاشگەزبوونەوە',
+      'closedReadOnly': 'تیمەکەمان ئێستا دەرەوەی کارە. بەم زووانە دەگەڕێینەوە.',
+      'skipSurvey': 'بازدان',
+      'closeChat': 'داخستن',
     },
     'de': {
       'send': 'Senden',
@@ -379,7 +393,6 @@ class ElcStrings {
       'yourMessage': 'Ihre Nachricht',
       'sendMessage': 'Nachricht senden',
       'closedNotice': 'Unser Team ist gerade offline. Hinterlassen Sie Ihre Nachricht — wir antworten, sobald wir zurück sind.',
-      'closedReadOnly': 'Unser Team ist gerade offline. Wir sind bald zurück.',
       'backAt': 'Wir sind ab {time} wieder da.',
       'noAgentsNotice': 'Gerade sind alle beschäftigt. Hinterlassen Sie eine Nachricht — wir melden uns gleich.',
       'closedForLabel': 'Wir haben wegen {label} geschlossen.',
@@ -388,6 +401,9 @@ class ElcStrings {
       'exitChatTitle': 'Möchten Sie diesen Chat wirklich schließen?',
       'exitChatConfirm': 'Chat schließen',
       'exitChatCancel': 'Abbrechen',
+      'closedReadOnly': 'Unser Team ist gerade offline. Wir sind bald zurück.',
+      'skipSurvey': 'Überspringen',
+      'closeChat': 'Schließen',
     },
     'es': {
       'send': 'Enviar',
@@ -422,7 +438,6 @@ class ElcStrings {
       'yourMessage': 'Tu mensaje',
       'sendMessage': 'Enviar mensaje',
       'closedNotice': 'Nuestro equipo no está disponible ahora. Deja tu mensaje y te responderemos en cuanto volvamos.',
-      'closedReadOnly': 'Nuestro equipo no está disponible ahora. Volvemos pronto.',
       'backAt': 'Volvemos a las {time}.',
       'noAgentsNotice': 'Ahora mismo todos están ocupados. Deja un mensaje y te responderemos en breve.',
       'closedForLabel': 'Cerramos por {label}.',
@@ -431,6 +446,9 @@ class ElcStrings {
       'exitChatTitle': '¿Seguro que quieres cerrar este chat?',
       'exitChatConfirm': 'Cerrar chat',
       'exitChatCancel': 'Cancelar',
+      'closedReadOnly': 'Nuestro equipo no está disponible ahora. Volvemos pronto.',
+      'skipSurvey': 'Omitir',
+      'closeChat': 'Cerrar',
     },
     'fr': {
       'send': 'Envoyer',
@@ -465,7 +483,6 @@ class ElcStrings {
       'yourMessage': 'Votre message',
       'sendMessage': 'Envoyer le message',
       'closedNotice': 'Notre équipe est hors ligne pour le moment. Laissez votre message, nous répondrons dès notre retour.',
-      'closedReadOnly': 'Notre équipe est hors ligne pour le moment. Nous revenons bientôt.',
       'backAt': 'Nous revenons à {time}.',
       'noAgentsNotice': "Tout le monde est occupé pour l'instant. Laissez un message, nous répondrons vite.",
       'closedForLabel': 'Nous sommes fermés pour {label}.',
@@ -474,6 +491,9 @@ class ElcStrings {
       'exitChatTitle': 'Voulez-vous vraiment fermer cette discussion ?',
       'exitChatConfirm': 'Fermer la discussion',
       'exitChatCancel': 'Annuler',
+      'closedReadOnly': 'Notre équipe est hors ligne pour le moment. Nous revenons bientôt.',
+      'skipSurvey': 'Passer',
+      'closeChat': 'Fermer',
     },
     'hi': {
       'send': 'भेजें',
@@ -508,7 +528,6 @@ class ElcStrings {
       'yourMessage': 'आपका संदेश',
       'sendMessage': 'संदेश भेजें',
       'closedNotice': 'हमारी टीम अभी ऑफ़लाइन है। अपना संदेश छोड़ें, लौटते ही हम उत्तर देंगे।',
-      'closedReadOnly': 'हमारी टीम अभी ऑफ़लाइन है। हम जल्द लौटेंगे।',
       'backAt': 'हम {time} बजे लौटते हैं।',
       'noAgentsNotice': 'अभी सभी व्यस्त हैं। संदेश छोड़ें, हम जल्द उत्तर देंगे।',
       'closedForLabel': 'हम {label} के कारण बंद हैं।',
@@ -517,6 +536,9 @@ class ElcStrings {
       'exitChatTitle': 'क्या आप वाकई यह चैट बंद करना चाहते हैं?',
       'exitChatConfirm': 'चैट बंद करें',
       'exitChatCancel': 'रद्द करें',
+      'closedReadOnly': 'हमारी टीम अभी ऑफ़लाइन है। हम जल्द लौटेंगे।',
+      'skipSurvey': 'छोड़ें',
+      'closeChat': 'बंद करें',
     },
     'it': {
       'send': 'Invia',
@@ -551,7 +573,6 @@ class ElcStrings {
       'yourMessage': 'Il tuo messaggio',
       'sendMessage': 'Invia messaggio',
       'closedNotice': 'Il nostro team non è disponibile al momento. Lascia il tuo messaggio e ti risponderemo appena torniamo.',
-      'closedReadOnly': 'Il nostro team non è disponibile al momento. Torniamo presto.',
       'backAt': 'Torniamo alle {time}.',
       'noAgentsNotice': 'Al momento sono tutti occupati. Lascia un messaggio e ti risponderemo a breve.',
       'closedForLabel': 'Siamo chiusi per {label}.',
@@ -560,6 +581,9 @@ class ElcStrings {
       'exitChatTitle': 'Vuoi davvero chiudere questa chat?',
       'exitChatConfirm': 'Chiudi chat',
       'exitChatCancel': 'Annulla',
+      'closedReadOnly': 'Il nostro team non è disponibile al momento. Torniamo presto.',
+      'skipSurvey': 'Salta',
+      'closeChat': 'Chiudi',
     },
     'kmr': {
       'send': 'هنارتن',
@@ -594,7 +618,6 @@ class ElcStrings {
       'yourMessage': 'نامەیا تە',
       'sendMessage': 'نامەیێ فرێکە',
       'closedNotice': 'تیمێ مە نوکە نە ل سەر خەتێ یە. پەیاما خۆ بهێلە، گاڤا ئەم ڤەگەڕین دێ بەرسڤا تە دەین.',
-      'closedReadOnly': 'Tîma me niha negirêdayî ye. Em ê zû vegerin.',
       'backAt': 'ئەم د {time} دا ڤەدگەڕین.',
       'noAgentsNotice': 'نوکە هەمی مژویل ن. پەیامەکێ بهێلە، دێ زوی بەرسڤ دەین.',
       'closedForLabel': 'ئەم ژ بەر {label} گرتی ن.',
@@ -603,6 +626,9 @@ class ElcStrings {
       'exitChatTitle': 'پشتراستی تە دڤێت ڤێ چاتێ بگری؟',
       'exitChatConfirm': 'چاتێ بگرە',
       'exitChatCancel': 'ڤەگەریان',
+      'closedReadOnly': 'Tîma me niha negirêdayî ye. Em ê zû vegerin.',
+      'skipSurvey': 'Bibuhurîne',
+      'closeChat': 'Bigire',
     },
     'pt': {
       'send': 'Enviar',
@@ -637,7 +663,6 @@ class ElcStrings {
       'yourMessage': 'Sua mensagem',
       'sendMessage': 'Enviar mensagem',
       'closedNotice': 'A nossa equipa está offline neste momento. Deixe a sua mensagem e responderemos assim que voltarmos.',
-      'closedReadOnly': 'A nossa equipa está offline neste momento. Voltamos em breve.',
       'backAt': 'Voltamos às {time}.',
       'noAgentsNotice': 'Estamos todos ocupados neste momento. Deixe uma mensagem e responderemos em breve.',
       'closedForLabel': 'Estamos fechados por {label}.',
@@ -646,6 +671,9 @@ class ElcStrings {
       'exitChatTitle': 'Tem certeza de que deseja fechar esta conversa?',
       'exitChatConfirm': 'Fechar conversa',
       'exitChatCancel': 'Cancelar',
+      'closedReadOnly': 'A nossa equipa está offline neste momento. Voltamos em breve.',
+      'skipSurvey': 'Ignorar',
+      'closeChat': 'Fechar',
     },
     'tr': {
       'send': 'Gönder',
@@ -680,7 +708,6 @@ class ElcStrings {
       'yourMessage': 'Mesajınız',
       'sendMessage': 'Mesaj gönder',
       'closedNotice': 'Ekibimiz şu anda çevrimdışı. Mesajınızı bırakın, döndüğümüzde hemen yanıtlayalım.',
-      'closedReadOnly': 'Ekibimiz şu anda çevrimdışı. Kısa süre içinde döneceğiz.',
       'backAt': '{time} itibarıyla döneriz.',
       'noAgentsNotice': 'Şu anda herkes meşgul. Mesaj bırakın, kısa sürede dönelim.',
       'closedForLabel': '{label} nedeniyle kapalıyız.',
@@ -689,6 +716,9 @@ class ElcStrings {
       'exitChatTitle': 'Bu sohbeti kapatmak istediğinize emin misiniz?',
       'exitChatConfirm': 'Sohbeti kapat',
       'exitChatCancel': 'İptal',
+      'closedReadOnly': 'Ekibimiz şu anda çevrimdışı. Kısa süre içinde döneceğiz.',
+      'skipSurvey': 'Atla',
+      'closeChat': 'Kapat',
     },
     'ur': {
       'send': 'بھیجیں',
@@ -723,7 +753,6 @@ class ElcStrings {
       'yourMessage': 'آپ کا پیغام',
       'sendMessage': 'پیغام بھیجیں',
       'closedNotice': 'ہماری ٹیم اس وقت آف لائن ہے۔ اپنا پیغام چھوڑ دیں، واپس آتے ہی جواب دیں گے۔',
-      'closedReadOnly': 'ہماری ٹیم اس وقت آف لائن ہے۔ ہم جلد واپس آئیں گے۔',
       'backAt': 'ہم {time} بجے واپس آتے ہیں۔',
       'noAgentsNotice': 'اس وقت سب مصروف ہیں۔ پیغام چھوڑیں، ہم جلد جواب دیں گے۔',
       'closedForLabel': 'ہم {label} کی وجہ سے بند ہیں۔',
@@ -732,6 +761,9 @@ class ElcStrings {
       'exitChatTitle': 'کیا آپ واقعی یہ چیٹ بند کرنا چاہتے ہیں؟',
       'exitChatConfirm': 'چیٹ بند کریں',
       'exitChatCancel': 'منسوخ کریں',
+      'closedReadOnly': 'ہماری ٹیم اس وقت آف لائن ہے۔ ہم جلد واپس آئیں گے۔',
+      'skipSurvey': 'چھوڑیں',
+      'closeChat': 'بند کریں',
     },
     'zh': {
       'send': '发送',
@@ -766,7 +798,6 @@ class ElcStrings {
       'yourMessage': '您的留言',
       'sendMessage': '发送留言',
       'closedNotice': '我们的团队当前不在线。请留言，我们回来后会尽快回复。',
-      'closedReadOnly': '我们的团队当前不在线。我们很快回来。',
       'backAt': '我们将于 {time} 回来。',
       'noAgentsNotice': '目前大家都在忙。请留言，我们会尽快回复。',
       'closedForLabel': '我们因{label}休息。',
@@ -775,6 +806,9 @@ class ElcStrings {
       'exitChatTitle': '确定要关闭此对话吗？',
       'exitChatConfirm': '关闭对话',
       'exitChatCancel': '取消',
+      'closedReadOnly': '我们的团队当前不在线。我们很快回来。',
+      'skipSurvey': '跳过',
+      'closeChat': '关闭',
     },
   };
 }

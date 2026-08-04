@@ -97,6 +97,20 @@ class _PostChatFormViewState extends State<PostChatFormView> {
     return code == null ? null : _s.forErrorCode(code);
   }
 
+  /// Leave the survey.
+  ///
+  /// The conversation is already over by the time this view exists, so there
+  /// is nothing to confirm and nothing to lose — the visitor owes nobody an
+  /// answer to get their own app back. Without this the only control on the
+  /// screen was Submit, which made an optional survey behave like a required
+  /// one.
+  ///
+  /// Pops our own route when we have one. A host that renders the chat inline
+  /// rather than pushing it owns its own dismissal, and the SDK has no
+  /// business forcing a state change on a screen it does not control — so
+  /// `maybePop` is deliberately a no-op there rather than a guess.
+  void _leave() => Navigator.maybePop(context);
+
   Future<void> _submit() async {
     setState(() => _formError = null);
     if (!(_formKey.currentState?.validate() ?? false)) return;
@@ -161,6 +175,13 @@ class _PostChatFormViewState extends State<PostChatFormView> {
               _s.thanksForFeedback,
               textAlign: TextAlign.center,
               style: TextStyle(color: t.text, fontSize: 16, height: 1.4),
+            ),
+            const SizedBox(height: 20),
+            // Somewhere to go once they're done. Previously the thanks screen
+            // was terminal: the survey submitted and then simply sat there.
+            TextButton(
+              onPressed: _leave,
+              child: Text(_s.closeChat, style: TextStyle(color: t.primary)),
             ),
           ],
         ),
@@ -393,6 +414,23 @@ class _PostChatFormViewState extends State<PostChatFormView> {
   }
 
   Widget _buildSubmit() {
+    final t = _theme;
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        _buildSubmitButton(),
+        TextButton(
+          onPressed: _submitting ? null : _leave,
+          child: Text(
+            _s.skipSurvey,
+            style: TextStyle(color: t.text.withValues(alpha: 0.6)),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSubmitButton() {
     final t = _theme;
     return SizedBox(
       height: 50,
