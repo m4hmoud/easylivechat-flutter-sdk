@@ -186,6 +186,9 @@ class ElcStrings {
   /// System transfer notice template; caller substitutes `{name}`.
   String get systemTransferredTo => _t('systemTransferredTo');
 
+  /// The explicit end-chat affordance (button tooltip / label).
+  String get endChat => _t('endChat');
+
   /// Headline on the closed screen. Short and unambiguous — the visitor should
   /// know they cannot be helped right now before reading a word of body copy.
   String get unavailableTitle => _t('unavailableTitle');
@@ -273,6 +276,7 @@ class ElcStrings {
       'skipSurvey': 'Skip',
       'closeChat': 'Close',
       'systemTransferredTo': 'Conversation transferred to {name}',
+      'endChat': 'End chat',
     },
     'ar': {
       'send': 'إرسال',
@@ -319,6 +323,7 @@ class ElcStrings {
       'skipSurvey': 'تخطٍّ',
       'closeChat': 'إغلاق',
       'systemTransferredTo': 'تم تحويل المحادثة إلى {name}',
+      'endChat': 'إنهاء المحادثة',
     },
     'ckb': {
       'send': 'ناردن',
@@ -365,6 +370,7 @@ class ElcStrings {
       'skipSurvey': 'بازدان',
       'closeChat': 'داخستن',
       'systemTransferredTo': 'گفتوگۆکە گوازرایەوە بۆ {name}',
+      'endChat': 'کۆتایی هێنان بە گفتوگۆ',
     },
     'de': {
       'send': 'Senden',
@@ -411,6 +417,7 @@ class ElcStrings {
       'skipSurvey': 'Überspringen',
       'closeChat': 'Schließen',
       'systemTransferredTo': 'Unterhaltung übertragen an {name}',
+      'endChat': 'Chat beenden',
     },
     'es': {
       'send': 'Enviar',
@@ -457,6 +464,7 @@ class ElcStrings {
       'skipSurvey': 'Omitir',
       'closeChat': 'Cerrar',
       'systemTransferredTo': 'Conversación transferida a {name}',
+      'endChat': 'Finalizar chat',
     },
     'fr': {
       'send': 'Envoyer',
@@ -503,6 +511,7 @@ class ElcStrings {
       'skipSurvey': 'Passer',
       'closeChat': 'Fermer',
       'systemTransferredTo': 'Conversation transférée à {name}',
+      'endChat': 'Terminer la discussion',
     },
     'hi': {
       'send': 'भेजें',
@@ -549,6 +558,7 @@ class ElcStrings {
       'skipSurvey': 'छोड़ें',
       'closeChat': 'बंद करें',
       'systemTransferredTo': 'बातचीत {name} को स्थानांतरित की गई',
+      'endChat': 'चैट समाप्त करें',
     },
     'it': {
       'send': 'Invia',
@@ -595,6 +605,7 @@ class ElcStrings {
       'skipSurvey': 'Salta',
       'closeChat': 'Chiudi',
       'systemTransferredTo': 'Conversazione trasferita a {name}',
+      'endChat': 'Termina chat',
     },
     'kmr': {
       'send': 'هنارتن',
@@ -641,6 +652,7 @@ class ElcStrings {
       'skipSurvey': 'Bibuhurîne',
       'closeChat': 'Bigire',
       'systemTransferredTo': 'ئاخڤتن هاتە ڤەگوهاستن بۆ {name}',
+      'endChat': 'ب دوماهیک ئینانا ئاخڤتنێ',
     },
     'pt': {
       'send': 'Enviar',
@@ -687,6 +699,7 @@ class ElcStrings {
       'skipSurvey': 'Ignorar',
       'closeChat': 'Fechar',
       'systemTransferredTo': 'Conversa transferida para {name}',
+      'endChat': 'Encerrar chat',
     },
     'tr': {
       'send': 'Gönder',
@@ -733,6 +746,7 @@ class ElcStrings {
       'skipSurvey': 'Atla',
       'closeChat': 'Kapat',
       'systemTransferredTo': 'Görüşme {name} adlı kişiye aktarıldı',
+      'endChat': 'Sohbeti bitir',
     },
     'ur': {
       'send': 'بھیجیں',
@@ -779,6 +793,7 @@ class ElcStrings {
       'skipSurvey': 'چھوڑیں',
       'closeChat': 'بند کریں',
       'systemTransferredTo': 'گفتگو {name} کو منتقل کر دی گئی',
+      'endChat': 'چیٹ ختم کریں',
     },
     'zh': {
       'send': '发送',
@@ -825,6 +840,7 @@ class ElcStrings {
       'skipSurvey': '跳过',
       'closeChat': '关闭',
       'systemTransferredTo': '对话已转接给 {name}',
+      'endChat': '结束对话',
     },
   };
 }

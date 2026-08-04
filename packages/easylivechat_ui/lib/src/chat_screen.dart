@@ -64,20 +64,14 @@ class EasyLiveChatScreen extends StatefulWidget {
   /// its own default (often `en`) regardless of the visitor's app language.
   final String? locale;
 
-  /// Ask before the visitor closes the chat.
-  ///
-  /// When true, backing out — the host's app-bar back button, the Android back
-  /// button, or the iOS swipe — first shows a confirmation. A stray gesture
-  /// mid-conversation otherwise drops the visitor straight out of the thread.
-  ///
-  /// Confirming ENDS the conversation, exactly as the web widget's × does: the
-  /// tenant's post-chat survey is shown right there, and reopening the chat
-  /// later starts a fresh conversation rather than resuming this one. The
-  /// visitor stays on the screen to answer the survey; backing out again once
-  /// the chat has ended simply leaves.
-  ///
-  /// Off by default so hosts that already own their own exit flow are
-  /// unaffected.
+  /// Deprecated — backing out no longer ends the conversation, so there is
+  /// nothing to confirm. Leaving mid-chat keeps the conversation open, and
+  /// reopening the screen resumes it right where it was (silentResume).
+  /// Ending is a deliberate act now: give the visitor an explicit affordance
+  /// via [EasyLiveChatEndChatButton] (or its `confirmAndEnd` helper for
+  /// callback-slot app bars), which confirms and shows the post-chat survey
+  /// in place.
+  @Deprecated('Back no longer ends the chat; use EasyLiveChatEndChatButton.')
   final bool confirmExit;
 
   const EasyLiveChatScreen({
@@ -232,18 +226,13 @@ class _EasyLiveChatScreenState extends State<EasyLiveChatScreen>
           }
           return Directionality(
             textDirection: theme.direction,
-            child: _ExitGuard(
-              enabled: widget.confirmExit,
-              theme: theme,
-              strings: ElcStrings.of(widget.locale ?? config?.locale),
-              child: Material(
-                color: theme.background,
-                child: SafeArea(
-                  child: ValueListenableBuilder<ChatPhase>(
-                    valueListenable: EasyLiveChat.instance.phase,
-                    builder: (context, phase, _) =>
-                        _buildPhase(context, phase, config, theme),
-                  ),
+            child: Material(
+              color: theme.background,
+              child: SafeArea(
+                child: ValueListenableBuilder<ChatPhase>(
+                  valueListenable: EasyLiveChat.instance.phase,
+                  builder: (context, phase, _) =>
+                      _buildPhase(context, phase, config, theme),
                 ),
               ),
             ),
@@ -345,99 +334,6 @@ class _Centered extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Center(child: child);
-}
-
-/// Confirms before the visitor closes the chat, then ends it.
-///
-/// A `PopScope` rather than a wrapper around some close button, because the
-/// host owns the chrome: the rider app supplies its own app-bar back arrow,
-/// and there is still the Android back button and the iOS edge swipe. Guarding
-/// the ROUTE catches all three, so a host needs no changes beyond the flag —
-/// though a host whose back button calls `Navigator.pop` DIRECTLY must route
-/// it through `Navigator.maybePop`, since a direct pop bypasses PopScope.
-///
-/// Only a live conversation is guarded. Once the chat has ended the visitor is
-/// answering the post-chat survey, and backing out of that should just leave
-/// rather than ask them again about a conversation that is already over.
-class _ExitGuard extends StatelessWidget {
-  final bool enabled;
-  final EasyLiveChatTheme theme;
-  final ElcStrings strings;
-  final Widget child;
-
-  const _ExitGuard({
-    required this.enabled,
-    required this.theme,
-    required this.strings,
-    required this.child,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    if (!enabled) return child;
-    return ValueListenableBuilder<ChatPhase>(
-      valueListenable: EasyLiveChat.instance.phase,
-      builder: (context, phase, _) {
-        final live = phase == ChatPhase.chat;
-        return PopScope(
-          // Nothing to confirm unless a conversation is actually in progress.
-          canPop: !live,
-          onPopInvokedWithResult: (didPop, _) async {
-            if (didPop) return;
-            final end = await _ask(context);
-            if (!end) return;
-            // Stay only if there is actually something to stay FOR. endChat()
-            // reports whether a post-chat step follows; it does not when the
-            // visitor already rated this chat (and then kept typing, which
-            // reopens it). Assuming a survey always follows left them
-            // confirming "close" and going nowhere.
-            final showsPostChat = await EasyLiveChat.instance.endChat();
-            if (!showsPostChat && context.mounted) {
-              Navigator.of(context).pop();
-            }
-          },
-          child: child,
-        );
-      },
-    );
-  }
-
-  Future<bool> _ask(BuildContext context) async {
-    final answer = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) => Directionality(
-        textDirection: theme.direction,
-        child: AlertDialog(
-          backgroundColor: theme.surface,
-          title: Text(
-            strings.exitChatTitle,
-            style: TextStyle(color: theme.text, fontSize: 16),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(dialogContext).pop(false),
-              child: Text(
-                strings.exitChatCancel,
-                style: TextStyle(color: theme.text.withValues(alpha: 0.7)),
-              ),
-            ),
-            TextButton(
-              onPressed: () => Navigator.of(dialogContext).pop(true),
-              child: Text(
-                strings.exitChatConfirm,
-                style: TextStyle(
-                  color: theme.primary,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-    // Dismissing the dialog by tapping outside means "no", not "leave".
-    return answer ?? false;
-  }
 }
 
 /// Full-screen error + retry, shown when config/session loading fails (instead

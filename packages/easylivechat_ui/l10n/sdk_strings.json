@@ -55,7 +55,8 @@
     "closedReadOnly": "Our team is offline right now. We'll be back soon.",
     "skipSurvey": "Skip",
     "closeChat": "Close",
-    "systemTransferredTo": "Conversation transferred to {name}"
+    "systemTransferredTo": "Conversation transferred to {name}",
+    "endChat": "End chat"
   },
   "ar": {
     "send": "إرسال",
@@ -101,7 +102,8 @@
     "closedReadOnly": "فريقنا غير متاح حالياً. سنعود قريباً.",
     "skipSurvey": "تخطٍّ",
     "closeChat": "إغلاق",
-    "systemTransferredTo": "تم تحويل المحادثة إلى {name}"
+    "systemTransferredTo": "تم تحويل المحادثة إلى {name}",
+    "endChat": "إنهاء المحادثة"
   },
   "ckb": {
     "send": "ناردن",
@@ -147,7 +149,8 @@
     "closedReadOnly": "تیمەکەمان ئێستا دەرەوەی کارە. بەم زووانە دەگەڕێینەوە.",
     "skipSurvey": "بازدان",
     "closeChat": "داخستن",
-    "systemTransferredTo": "گفتوگۆکە گوازرایەوە بۆ {name}"
+    "systemTransferredTo": "گفتوگۆکە گوازرایەوە بۆ {name}",
+    "endChat": "کۆتایی هێنان بە گفتوگۆ"
   },
   "de": {
     "send": "Senden",
@@ -193,7 +196,8 @@
     "closedReadOnly": "Unser Team ist gerade offline. Wir sind bald zurück.",
     "skipSurvey": "Überspringen",
     "closeChat": "Schließen",
-    "systemTransferredTo": "Unterhaltung übertragen an {name}"
+    "systemTransferredTo": "Unterhaltung übertragen an {name}",
+    "endChat": "Chat beenden"
   },
   "es": {
     "send": "Enviar",
@@ -239,7 +243,8 @@
     "closedReadOnly": "Nuestro equipo no está disponible ahora. Volvemos pronto.",
     "skipSurvey": "Omitir",
     "closeChat": "Cerrar",
-    "systemTransferredTo": "Conversación transferida a {name}"
+    "systemTransferredTo": "Conversación transferida a {name}",
+    "endChat": "Finalizar chat"
   },
   "fr": {
     "send": "Envoyer",
@@ -285,7 +290,8 @@
     "closedReadOnly": "Notre équipe est hors ligne pour le moment. Nous revenons bientôt.",
     "skipSurvey": "Passer",
     "closeChat": "Fermer",
-    "systemTransferredTo": "Conversation transférée à {name}"
+    "systemTransferredTo": "Conversation transférée à {name}",
+    "endChat": "Terminer la discussion"
   },
   "hi": {
     "send": "भेजें",
@@ -331,7 +337,8 @@
     "closedReadOnly": "हमारी टीम अभी ऑफ़लाइन है। हम जल्द लौटेंगे।",
     "skipSurvey": "छोड़ें",
     "closeChat": "बंद करें",
-    "systemTransferredTo": "बातचीत {name} को स्थानांतरित की गई"
+    "systemTransferredTo": "बातचीत {name} को स्थानांतरित की गई",
+    "endChat": "चैट समाप्त करें"
   },
   "it": {
     "send": "Invia",
@@ -377,7 +384,8 @@
     "closedReadOnly": "Il nostro team non è disponibile al momento. Torniamo presto.",
     "skipSurvey": "Salta",
     "closeChat": "Chiudi",
-    "systemTransferredTo": "Conversazione trasferita a {name}"
+    "systemTransferredTo": "Conversazione trasferita a {name}",
+    "endChat": "Termina chat"
   },
   "kmr": {
     "send": "هنارتن",
@@ -423,7 +431,8 @@
     "closedReadOnly": "Tîma me niha negirêdayî ye. Em ê zû vegerin.",
     "skipSurvey": "Bibuhurîne",
     "closeChat": "Bigire",
-    "systemTransferredTo": "ئاخڤتن هاتە ڤەگوهاستن بۆ {name}"
+    "systemTransferredTo": "ئاخڤتن هاتە ڤەگوهاستن بۆ {name}",
+    "endChat": "ب دوماهیک ئینانا ئاخڤتنێ"
   },
   "pt": {
     "send": "Enviar",
@@ -469,7 +478,8 @@
     "closedReadOnly": "A nossa equipa está offline neste momento. Voltamos em breve.",
     "skipSurvey": "Ignorar",
     "closeChat": "Fechar",
-    "systemTransferredTo": "Conversa transferida para {name}"
+    "systemTransferredTo": "Conversa transferida para {name}",
+    "endChat": "Encerrar chat"
   },
   "tr": {
     "send": "Gönder",
@@ -515,7 +525,8 @@
     "closedReadOnly": "Ekibimiz şu anda çevrimdışı. Kısa süre içinde döneceğiz.",
     "skipSurvey": "Atla",
     "closeChat": "Kapat",
-    "systemTransferredTo": "Görüşme {name} adlı kişiye aktarıldı"
+    "systemTransferredTo": "Görüşme {name} adlı kişiye aktarıldı",
+    "endChat": "Sohbeti bitir"
   },
   "ur": {
     "send": "بھیجیں",
@@ -561,7 +572,8 @@
     "closedReadOnly": "ہماری ٹیم اس وقت آف لائن ہے۔ ہم جلد واپس آئیں گے۔",
     "skipSurvey": "چھوڑیں",
     "closeChat": "بند کریں",
-    "systemTransferredTo": "گفتگو {name} کو منتقل کر دی گئی"
+    "systemTransferredTo": "گفتگو {name} کو منتقل کر دی گئی",
+    "endChat": "چیٹ ختم کریں"
   },
   "zh": {
     "send": "发送",
@@ -607,6 +619,7 @@
     "closedReadOnly": "我们的团队当前不在线。我们很快回来。",
     "skipSurvey": "跳过",
     "closeChat": "关闭",
-    "systemTransferredTo": "对话已转接给 {name}"
+    "systemTransferredTo": "对话已转接给 {name}",
+    "endChat": "结束对话"
   }
 }
