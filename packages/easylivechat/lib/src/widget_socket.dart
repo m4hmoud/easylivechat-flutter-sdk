@@ -148,9 +148,11 @@ class WidgetSocket {
     });
 
     socket.on('agent:typing', (data) {
-      // Payload is `{ isTyping }`; the server only ever sends true and lets the
-      // controller's ~4s timer clear it. Require an explicit true so a malformed
-      // or empty payload can't show a phantom "agent is typing".
+      // Payload is `{ isTyping }`. The server relays whatever the agent sent,
+      // false included — an earlier comment here claimed otherwise, which is
+      // why the controller leaned entirely on its own timeout. Require an
+      // explicit true so a malformed or empty payload can't show a phantom
+      // "agent is typing"; the timeout stays as a backstop for a dropped stop.
       final m = _asMap(data);
       final isTyping = m?['isTyping'] == true;
       if (!_onAgentTyping.isClosed) _onAgentTyping.add(isTyping);
