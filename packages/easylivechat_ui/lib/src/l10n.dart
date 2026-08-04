@@ -183,6 +183,9 @@ class ElcStrings {
   /// Used instead of [closedNotice] when the closure has a name.
   String get closedForLabel => _t('closedForLabel');
 
+  /// System transfer notice template; caller substitutes `{name}`.
+  String get systemTransferredTo => _t('systemTransferredTo');
+
   /// Headline on the closed screen. Short and unambiguous — the visitor should
   /// know they cannot be helped right now before reading a word of body copy.
   String get unavailableTitle => _t('unavailableTitle');
@@ -269,6 +272,7 @@ class ElcStrings {
       'closedReadOnly': "Our team is offline right now. We'll be back soon.",
       'skipSurvey': 'Skip',
       'closeChat': 'Close',
+      'systemTransferredTo': 'Conversation transferred to {name}',
     },
     'ar': {
       'send': 'إرسال',
@@ -314,6 +318,7 @@ class ElcStrings {
       'closedReadOnly': 'فريقنا غير متاح حالياً. سنعود قريباً.',
       'skipSurvey': 'تخطٍّ',
       'closeChat': 'إغلاق',
+      'systemTransferredTo': 'تم تحويل المحادثة إلى {name}',
     },
     'ckb': {
       'send': 'ناردن',
@@ -359,6 +364,7 @@ class ElcStrings {
       'closedReadOnly': 'تیمەکەمان ئێستا دەرەوەی کارە. بەم زووانە دەگەڕێینەوە.',
       'skipSurvey': 'بازدان',
       'closeChat': 'داخستن',
+      'systemTransferredTo': 'گفتوگۆکە گوازرایەوە بۆ {name}',
     },
     'de': {
       'send': 'Senden',
@@ -404,6 +410,7 @@ class ElcStrings {
       'closedReadOnly': 'Unser Team ist gerade offline. Wir sind bald zurück.',
       'skipSurvey': 'Überspringen',
       'closeChat': 'Schließen',
+      'systemTransferredTo': 'Unterhaltung übertragen an {name}',
     },
     'es': {
       'send': 'Enviar',
@@ -449,6 +456,7 @@ class ElcStrings {
       'closedReadOnly': 'Nuestro equipo no está disponible ahora. Volvemos pronto.',
       'skipSurvey': 'Omitir',
       'closeChat': 'Cerrar',
+      'systemTransferredTo': 'Conversación transferida a {name}',
     },
     'fr': {
       'send': 'Envoyer',
@@ -494,6 +502,7 @@ class ElcStrings {
       'closedReadOnly': 'Notre équipe est hors ligne pour le moment. Nous revenons bientôt.',
       'skipSurvey': 'Passer',
       'closeChat': 'Fermer',
+      'systemTransferredTo': 'Conversation transférée à {name}',
     },
     'hi': {
       'send': 'भेजें',
@@ -539,6 +548,7 @@ class ElcStrings {
       'closedReadOnly': 'हमारी टीम अभी ऑफ़लाइन है। हम जल्द लौटेंगे।',
       'skipSurvey': 'छोड़ें',
       'closeChat': 'बंद करें',
+      'systemTransferredTo': 'बातचीत {name} को स्थानांतरित की गई',
     },
     'it': {
       'send': 'Invia',
@@ -584,6 +594,7 @@ class ElcStrings {
       'closedReadOnly': 'Il nostro team non è disponibile al momento. Torniamo presto.',
       'skipSurvey': 'Salta',
       'closeChat': 'Chiudi',
+      'systemTransferredTo': 'Conversazione trasferita a {name}',
     },
     'kmr': {
       'send': 'هنارتن',
@@ -629,6 +640,7 @@ class ElcStrings {
       'closedReadOnly': 'Tîma me niha negirêdayî ye. Em ê zû vegerin.',
       'skipSurvey': 'Bibuhurîne',
       'closeChat': 'Bigire',
+      'systemTransferredTo': 'ئاخڤتن هاتە ڤەگوهاستن بۆ {name}',
     },
     'pt': {
       'send': 'Enviar',
@@ -674,6 +686,7 @@ class ElcStrings {
       'closedReadOnly': 'A nossa equipa está offline neste momento. Voltamos em breve.',
       'skipSurvey': 'Ignorar',
       'closeChat': 'Fechar',
+      'systemTransferredTo': 'Conversa transferida para {name}',
     },
     'tr': {
       'send': 'Gönder',
@@ -719,6 +732,7 @@ class ElcStrings {
       'closedReadOnly': 'Ekibimiz şu anda çevrimdışı. Kısa süre içinde döneceğiz.',
       'skipSurvey': 'Atla',
       'closeChat': 'Kapat',
+      'systemTransferredTo': 'Görüşme {name} adlı kişiye aktarıldı',
     },
     'ur': {
       'send': 'بھیجیں',
@@ -764,6 +778,7 @@ class ElcStrings {
       'closedReadOnly': 'ہماری ٹیم اس وقت آف لائن ہے۔ ہم جلد واپس آئیں گے۔',
       'skipSurvey': 'چھوڑیں',
       'closeChat': 'بند کریں',
+      'systemTransferredTo': 'گفتگو {name} کو منتقل کر دی گئی',
     },
     'zh': {
       'send': '发送',
@@ -809,6 +824,7 @@ class ElcStrings {
       'closedReadOnly': '我们的团队当前不在线。我们很快回来。',
       'skipSurvey': '跳过',
       'closeChat': '关闭',
+      'systemTransferredTo': '对话已转接给 {name}',
     },
   };
 }

@@ -94,6 +94,12 @@ class ChatMessage {
   /// True when the optimistic send failed (ack `ok:false`) — UI shows retry.
   final bool failed;
 
+  /// Raw server metadata. SYSTEM notices carry `i18n: {key, params}` here so
+  /// the UI can render them in the viewer's language; [body] stays as the
+  /// workspace-language fallback. Kept as a loose map — unknown shapes must
+  /// never break decoding.
+  final Map<String, dynamic>? metadata;
+
   const ChatMessage({
     required this.id,
     required this.conversationId,
@@ -111,7 +117,22 @@ class ChatMessage {
     required this.createdAt,
     this.isOptimistic = false,
     this.failed = false,
+    this.metadata,
   });
+
+  /// The i18n key of a SYSTEM notice (`conversation.transferred`), or null.
+  String? get systemI18nKey {
+    final i18n = metadata?['i18n'];
+    return i18n is Map ? i18n['key']?.toString() : null;
+  }
+
+  /// A named param of the SYSTEM notice's i18n payload, or ''.
+  String systemI18nParam(String name) {
+    final i18n = metadata?['i18n'];
+    if (i18n is! Map) return '';
+    final params = i18n['params'];
+    return params is Map ? (params[name] ?? '').toString() : '';
+  }
 
   bool get isFromCustomer => senderType == SenderType.customer;
   bool get isFromAgent => senderType == SenderType.agent;
@@ -159,6 +180,9 @@ class ChatMessage {
           MessageDeliveryStatus.fromWire(j['deliveryStatus'] ?? j['status']),
       createdAt: _parseDate(j['createdAt'] ?? j['created_at']),
       isOptimistic: false,
+      metadata: j['metadata'] is Map
+          ? (j['metadata'] as Map).cast<String, dynamic>()
+          : null,
     );
   }
 
@@ -209,6 +233,7 @@ class ChatMessage {
       createdAt: createdAt,
       isOptimistic: isOptimistic ?? this.isOptimistic,
       failed: failed ?? this.failed,
+      metadata: metadata,
     );
   }
 

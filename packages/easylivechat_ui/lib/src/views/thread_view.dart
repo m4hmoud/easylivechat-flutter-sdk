@@ -242,7 +242,13 @@ class MessageBubble extends StatelessWidget {
     // dashboard, web widget and native apps. The body arrives from the server
     // already localized to the workspace language.
     if (message.senderType == SenderType.system) {
-      final notice = (message.body ?? '').trim();
+      // Prefer the structured key so the line renders in the VIEWER's
+      // language; the body is the workspace-language fallback for notices
+      // sent before the key existed (or with keys this SDK doesn't know).
+      final notice = message.systemI18nKey == 'conversation.transferred'
+          ? strings.systemTransferredTo
+              .replaceAll('{name}', message.systemI18nParam('name'))
+          : (message.body ?? '').trim();
       if (notice.isEmpty) return const SizedBox.shrink();
       return Padding(
         padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 6),
