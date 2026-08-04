@@ -237,6 +237,38 @@ class MessageBubble extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // System lines ("Conversation transferred to X") are notices, not chat:
+    // centered, small, muted, no bubble/avatar/name/meta — matching the
+    // dashboard, web widget and native apps. The body arrives from the server
+    // already localized to the workspace language.
+    if (message.senderType == SenderType.system) {
+      final notice = (message.body ?? '').trim();
+      if (notice.isEmpty) return const SizedBox.shrink();
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 6),
+        child: Center(
+          child: Container(
+            constraints: const BoxConstraints(maxWidth: 280),
+            padding:
+                const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+            decoration: BoxDecoration(
+              color: theme.text.withValues(alpha: 0.06),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Text(
+              notice,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: theme.text.withValues(alpha: 0.55),
+                fontSize: 11.5,
+                height: 1.4,
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
     final bubbleColor = _isCustomer ? theme.primary : theme.surface;
     final textColor = _isCustomer ? _onColor(theme.primary) : theme.text;
     final align =
