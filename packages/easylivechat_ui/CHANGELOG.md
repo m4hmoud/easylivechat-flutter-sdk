@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.1.39
+
+- Typing indicator rebuilt: staggered messenger-style hop (each dot takes
+  its turn to rise and brighten) instead of a flat synchronized fade — and
+  the dot spacing no longer collapses under RTL, where the old physical
+  padding stacked the dots on top of each other.
+- Bubble tail corners are now logical (start/end), so the tail hugs the
+  correct side in RTL layouts for both message bubbles and the typing row.
+
 ## 0.1.38
 
 - Repository moved to a dedicated public home:

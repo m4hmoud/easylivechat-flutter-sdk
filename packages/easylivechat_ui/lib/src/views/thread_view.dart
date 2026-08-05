@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:easylivechat/easylivechat.dart';
@@ -315,11 +316,14 @@ class MessageBubble extends StatelessWidget {
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
               decoration: BoxDecoration(
                 color: bubbleColor,
-                borderRadius: BorderRadius.only(
-                  topLeft: const Radius.circular(16),
-                  topRight: const Radius.circular(16),
-                  bottomLeft: Radius.circular(_isCustomer ? 16 : 4),
-                  bottomRight: Radius.circular(_isCustomer ? 4 : 16),
+                // Logical corners: the tail hugs the sender's own side in RTL
+                // as well — bottomStart/bottomEnd flip with the layout,
+                // physical left/right did not.
+                borderRadius: BorderRadiusDirectional.only(
+                  topStart: const Radius.circular(16),
+                  topEnd: const Radius.circular(16),
+                  bottomStart: Radius.circular(_isCustomer ? 16 : 4),
+                  bottomEnd: Radius.circular(_isCustomer ? 4 : 16),
                 ),
                 border: _isCustomer
                     ? null
@@ -678,7 +682,7 @@ class _TypingRow extends StatefulWidget {
 class _TypingRowState extends State<_TypingRow>
     with SingleTickerProviderStateMixin {
   late final AnimationController _c = AnimationController(
-      vsync: this, duration: const Duration(milliseconds: 900))
+      vsync: this, duration: const Duration(milliseconds: 1100))
     ..repeat();
 
   @override
@@ -701,42 +705,55 @@ class _TypingRowState extends State<_TypingRow>
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
             decoration: BoxDecoration(
               color: t.surface,
-              borderRadius: const BorderRadius.only(
-                topLeft: Radius.circular(16),
-                topRight: Radius.circular(16),
-                bottomRight: Radius.circular(16),
-                bottomLeft: Radius.circular(4),
+              // Logical corners so the bubble tail hugs the leading edge in
+              // RTL too, matching the message bubbles.
+              borderRadius: const BorderRadiusDirectional.only(
+                topStart: Radius.circular(16),
+                topEnd: Radius.circular(16),
+                bottomEnd: Radius.circular(16),
+                bottomStart: Radius.circular(4),
               ),
               border: Border.all(color: t.text.withValues(alpha: 0.08)),
             ),
             child: AnimatedBuilder(
               animation: _c,
               builder: (context, _) {
+                // Fixed gaps between the dots (a SizedBox is direction-proof;
+                // the old physical `right:` padding collapsed under RTL and
+                // stacked the dots on top of each other).
                 return Row(
                   mainAxisSize: MainAxisSize.min,
-                  children: List.generate(3, (i) {
-                    final phase = (_c.value + i * 0.33) % 1.0;
-                    final opacity = 0.3 +
-                        0.7 * (1 - (phase - 0.5).abs() * 2).clamp(0.0, 1.0);
-                    return Padding(
-                      padding: EdgeInsets.only(right: i < 2 ? 4 : 0),
-                      child: Opacity(
-                        opacity: opacity,
-                        child: Container(
-                          width: 7,
-                          height: 7,
-                          decoration: BoxDecoration(
-                            color: t.text.withValues(alpha: 0.5),
-                            shape: BoxShape.circle,
-                          ),
-                        ),
-                      ),
-                    );
-                  }),
+                  children: [
+                    for (var i = 0; i < 3; i++) ...[
+                      if (i > 0) const SizedBox(width: 5),
+                      _dot(t, i),
+                    ],
+                  ],
                 );
               },
             ),
           ),
+        ),
+      ),
+    );
+  }
+
+  /// One dot of the staggered wave: each takes its turn to hop and brighten,
+  /// resting between turns — the familiar messenger cadence rather than a
+  /// flat synchronized fade.
+  Widget _dot(EasyLiveChatTheme t, int i) {
+    final phase = (_c.value - i * 0.15) % 1.0;
+    final active =
+        phase < 0.45 ? math.sin(phase / 0.45 * math.pi) : 0.0;
+    return Transform.translate(
+      // Hop stays inside the bubble's 12px vertical padding.
+      offset: Offset(0, -3.5 * active),
+      child: Container(
+        width: 7,
+        height: 7,
+        decoration: BoxDecoration(
+          color: t.text.withValues(alpha: 0.35 + 0.45 * active),
+          shape: BoxShape.circle,
         ),
       ),
     );
