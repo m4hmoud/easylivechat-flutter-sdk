@@ -7,7 +7,6 @@ your own app) into any Flutter app. The SDK speaks the existing anonymous
 `/widget-presence`, with a per-visitor 24h widget JWT — so the foreground chat
 experience works against today's backend with **zero server changes**.
 
-> Design + protocol reference: [`docs/FLUTTER_SDK_SPEC.md`](../docs/FLUTTER_SDK_SPEC.md).
 
 ## Packages
 

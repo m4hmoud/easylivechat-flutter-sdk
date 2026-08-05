@@ -49,5 +49,4 @@ EasyLiveChat.instance.sendText('Hi there');  // optimistic send + reconcile
 
 ## Server
 
-This client talks to an EasyLiveChat workspace. The backend is the
-`apps/api` service in the [same repository](https://github.com/nullsam/easylivechat).
+This client talks to an EasyLiveChat workspace. Create a workspace at [livechattools.com](https://livechattools.com).

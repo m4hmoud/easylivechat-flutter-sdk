@@ -58,5 +58,5 @@ Navigator.of(context).push(
 
 ## Server
 
-Talks to an EasyLiveChat workspace — the `apps/api` service in the
-[same repository](https://github.com/nullsam/easylivechat).
+Talks to an EasyLiveChat workspace — create one at
+[livechattools.com](https://livechattools.com).

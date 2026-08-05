@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.38
+
+- Repository moved to a dedicated public home:
+  [m4hmoud/easylivechat-flutter-sdk](https://github.com/m4hmoud/easylivechat-flutter-sdk).
+  No code changes.
+
 ## 0.1.37
 
 First pub.dev release. Previously consumed as a git dependency
