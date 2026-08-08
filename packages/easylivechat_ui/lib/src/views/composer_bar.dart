@@ -309,8 +309,14 @@ class _ComposerBarState extends State<ComposerBar> {
                       const SizedBox(width: 4),
                     ],
                     Expanded(child: _textField()),
-                    const SizedBox(width: 8),
-                    _sendButton(),
+                    // Same reasoning as the paperclip: a live accent-colored
+                    // send button beside a disabled field promised something
+                    // the composer would then refuse. While locked the row is
+                    // just the field and its explanatory hint.
+                    if (!_locked) ...[
+                      const SizedBox(width: 8),
+                      _sendButton(),
+                    ],
                   ],
                 ),
               ),

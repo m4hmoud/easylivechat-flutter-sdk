@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.1.40
+
+- End-chat confirmation redesigned: the workspace's own colors and text
+  direction, 24px corners, a solid confirm button and a quiet cancel stacked
+  full-width instead of two cramped text buttons in the host app's Material
+  theme. `EasyLiveChatEndChatButton` and `confirmAndEnd` take an optional
+  `theme` so a host that themes the chat screen can match the dialog to it.
+- The send button now hides while the composer is locked, like the attach
+  button already did — a live accent-colored send beside a disabled field
+  promised something the composer would refuse.
+
 ## 0.1.39
 
 - Typing indicator rebuilt: staggered messenger-style hop (each dot takes
