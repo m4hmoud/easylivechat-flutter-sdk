@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.42
+
+- "Typing" now follows the FIELD, not the keystrokes: it keeps announcing for
+  as long as the composer has text and stops the moment it empties (or on
+  send). Previously it stopped after ~1.5s of no keystrokes, so pausing
+  mid-sentence made the indicator disappear on the agent's screen while the
+  visitor was still composing.
+
 ## 0.1.41
 
 - The visitor's "typing" now keeps announcing itself while they type. It was

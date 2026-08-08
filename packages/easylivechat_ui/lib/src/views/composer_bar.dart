@@ -19,8 +19,9 @@ import '../theme.dart';
 /// are linked to the message via `sendMessage(text, attachmentUrls: [...])` —
 /// the send itself is optimistic (the controller pushes a `tmp-` bubble).
 ///
-/// Typing presence is debounced: `setTyping(true)` fires on input, and
-/// `setTyping(false)` after ~1.5s idle or immediately on send.
+/// Typing presence follows the FIELD, not the keystrokes: `setTyping(true)`
+/// repeats every 2s for as long as the box has text, and `setTyping(false)`
+/// fires the moment it empties, on send, or on teardown.
 class ComposerBar extends StatefulWidget {
   final EasyLiveChatTheme theme;
 
@@ -40,10 +41,9 @@ class _ComposerBarState extends State<ComposerBar> {
   final FocusNode _focus = FocusNode();
   final ImagePicker _imagePicker = ImagePicker();
 
-  Timer? _typingDebounce;
+  /// Repeats `true` while the field has text; cancelled when it empties.
+  Timer? _typingKeepAlive;
   bool _typingActive = false;
-  /// When the last `true` went out — throttles the keep-alive re-announce.
-  DateTime _typingSentAt = DateTime.fromMillisecondsSinceEpoch(0);
 
   /// Pending uploaded attachment URLs awaiting send.
   final List<UploadedFile> _pending = [];
@@ -62,7 +62,7 @@ class _ComposerBarState extends State<ComposerBar> {
 
   @override
   void dispose() {
-    _typingDebounce?.cancel();
+    _typingKeepAlive?.cancel();
     if (_typingActive) {
       // Best-effort: let the agent side know we stopped typing on teardown.
       EasyLiveChat.instance.setTyping(false);
@@ -77,27 +77,27 @@ class _ComposerBarState extends State<ComposerBar> {
 
   void _onTextChanged() {
     final hasText = _controller.text.trim().isNotEmpty;
-    if (hasText) {
-      // "true" REPEATS while the visitor keeps typing. The agent apps clear
-      // their indicator ~4s after the last event they heard, so announcing
-      // once at the first keystroke made "typing…" vanish mid-sentence, with
-      // no state change left to fire another. At most one every 2s.
-      final now = DateTime.now();
-      if (!_typingActive ||
-          now.difference(_typingSentAt) >= const Duration(seconds: 2)) {
-        _typingActive = true;
-        _typingSentAt = now;
-        EasyLiveChat.instance.setTyping(true);
-      }
-      _typingDebounce?.cancel();
-      _typingDebounce = Timer(const Duration(milliseconds: 1500), _stopTyping);
-    } else if (_typingActive) {
+    if (!hasText) {
       _stopTyping();
+      return;
     }
+    if (!_typingActive) {
+      _typingActive = true;
+      EasyLiveChat.instance.setTyping(true);
+    }
+    // Keep announcing for as long as the field HAS TEXT — not merely while
+    // keys are moving. The agent side clears its indicator a few seconds
+    // after the last event it heard, so pausing mid-sentence would read as
+    // "stopped typing" even though the visitor is still composing.
+    _typingKeepAlive ??= Timer.periodic(
+      const Duration(seconds: 2),
+      (_) => EasyLiveChat.instance.setTyping(true),
+    );
   }
 
   void _stopTyping() {
-    _typingDebounce?.cancel();
+    _typingKeepAlive?.cancel();
+    _typingKeepAlive = null;
     if (_typingActive) {
       _typingActive = false;
       EasyLiveChat.instance.setTyping(false);
