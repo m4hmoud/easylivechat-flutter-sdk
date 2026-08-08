@@ -42,6 +42,8 @@ class _ComposerBarState extends State<ComposerBar> {
 
   Timer? _typingDebounce;
   bool _typingActive = false;
+  /// When the last `true` went out — throttles the keep-alive re-announce.
+  DateTime _typingSentAt = DateTime.fromMillisecondsSinceEpoch(0);
 
   /// Pending uploaded attachment URLs awaiting send.
   final List<UploadedFile> _pending = [];
@@ -76,8 +78,15 @@ class _ComposerBarState extends State<ComposerBar> {
   void _onTextChanged() {
     final hasText = _controller.text.trim().isNotEmpty;
     if (hasText) {
-      if (!_typingActive) {
+      // "true" REPEATS while the visitor keeps typing. The agent apps clear
+      // their indicator ~4s after the last event they heard, so announcing
+      // once at the first keystroke made "typing…" vanish mid-sentence, with
+      // no state change left to fire another. At most one every 2s.
+      final now = DateTime.now();
+      if (!_typingActive ||
+          now.difference(_typingSentAt) >= const Duration(seconds: 2)) {
         _typingActive = true;
+        _typingSentAt = now;
         EasyLiveChat.instance.setTyping(true);
       }
       _typingDebounce?.cancel();

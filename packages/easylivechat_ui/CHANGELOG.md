@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.41
+
+- The visitor's "typing" now keeps announcing itself while they type. It was
+  sent once on the first keystroke, so an agent app — which clears its
+  indicator ~4s after the last event — stopped showing it mid-sentence with no
+  state change left to fire another event. Re-announced at most every 2s.
+
 ## 0.1.40
 
 - End-chat confirmation redesigned: the workspace's own colors and text
