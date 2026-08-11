@@ -3,6 +3,7 @@ import 'package:easylivechat/easylivechat.dart';
 import 'package:flutter/material.dart';
 
 import 'chat_screen.dart';
+import 'chime.dart';
 import 'picked_file.dart';
 import 'theme.dart';
 
@@ -61,6 +62,20 @@ class EasyLiveChatLauncher extends StatefulWidget {
 class _EasyLiveChatLauncherState extends State<EasyLiveChatLauncher> {
   bool _opening = false;
   bool _presented = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // The bubble is the surface that's up when the visitor ISN'T reading the
+    // thread — exactly when a reply most needs to make a sound.
+    ElcChime.instance.attach();
+  }
+
+  @override
+  void dispose() {
+    ElcChime.instance.detach();
+    super.dispose();
+  }
 
   Alignment _alignmentFromConfig(WidgetConfigModel? config) {
     if (widget.alignment != null) return widget.alignment!;

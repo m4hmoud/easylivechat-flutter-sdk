@@ -1,5 +1,30 @@
 # Changelog
 
+## 0.1.41
+
+- The post-chat survey is offered once per VISIT, not once per conversation.
+  `_ratedConversations` is keyed by conversation id, and a returning customer
+  now lands back in the thread they already have — so rating a chat once
+  suppressed the survey for every later visit: the visitor ended a second chat
+  and it simply closed, having never been asked. Cleared when the server
+  announces a new session in that thread.
+
+## 0.1.40
+
+- `ChatMessage.postChat` reads a post-chat survey the visitor submitted out of
+  `metadata.postChat`, so a thread can draw the submission at the point it was
+  filled in. The getter has been in the source since the survey work, but no
+  release carried it — which left `easylivechat_ui` 0.1.44 calling into a core
+  that did not have it.
+
+## 0.1.39
+
+- Read receipts: `markRead()` now also reports to the server, so an agent's
+  delivery ticks turn green once the visitor is looking at the thread. Every
+  other channel learns this from a provider webhook; an SDK conversation had no
+  receipt path at all, leaving agent messages on a permanent single check with
+  no way to tell read from ignored.
+
 ## 0.1.38
 
 - Repository moved to a dedicated public home:

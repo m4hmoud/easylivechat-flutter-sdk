@@ -242,7 +242,66 @@ class MessageBubble extends StatelessWidget {
     // centered, small, muted, no bubble/avatar/name/meta — matching the
     // dashboard, web widget and native apps. The body arrives from the server
     // already localized to the workspace language.
+    // The survey the visitor filled in, drawn where they filled it in. A
+    // thread that swallowed it would look like the submission failed, and
+    // pinning it below everything (as the old conversation-level field did)
+    // put an older visit's rating under newer messages.
+    final submitted = message.postChat;
+    if (submitted != null) {
+      return _PostChatCard(
+        submission: submitted,
+        submittedAt: message.createdAt,
+        theme: theme,
+        strings: strings,
+      );
+    }
     if (message.senderType == SenderType.system) {
+      // A returning visitor lands back in the conversation they already have
+      // rather than starting a fresh one, so a thread can span months and
+      // several unrelated problems. These bracket each visit — a labelled rule
+      // rather than the usual pill, so a session boundary reads as a break in
+      // the transcript and not as another notice. The date comes off the row
+      // itself, in the visitor's own locale.
+      final sessionKey = message.systemI18nKey;
+      if (sessionKey == 'conversation.session.ended' ||
+          sessionKey == 'conversation.session.ended.customer' ||
+          sessionKey == 'conversation.session.started') {
+        final started = sessionKey == 'conversation.session.started';
+        // Leaving is a moment in a working day, so it reads at a clock time;
+        // an agent resolving something is a day-level event in a thread that
+        // may span months.
+        final left = sessionKey == 'conversation.session.ended.customer';
+        final label = left
+            ? strings.systemSessionLeft.replaceAll(
+                '{time}', _sessionTime(context, message.createdAt))
+            : (started
+                    ? strings.systemSessionStarted
+                    : strings.systemSessionEnded)
+                .replaceAll('{date}', _sessionDate(context, message.createdAt));
+        final rule = theme.text.withValues(alpha: 0.12);
+        return Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          child: Row(
+            children: [
+              Expanded(child: Container(height: 1, color: rule)),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 10),
+                child: Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w500,
+                    color: started
+                        ? theme.primary
+                        : theme.text.withValues(alpha: 0.55),
+                  ),
+                ),
+              ),
+              Expanded(child: Container(height: 1, color: rule)),
+            ],
+          ),
+        );
+      }
       // Prefer the structured key so the line renders in the VIEWER's
       // language; the body is the workspace-language fallback for notices
       // sent before the key existed (or with keys this SDK doesn't know).
@@ -604,6 +663,43 @@ class MessageBubble extends StatelessWidget {
 
   /// Context-free `HH:mm` (24h) timestamp. Locale-aware day/12h formatting is
   /// avoided here to keep the bubble free of a `BuildContext` dependency.
+  /// Localized clock time, for the line a visitor's own exit leaves behind.
+  ///
+  /// Same reasoning as [_sessionDate]: the host app's MaterialLocalizations
+  /// decide the format (12- vs 24-hour included), and a host without them gets
+  /// an unambiguous zero-padded 24-hour fallback rather than nothing.
+  static String _sessionTime(BuildContext context, DateTime dt) {
+    final local = dt.toLocal();
+    final l10n = Localizations.of<MaterialLocalizations>(
+      context,
+      MaterialLocalizations,
+    );
+    if (l10n != null) {
+      return l10n.formatTimeOfDay(TimeOfDay.fromDateTime(local));
+    }
+    final h = local.hour.toString().padLeft(2, '0');
+    final m = local.minute.toString().padLeft(2, '0');
+    return '$h:$m';
+  }
+
+  /// Localized short date for a session divider.
+  ///
+  /// [MaterialLocalizations] comes from the host app's delegates, so the format
+  /// follows the app's locale without this package taking an intl dependency.
+  /// A host without Material localizations falls back to an unambiguous
+  /// year-month-day rather than to nothing.
+  static String _sessionDate(BuildContext context, DateTime dt) {
+    final local = dt.toLocal();
+    final l10n = Localizations.of<MaterialLocalizations>(
+      context,
+      MaterialLocalizations,
+    );
+    if (l10n != null) return l10n.formatShortDate(local);
+    final m = local.month.toString().padLeft(2, '0');
+    final d = local.day.toString().padLeft(2, '0');
+    return '${local.year}-$m-$d';
+  }
+
   static String _formatTime(DateTime dt) {
     final h = dt.hour.toString().padLeft(2, '0');
     final m = dt.minute.toString().padLeft(2, '0');
@@ -763,4 +859,115 @@ class _TypingRowState extends State<_TypingRow>
 /// Destructive color for failed-send markers (kept local to the thread view).
 abstract final class _ThreadErrorColor {
   static const Color color = Color(0xFFDC2626);
+}
+
+
+/// The post-chat survey as it appears in the thread.
+///
+/// Deliberately not a chat bubble: it is a form the visitor submitted, so it
+/// reads as a small centred card — matching the dashboard and the native apps.
+class _PostChatCard extends StatelessWidget {
+  final Map<String, dynamic> submission;
+  final DateTime submittedAt;
+  final EasyLiveChatTheme theme;
+  final ElcStrings strings;
+
+  const _PostChatCard({
+    required this.submission,
+    required this.submittedAt,
+    required this.theme,
+    required this.strings,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final rating = submission['rating'];
+    final comment = (submission['comment'] ?? '').toString();
+    final rawAnswers = submission['answers'];
+    // Everything except the rating and the comment, which are drawn in their
+    // own right above — a form whose comment field IS the comment would
+    // otherwise print it twice.
+    final extras = (rawAnswers is List ? rawAnswers : const [])
+        .whereType<Map>()
+        .where((a) =>
+            a['type'] != 'rating' &&
+            (a['value'] ?? '').toString().trim().isNotEmpty &&
+            (a['value'] ?? '').toString() != comment)
+        .toList();
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+      child: Center(
+        child: Container(
+          constraints: const BoxConstraints(maxWidth: 320),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          decoration: BoxDecoration(
+            color: theme.text.withValues(alpha: 0.06),
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Text(
+                strings.postChatTitle.toUpperCase(),
+                style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: 0.8,
+                  color: theme.text.withValues(alpha: 0.55),
+                ),
+              ),
+              if (rating is int) ...[
+                const SizedBox(height: 6),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: List.generate(5, (i) {
+                    final earned = i < rating;
+                    return Icon(
+                      earned ? Icons.star_rounded : Icons.star_border_rounded,
+                      size: 16,
+                      color: earned
+                          ? const Color(0xFFF59E0B)
+                          : theme.text.withValues(alpha: 0.3),
+                    );
+                  }),
+                ),
+              ],
+              if (comment.isNotEmpty) ...[
+                const SizedBox(height: 6),
+                Text(
+                  comment,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 12.5, color: theme.text),
+                ),
+              ],
+              for (final answer in extras) ...[
+                const SizedBox(height: 6),
+                Align(
+                  alignment: AlignmentDirectional.centerStart,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        (answer['label'] ?? '').toString(),
+                        style: TextStyle(
+                          fontSize: 10.5,
+                          color: theme.text.withValues(alpha: 0.55),
+                        ),
+                      ),
+                      Text(
+                        (answer['value'] ?? '').toString(),
+                        style: TextStyle(fontSize: 12.5, color: theme.text),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }

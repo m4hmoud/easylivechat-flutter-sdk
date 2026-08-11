@@ -1,5 +1,46 @@
 # Changelog
 
+## 0.1.45
+
+- Requires `easylivechat` ^0.1.40. 0.1.44 drew the submitted post-chat survey
+  in the thread through `ChatMessage.postChat`, but still allowed core 0.1.39,
+  where that getter does not exist — so every host outside this repository
+  failed to compile with "The getter 'postChat' isn't defined for the type
+  'ChatMessage'". In-repo builds resolve the sibling core through
+  `pubspec_overrides.yaml`, which is why the gap only showed up downstream.
+- The post-chat survey a visitor filled in renders where they filled it in,
+  instead of below newer messages. Shipped in 0.1.44 but never listed here.
+
+## 0.1.44
+
+- `EasyLiveChatScreen` can draw its own app bar: `showAppBar: true` gives a
+  back button and an X. They are different actions on purpose — backing out
+  leaves the conversation open so the visitor can return to it, while the X is
+  the explicit end that confirms first and then shows the post-chat survey.
+  Off by default, since most hosts push the screen into a route that already
+  has an app bar and would otherwise get two. `appBarTitle` overrides the
+  title, which defaults to the workspace's own.
+- The end-chat confirmation now takes its typeface from the host app.
+  `styleFrom(textStyle:)` REPLACES a button's text style, so the bare
+  TextStyles it used dropped the app's fontFamily and fell back to Material's
+  default — the two buttons could render in different faces from each other
+  and from the rest of the app. Both are also the same weight now.
+
+## 0.1.43
+
+- An arriving agent reply now chimes, the way the web widget always has — the
+  visitor is usually looking at something else in the host app, so a thread
+  that updated silently was simply missed. Honours the workspace's
+  `soundEnabled` / `soundUrl` widget config, falling back to a bundled default
+  (the same audio file the web widget serves). Only AGENT messages ring, not
+  the visitor's own sends, bot greetings, or transfer notices. Adds an
+  `audioplayers` dependency.
+- `EasyLiveChatEndChatButton` is a plain X instead of the speaker-notes-off
+  glyph, which read as a mute control rather than "close this".
+- The chat screen reports read receipts while it is on screen (on mount, on
+  each arrival, and on app resume), so the agent's ticks turn green. Needs
+  `easylivechat` 0.1.39.
+
 ## 0.1.42
 
 - "Typing" now follows the FIELD, not the keystrokes: it keeps announcing for

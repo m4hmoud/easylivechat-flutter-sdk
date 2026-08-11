@@ -66,6 +66,15 @@ class EasyLiveChatEndChatButton extends StatelessWidget {
     final onPrimary =
         t.primary.computeLuminance() > 0.5 ? const Color(0xFF0F172A) : Colors.white;
 
+    // Take the host app's typeface with us. `styleFrom(textStyle:)` REPLACES
+    // a button's text style, so a bare TextStyle here drops the app's
+    // fontFamily and silently falls back to Material's default — which is why
+    // the two buttons could render in different faces from each other and from
+    // the rest of the app. Deriving from the ambient theme keeps the family
+    // (and its package) and overrides only size and weight.
+    final buttonBase = Theme.of(context).textTheme.labelLarge ?? const TextStyle();
+    final titleBase = Theme.of(context).textTheme.titleMedium ?? const TextStyle();
+
     final answer = await showDialog<bool>(
       context: context,
       barrierColor: Colors.black.withValues(alpha: 0.45),
@@ -87,7 +96,7 @@ class EasyLiveChatEndChatButton extends StatelessWidget {
                 Text(
                   strings.exitChatTitle,
                   textAlign: TextAlign.center,
-                  style: TextStyle(
+                  style: titleBase.copyWith(
                     color: t.text,
                     fontSize: 17,
                     height: 1.35,
@@ -106,7 +115,7 @@ class EasyLiveChatEndChatButton extends StatelessWidget {
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(14),
                     ),
-                    textStyle: const TextStyle(
+                    textStyle: buttonBase.copyWith(
                       fontSize: 15,
                       fontWeight: FontWeight.w700,
                     ),
@@ -122,9 +131,12 @@ class EasyLiveChatEndChatButton extends StatelessWidget {
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(14),
                     ),
-                    textStyle: const TextStyle(
+                    textStyle: buttonBase.copyWith(
                       fontSize: 15,
-                      fontWeight: FontWeight.w600,
+                      // Same weight as the confirm button: the two sat at w700
+                      // and w600, which read as two different fonts even when
+                      // the family matched.
+                      fontWeight: FontWeight.w700,
                     ),
                   ),
                   child: Text(strings.exitChatCancel),
@@ -152,7 +164,9 @@ class EasyLiveChatEndChatButton extends StatelessWidget {
         final strings = ElcStrings.of(
             locale ?? EasyLiveChat.instance.widgetConfig.value?.locale);
         return IconButton(
-          icon: const Icon(Icons.speaker_notes_off_outlined),
+          // A plain X: "close this" is what people reach for in an app bar,
+          // and the old speaker-notes-off glyph read as a mute control.
+          icon: const Icon(Icons.close),
           color: color,
           tooltip: strings.endChat,
           onPressed: () => confirmAndEnd(context, locale: locale, theme: theme),

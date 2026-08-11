@@ -152,6 +152,12 @@ class SessionController {
   /// Conversations whose post-chat step is finished — rated, surveyed, or
   /// terminal. One set for both, because the visitor only ever sees one of the
   /// two and neither should reappear after it is done.
+  ///
+  /// Cleared for a conversation when a NEW SESSION opens inside it. A returning
+  /// customer now lands back in the thread they already have, so these ids are
+  /// no longer one-per-visit: without clearing, rating a chat once suppressed
+  /// the survey for every later visit — the visitor ended a second chat and it
+  /// simply closed, having never been asked.
   final Set<String> _ratedConversations = {};
 
   bool _disposed = false;
@@ -726,9 +732,15 @@ class SessionController {
     return page;
   }
 
-  /// Local-only: clear the unread badge (UI calls this when the thread shows).
+  /// The thread is on screen: clear the unread badge and tell the server.
+  ///
+  /// The badge half is local. The server half turns the agent's delivery ticks
+  /// green — without it a message to an SDK visitor sat on a permanent single
+  /// check and no agent could tell read from ignored. Safe to call often; the
+  /// server throttles and no-ops once the thread is fully read.
   void markRead() {
     if (unreadCount.value != 0) unreadCount.value = 0;
+    _socket?.reportSeen();
   }
 
   // ── attachments ──

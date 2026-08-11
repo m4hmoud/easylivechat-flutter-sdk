@@ -267,6 +267,16 @@ class WidgetSocket {
     _socket?.emit('typing', {'isTyping': isTyping});
   }
 
+  /// Tell the server the visitor is looking at the thread.
+  ///
+  /// Turns the agent's ticks green. Every other channel learns this from a
+  /// provider receipt webhook; a native SDK has no provider, so it reports
+  /// directly. Fire and forget — the server throttles and no-ops once
+  /// everything in the thread is already read, so callers can be generous.
+  void reportSeen() {
+    _socket?.emit('messages:seen');
+  }
+
   /// Ask the server to close this conversation on the visitor's behalf.
   ///
   /// The server marks it CLOSED, tells the agents' inboxes, and echoes

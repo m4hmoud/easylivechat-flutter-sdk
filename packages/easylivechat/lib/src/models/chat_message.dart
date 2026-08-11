@@ -126,6 +126,16 @@ class ChatMessage {
     return i18n is Map ? i18n['key']?.toString() : null;
   }
 
+  /// A post-chat survey the customer submitted (`metadata.postChat`), or null.
+  ///
+  /// Carried on the message so it sits where they submitted it: a thread the
+  /// visitor keeps coming back to holds one per visit, where the old
+  /// conversation-level field held one ever and pinned it to the bottom.
+  Map<String, dynamic>? get postChat {
+    final raw = metadata?['postChat'];
+    return raw is Map ? Map<String, dynamic>.from(raw) : null;
+  }
+
   /// A named param of the SYSTEM notice's i18n payload, or ''.
   String systemI18nParam(String name) {
     final i18n = metadata?['i18n'];

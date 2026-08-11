@@ -186,6 +186,14 @@ class ElcStrings {
   /// System transfer notice template; caller substitutes `{name}`.
   String get systemTransferredTo => _t('systemTransferredTo');
 
+  /// Session divider closing a visit; caller substitutes `{date}`.
+  String get systemSessionEnded => _t('systemSessionEnded');
+
+  /// Session divider opening a return visit; caller substitutes `{date}`.
+  String get systemSessionStarted => _t('systemSessionStarted');
+  String get systemSessionLeft => _t('systemSessionLeft');
+  String get postChatTitle => _t('postChatTitle');
+
   /// The explicit end-chat affordance (button tooltip / label).
   String get endChat => _t('endChat');
 
@@ -276,7 +284,11 @@ class ElcStrings {
       'skipSurvey': 'Skip',
       'closeChat': 'Close',
       'systemTransferredTo': 'Conversation transferred to {name}',
+      'systemSessionEnded': 'Chat ended · {date}',
+      'systemSessionStarted': 'New chat · {date}',
       'endChat': 'End chat',
+      'systemSessionLeft': 'Archived — you left the chat · {time}',
+      'postChatTitle': 'Post-chat form',
     },
     'ar': {
       'send': 'إرسال',
@@ -323,7 +335,11 @@ class ElcStrings {
       'skipSurvey': 'تخطٍّ',
       'closeChat': 'إغلاق',
       'systemTransferredTo': 'تم تحويل المحادثة إلى {name}',
+      'systemSessionEnded': 'انتهت المحادثة · {date}',
+      'systemSessionStarted': 'محادثة جديدة · {date}',
       'endChat': 'إنهاء المحادثة',
+      'systemSessionLeft': 'مؤرشفة — غادرت المحادثة · {time}',
+      'postChatTitle': 'نموذج ما بعد المحادثة',
     },
     'ckb': {
       'send': 'ناردن',
@@ -370,7 +386,11 @@ class ElcStrings {
       'skipSurvey': 'بازدان',
       'closeChat': 'داخستن',
       'systemTransferredTo': 'گفتوگۆکە گوازرایەوە بۆ {name}',
+      'systemSessionEnded': 'گفتوگۆکە کۆتایی هات · {date}',
+      'systemSessionStarted': 'گفتوگۆی نوێ · {date}',
       'endChat': 'کۆتایی هێنان بە گفتوگۆ',
+      'systemSessionLeft': 'ئەرشیفکراو — گفتوگۆکەت بەجێهێشت · {time}',
+      'postChatTitle': 'فۆرمی دوای گفتوگۆ',
     },
     'de': {
       'send': 'Senden',
@@ -417,7 +437,11 @@ class ElcStrings {
       'skipSurvey': 'Überspringen',
       'closeChat': 'Schließen',
       'systemTransferredTo': 'Unterhaltung übertragen an {name}',
+      'systemSessionEnded': 'Unterhaltung beendet · {date}',
+      'systemSessionStarted': 'Neue Unterhaltung · {date}',
       'endChat': 'Chat beenden',
+      'systemSessionLeft': 'Archiviert — Sie haben den Chat verlassen · {time}',
+      'postChatTitle': 'Formular nach dem Chat',
     },
     'es': {
       'send': 'Enviar',
@@ -464,7 +488,11 @@ class ElcStrings {
       'skipSurvey': 'Omitir',
       'closeChat': 'Cerrar',
       'systemTransferredTo': 'Conversación transferida a {name}',
+      'systemSessionEnded': 'Conversación finalizada · {date}',
+      'systemSessionStarted': 'Nueva conversación · {date}',
       'endChat': 'Finalizar chat',
+      'systemSessionLeft': 'Archivada — saliste del chat · {time}',
+      'postChatTitle': 'Formulario posterior al chat',
     },
     'fr': {
       'send': 'Envoyer',
@@ -511,7 +539,11 @@ class ElcStrings {
       'skipSurvey': 'Passer',
       'closeChat': 'Fermer',
       'systemTransferredTo': 'Conversation transférée à {name}',
+      'systemSessionEnded': 'Conversation terminée · {date}',
+      'systemSessionStarted': 'Nouvelle conversation · {date}',
       'endChat': 'Terminer la discussion',
+      'systemSessionLeft': 'Archivée — vous avez quitté la discussion · {time}',
+      'postChatTitle': 'Formulaire après discussion',
     },
     'hi': {
       'send': 'भेजें',
@@ -558,7 +590,11 @@ class ElcStrings {
       'skipSurvey': 'छोड़ें',
       'closeChat': 'बंद करें',
       'systemTransferredTo': 'बातचीत {name} को स्थानांतरित की गई',
+      'systemSessionEnded': 'बातचीत समाप्त · {date}',
+      'systemSessionStarted': 'नई बातचीत · {date}',
       'endChat': 'चैट समाप्त करें',
+      'systemSessionLeft': 'संग्रहित — आपने चैट छोड़ दी · {time}',
+      'postChatTitle': 'चैट के बाद का फ़ॉर्म',
     },
     'it': {
       'send': 'Invia',
@@ -605,7 +641,11 @@ class ElcStrings {
       'skipSurvey': 'Salta',
       'closeChat': 'Chiudi',
       'systemTransferredTo': 'Conversazione trasferita a {name}',
+      'systemSessionEnded': 'Conversazione terminata · {date}',
+      'systemSessionStarted': 'Nuova conversazione · {date}',
       'endChat': 'Termina chat',
+      'systemSessionLeft': 'Archiviata — hai lasciato la chat · {time}',
+      'postChatTitle': 'Modulo post-chat',
     },
     'kmr': {
       'send': 'هنارتن',
@@ -652,7 +692,11 @@ class ElcStrings {
       'skipSurvey': 'Bibuhurîne',
       'closeChat': 'Bigire',
       'systemTransferredTo': 'ئاخڤتن هاتە ڤەگوهاستن بۆ {name}',
+      'systemSessionEnded': 'Axaftin qediya · {date}',
+      'systemSessionStarted': 'Axaftina nû · {date}',
       'endChat': 'ب دوماهیک ئینانا ئاخڤتنێ',
+      'systemSessionLeft': 'Arşîvkirî — te ji chatê derket · {time}',
+      'postChatTitle': 'Forma piştî chatê',
     },
     'pt': {
       'send': 'Enviar',
@@ -699,7 +743,11 @@ class ElcStrings {
       'skipSurvey': 'Ignorar',
       'closeChat': 'Fechar',
       'systemTransferredTo': 'Conversa transferida para {name}',
+      'systemSessionEnded': 'Conversa encerrada · {date}',
+      'systemSessionStarted': 'Nova conversa · {date}',
       'endChat': 'Encerrar chat',
+      'systemSessionLeft': 'Arquivada — você saiu do chat · {time}',
+      'postChatTitle': 'Formulário pós-chat',
     },
     'tr': {
       'send': 'Gönder',
@@ -746,7 +794,11 @@ class ElcStrings {
       'skipSurvey': 'Atla',
       'closeChat': 'Kapat',
       'systemTransferredTo': 'Görüşme {name} adlı kişiye aktarıldı',
+      'systemSessionEnded': 'Görüşme sona erdi · {date}',
+      'systemSessionStarted': 'Yeni görüşme · {date}',
       'endChat': 'Sohbeti bitir',
+      'systemSessionLeft': 'Arşivlendi — sohbetten ayrıldınız · {time}',
+      'postChatTitle': 'Sohbet sonrası form',
     },
     'ur': {
       'send': 'بھیجیں',
@@ -793,7 +845,11 @@ class ElcStrings {
       'skipSurvey': 'چھوڑیں',
       'closeChat': 'بند کریں',
       'systemTransferredTo': 'گفتگو {name} کو منتقل کر دی گئی',
+      'systemSessionEnded': 'گفتگو ختم ہوگئی · {date}',
+      'systemSessionStarted': 'نئی گفتگو · {date}',
       'endChat': 'چیٹ ختم کریں',
+      'systemSessionLeft': 'محفوظ شدہ — آپ نے چیٹ چھوڑ دی · {time}',
+      'postChatTitle': 'چیٹ کے بعد کا فارم',
     },
     'zh': {
       'send': '发送',
@@ -840,7 +896,11 @@ class ElcStrings {
       'skipSurvey': '跳过',
       'closeChat': '关闭',
       'systemTransferredTo': '对话已转接给 {name}',
+      'systemSessionEnded': '对话已结束 · {date}',
+      'systemSessionStarted': '新对话 · {date}',
       'endChat': '结束对话',
+      'systemSessionLeft': '已归档 — 您已离开对话 · {time}',
+      'postChatTitle': '对话后表单',
     },
   };
 }

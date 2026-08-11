@@ -3,6 +3,8 @@ import 'dart:async';
 import 'package:easylivechat/easylivechat.dart';
 import 'package:flutter/material.dart';
 
+import 'chime.dart';
+import 'end_chat_button.dart';
 import 'l10n.dart';
 import 'picked_file.dart';
 import 'theme.dart';
@@ -74,6 +76,22 @@ class EasyLiveChatScreen extends StatefulWidget {
   @Deprecated('Back no longer ends the chat; use EasyLiveChatEndChatButton.')
   final bool confirmExit;
 
+  /// Show the SDK's own app bar: a back button that leaves the chat running,
+  /// and an X that ends it (after [EasyLiveChatEndChatButton]'s confirmation).
+  ///
+  /// Opt-in and false by default because most hosts push this screen inside a
+  /// route that already has an app bar, and turning it on unconditionally
+  /// would give them two stacked bars. Turn it on when the SDK owns the whole
+  /// screen.
+  ///
+  /// Leaving and ending are deliberately different actions: backing out keeps
+  /// the conversation open so the visitor can return to it, while the X is the
+  /// explicit "I'm done" that closes it and shows the post-chat survey.
+  final bool showAppBar;
+
+  /// Title for [showAppBar]. Defaults to the workspace's own chat title.
+  final String? appBarTitle;
+
   const EasyLiveChatScreen({
     super.key,
     this.themeOverride,
@@ -83,6 +101,8 @@ class EasyLiveChatScreen extends StatefulWidget {
     this.stringsByLocale,
     this.locale,
     this.confirmExit = false,
+    this.showAppBar = false,
+    this.appBarTitle,
   });
 
   @override
@@ -99,6 +119,9 @@ class _EasyLiveChatScreenState extends State<EasyLiveChatScreen>
   EasyLiveChatError? _error;
   StreamSubscription<EasyLiveChatError>? _errSub;
 
+  /// Reports "the visitor is reading this" for as long as the screen is up.
+  StreamSubscription<ChatMessage>? _seenSub;
+
   @override
   void initState() {
     super.initState();
@@ -109,6 +132,9 @@ class _EasyLiveChatScreenState extends State<EasyLiveChatScreen>
       ElcStrings.overrideByLocale(widget.stringsByLocale!);
     }
     WidgetsBinding.instance.addObserver(this);
+    // Chime here too, for hosts that push the screen directly without ever
+    // mounting the launcher bubble. Ref-counted, so having both up is fine.
+    ElcChime.instance.attach();
     if (EasyLiveChat.instance.isBooted) {
       // Surface a full-screen error only while we're still blocked loading the
       // config (no config yet). Once config is in, send/socket errors are owned
@@ -120,14 +146,28 @@ class _EasyLiveChatScreenState extends State<EasyLiveChatScreen>
         }
       });
     }
+    // The thread being on screen IS the read receipt. Reported on every
+    // arrival rather than once on mount because the socket may not be up yet
+    // at this point, and because a visitor sitting on the thread should keep
+    // the agent's ticks current as each reply lands.
+    _seenSub = EasyLiveChat.instance.onMessage.listen((message) {
+      if (!mounted || message.isFromCustomer) return;
+      EasyLiveChat.instance.markRead();
+    });
     // If the host pushed the screen without going through the launcher, kick
     // the session machine after the first frame.
-    WidgetsBinding.instance.addPostFrameCallback((_) => _maybeOpen());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _maybeOpen();
+      // Catches everything that arrived before this screen was pushed.
+      EasyLiveChat.instance.markRead();
+    });
   }
 
   @override
   void dispose() {
     _errSub?.cancel();
+    _seenSub?.cancel();
+    ElcChime.instance.detach();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
@@ -148,6 +188,9 @@ class _EasyLiveChatScreenState extends State<EasyLiveChatScreen>
           _openRequested = false;
         }
         _maybeOpen();
+        // Back on the thread after a spell in the background — anything that
+        // landed meanwhile is being read right now.
+        EasyLiveChat.instance.markRead();
       case AppLifecycleState.paused:
       case AppLifecycleState.detached:
       case AppLifecycleState.hidden:
@@ -229,10 +272,24 @@ class _EasyLiveChatScreenState extends State<EasyLiveChatScreen>
             child: Material(
               color: theme.background,
               child: SafeArea(
-                child: ValueListenableBuilder<ChatPhase>(
-                  valueListenable: EasyLiveChat.instance.phase,
-                  builder: (context, phase, _) =>
-                      _buildPhase(context, phase, config, theme),
+                child: Column(
+                  children: [
+                    if (widget.showAppBar)
+                      _ChatAppBar(
+                        theme: theme,
+                        title: widget.appBarTitle ??
+                            config?.welcomeTitle ??
+                            '',
+                        locale: widget.locale,
+                      ),
+                    Expanded(
+                      child: ValueListenableBuilder<ChatPhase>(
+                        valueListenable: EasyLiveChat.instance.phase,
+                        builder: (context, phase, _) =>
+                            _buildPhase(context, phase, config, theme),
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),
@@ -397,6 +454,83 @@ class _BootRequiredScaffold extends StatelessWidget {
             textAlign: TextAlign.center,
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// The SDK's own app bar: back on the leading edge, end-chat on the trailing.
+///
+/// Two separate affordances on purpose. Backing out leaves the conversation
+/// open — the visitor can come back to it and the agent still sees it live —
+/// whereas the X is the explicit end, which confirms first and then shows the
+/// post-chat survey. Collapsing them into one control loses that distinction,
+/// and a visitor who merely wanted to look at something else ends up ending
+/// their chat.
+///
+/// Directional icons throughout: `arrow_back` mirrors itself for RTL, and the
+/// leading/trailing slots follow the resolved text direction, so ar/ku/ur get
+/// the back button on the right without a second layout.
+class _ChatAppBar extends StatelessWidget {
+  final EasyLiveChatTheme theme;
+  final String title;
+  final String? locale;
+
+  const _ChatAppBar({
+    required this.theme,
+    required this.title,
+    this.locale,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final onSurface = theme.text;
+    return Container(
+      height: 52,
+      padding: const EdgeInsetsDirectional.only(start: 4, end: 4),
+      decoration: BoxDecoration(
+        color: theme.background,
+        border: Border(
+          bottom: BorderSide(color: theme.text.withValues(alpha: 0.08)),
+        ),
+      ),
+      child: Row(
+        children: [
+          IconButton(
+            icon: const Icon(Icons.arrow_back),
+            color: onSurface,
+            tooltip: MaterialLocalizations.of(context).backButtonTooltip,
+            // Leaving is not ending: the conversation stays open behind us.
+            onPressed: () => Navigator.of(context).maybePop(),
+          ),
+          Expanded(
+            child: Text(
+              title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: onSurface,
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+          // Only while there is something to end — during the survey or the
+          // offline notice this would close nothing.
+          ValueListenableBuilder<ChatPhase>(
+            valueListenable: EasyLiveChat.instance.phase,
+            builder: (context, phase, _) {
+              if (phase != ChatPhase.chat) {
+                return const SizedBox(width: 48);
+              }
+              return EasyLiveChatEndChatButton(
+                color: onSurface,
+                locale: locale,
+                theme: theme,
+              );
+            },
+          ),
+        ],
       ),
     );
   }
