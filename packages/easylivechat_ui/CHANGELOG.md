@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.1.46
+
+- Requires `easylivechat` ^0.1.42. The thread reads
+  `EasyLiveChat.hasOlderHistory`, which does not exist in earlier cores —
+  the same compile failure 0.1.45 was cut to fix, one getter later.
+- The thread no longer pulls a page of history the moment it appears. That was
+  right when a conversation was a single visit; now that a returning customer
+  resumes a thread spanning months, it dragged the previous visit straight back
+  on screen, underneath the greeting for the visit just started. Older messages
+  arrive when the visitor scrolls up, or asks for them.
+- "Load earlier messages" is a real control again. It rendered nothing when
+  idle, on the reasoning that loading was automatic; with the eager load gone
+  that would have stranded history on a session too short to scroll. The list
+  is also always draggable, so the pull gesture works even when the thread fits
+  the screen.
+
 ## 0.1.45
 
 - Requires `easylivechat` ^0.1.40. 0.1.44 drew the submitted post-chat survey

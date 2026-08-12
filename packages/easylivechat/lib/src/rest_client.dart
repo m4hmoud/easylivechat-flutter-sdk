@@ -110,6 +110,11 @@ class RestClient {
           if (config.attributes != null && config.attributes!.isNotEmpty)
             'attributes': config.attributes,
           if (resumeOnly) 'resumeOnly': true,
+          // Open on the visit being started, not on every visit ever made.
+          // A returning customer lands back in a conversation that can span
+          // months, and handing them all of it at once buries what they came
+          // back for. Earlier visits stay one scroll up, behind the cursor.
+          'historyScope': 'session',
           if (fields != null && fields.isNotEmpty) 'fields': fields,
         },
         options: Options(headers: _headers()),

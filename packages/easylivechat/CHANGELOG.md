@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.1.42
+
+- A resumed chat opens on the visit it is in. A returning customer lands back
+  in the thread they already have, which can span months and half a dozen
+  separate problems, so opening it handed them all of it at once and buried
+  what they came back for. The session request now asks for
+  `historyScope: 'session'`; the first page starts at the session boundary the
+  transcript is already bracketed by, and earlier visits stay behind the
+  cursor. Paging deliberately crosses that boundary — only the first page is
+  scoped.
+- New `EasyLiveChat.hasOlderHistory`: whether the server says history sits
+  behind the loaded page. A brand-new conversation reports false. Hosts that
+  draw their own "load earlier" affordance should read this instead of assuming
+  there is always more, since a scoped first page can no longer be told apart
+  from a complete one by looking at what arrived.
+- Older servers ignore `historyScope` and return the whole thread as before, so
+  this is safe against a backend that has not been updated.
+
 ## 0.1.41
 
 - The post-chat survey is offered once per VISIT, not once per conversation.

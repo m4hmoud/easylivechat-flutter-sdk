@@ -706,6 +706,14 @@ class SessionController {
     return willShowPostChat;
   }
 
+  /// Whether the server says there is history behind the loaded page.
+  ///
+  /// The cursor is the only authority on this: a thread opened on the current
+  /// session has earlier visits behind it, a brand-new conversation does not,
+  /// and the client cannot tell the two apart by looking at what it holds.
+  /// Drives the "load earlier" affordance.
+  bool get hasOlderHistory => _oldestCursor != null || !_historyLoadedOnce;
+
   /// Page older history via `GET /messages?cursor=` (walks backward in time).
   Future<MessagePage> loadOlderMessages() async {
     final token = _token;

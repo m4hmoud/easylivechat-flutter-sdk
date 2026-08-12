@@ -39,7 +39,10 @@ class _ThreadViewState extends State<ThreadView> {
   final ScrollController _scroll = ScrollController();
   int _lastCount = 0;
   bool _loadingOlder = false;
-  bool _hasMoreOlder = true;
+  /// Read through to the controller rather than mirrored locally: the cursor
+  /// is what actually knows whether earlier visits exist, and a copy of it here
+  /// only creates two answers that can disagree.
+  bool get _hasMoreOlder => EasyLiveChat.instance.hasOlderHistory;
 
   EasyLiveChatTheme get _theme => widget.theme;
   ElcStrings get _s =>
@@ -56,13 +59,17 @@ class _ThreadViewState extends State<ThreadView> {
     super.initState();
     _lastCount = EasyLiveChat.instance.messages.value.length;
     EasyLiveChat.instance.messages.addListener(_onMessages);
-    // History loads itself: one page as soon as the thread appears, then more
-    // as the visitor scrolls up. Making them find and tap "load earlier" to
-    // see their own conversation was busywork.
+    // Older history loads as the visitor scrolls up, and only then.
+    //
+    // It used to also pull one page the moment the thread appeared. That made
+    // sense when a conversation was a single visit, but a returning customer
+    // now lands back in a thread that can span months: the eager page dragged
+    // the previous visit straight back on screen, under the greeting for the
+    // visit they had just started. The server opens the thread on the current
+    // session; reaching past it is the visitor's call.
     _scroll.addListener(_onScroll);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _jumpToBottom();
-      unawaited(_loadOlder());
     });
   }
 
@@ -126,7 +133,6 @@ class _ThreadViewState extends State<ThreadView> {
     final beforePixels = _scroll.hasClients ? _scroll.position.pixels : 0.0;
     try {
       final page = await EasyLiveChat.instance.loadOlderMessages();
-      if (mounted && page.nextCursor == null) _hasMoreOlder = false;
       if (mounted && page.messages.isNotEmpty) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (!_scroll.hasClients) return;
@@ -162,6 +168,9 @@ class _ThreadViewState extends State<ThreadView> {
                 final itemCount = messages.length + 1 + (typing ? 1 : 0);
                 return ListView.builder(
                   controller: _scroll,
+                  // So the thread can be pulled even when it fits the screen —
+                  // that drag is how a visitor reaches earlier visits.
+                  physics: const AlwaysScrollableScrollPhysics(),
                   padding: const EdgeInsets.symmetric(vertical: 12),
                   itemCount: itemCount,
                   itemBuilder: (context, index) {
@@ -207,9 +216,20 @@ class _ThreadViewState extends State<ThreadView> {
                       _theme.text.withValues(alpha: 0.4)),
                 ),
               )
-            // No affordance: loading is automatic, so an idle moment shows
-            // nothing rather than a button that would do what already happens.
-            : const SizedBox.shrink(),
+            // A real control, not just a spinner. Scrolling up still loads
+            // automatically, but a thread that opens on a short session may
+            // not be scrollable at all, and the earlier visits behind it have
+            // to stay reachable.
+            : GestureDetector(
+                onTap: () => unawaited(_loadOlder()),
+                child: Text(
+                  _s.loadOlder,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: _theme.text.withValues(alpha: 0.6),
+                  ),
+                ),
+              ),
       ),
     );
   }

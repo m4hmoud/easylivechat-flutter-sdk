@@ -166,6 +166,13 @@ class EasyLiveChat {
   /// was no live connection — and the caller should close the chat UI.
   Future<bool> endChat() => _controller.endChat();
   Future<MessagePage> loadOlderMessages() => _controller.loadOlderMessages();
+
+  /// Whether the server says there is history behind the loaded page.
+  ///
+  /// A resumed thread opens on the visit the customer just started, so earlier
+  /// visits sit behind the cursor rather than on screen. Drives the host UI's
+  /// "load earlier" affordance — a brand-new conversation reports false.
+  bool get hasOlderHistory => _controller.hasOlderHistory;
   void markRead() => _controller.markRead();
 
   // ── attachments ──
