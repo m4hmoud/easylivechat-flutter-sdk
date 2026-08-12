@@ -694,11 +694,13 @@ class MessageBubble extends StatelessWidget {
       MaterialLocalizations,
     );
     if (l10n != null) {
-      return l10n.formatTimeOfDay(TimeOfDay.fromDateTime(local));
+      return _isolate(l10n.formatTimeOfDay(TimeOfDay.fromDateTime(local)));
     }
     final h = local.hour.toString().padLeft(2, '0');
     final m = local.minute.toString().padLeft(2, '0');
-    return '$h:$m';
+    // Isolated for the same reason as the date: this one is dropped into an
+    // RTL sentence too, where `15:52` is a neutral-joined numeric run.
+    return _isolate('$h:$m');
   }
 
   /// Localized short date for a session divider.
@@ -713,11 +715,26 @@ class MessageBubble extends StatelessWidget {
       context,
       MaterialLocalizations,
     );
-    if (l10n != null) return l10n.formatShortDate(local);
+    if (l10n != null) return _isolate(l10n.formatShortDate(local));
     final m = local.month.toString().padLeft(2, '0');
     final d = local.day.toString().padLeft(2, '0');
-    return '${local.year}-$m-$d';
+    return _isolate('${local.year}-$m-$d');
   }
+
+  /// Wrap a number-and-separator run so it keeps its own reading order inside a
+  /// right-to-left sentence.
+  ///
+  /// `12/08/2026` is digits joined by neutral characters, and neutrals take the
+  /// direction of the paragraph around them. Dropped bare into Kurdish or
+  /// Arabic copy, the groups are laid out right-to-left and the date reads back
+  /// to front — `2026/08/12` rendered as `12/08/2026` reversed, which is how a
+  /// correct date arrives on screen looking like `٢٢/٠٨/٢٢٤`. Arabic hid this
+  /// only because its short format uses a month NAME, whose strong letters pin
+  /// the order.
+  ///
+  /// FSI/PDI (rather than LRE/PDF): the run decides its own direction from its
+  /// first strong character and cannot leak that decision to the sentence.
+  static String _isolate(String run) => '\u2068$run\u2069';
 
   static String _formatTime(DateTime dt) {
     final h = dt.hour.toString().padLeft(2, '0');

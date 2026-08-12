@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.1.52
+
+- The date on a session divider reads correctly in right-to-left locales.
+  `12/08/2026` is digits joined by neutral characters, and neutrals take the
+  direction of the text around them — so in Kurdish (kmr, ckb) the groups were
+  laid out right-to-left and a correct date arrived on screen looking like
+  `٢٢/٠٨/٢٢٤`. Arabic hid the bug only because its short format uses a month
+  name, whose strong letters pin the order. The date and the "you left the chat"
+  time are now wrapped in a Unicode isolate, so each keeps its own reading order
+  without leaking direction into the sentence around it.
+
 ## 0.1.51
 
 - Kurmanji (kmr): corrected the wording of the failed-send retry line.
