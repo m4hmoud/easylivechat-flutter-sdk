@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.1.50
+
+- Requires `easylivechat` ^0.1.45. The floor moves because behaviour this
+  package presents now depends on it: "Close chat" only offers the post-chat
+  survey on a second visit with core 0.1.45. `^0.1.42` still *allowed* 0.1.45,
+  but it also allowed 0.1.42 — and a consumer holding an old lockfile would
+  keep a UI whose end-chat button silently does nothing, which is the bug that
+  release fixed.
+- Corrected the Kurmanji (kmr) strings. Seven were still untranslated
+  Latin-script placeholders — the close-chat button, the survey skip, the
+  session notices and the post-chat title all showed romanised text to a
+  Badini reader — and the rest are retranslations from a native speaker.
+
 ## 0.1.49
 
 - Activated the lints. `flutter_lints` was a dev-dependency with no
