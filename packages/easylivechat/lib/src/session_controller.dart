@@ -1299,6 +1299,35 @@ class SessionController {
 
   void _setMessages(List<ChatMessage> next) {
     messages.value = List<ChatMessage>.unmodifiable(next);
+    _noteSessionBoundary(next);
+  }
+
+  /// The session marker the current post-chat state belongs to.
+  ///
+  /// Identity, not presence. Seeing the SAME marker again — a resume, a
+  /// backfill, a reconnect — must not re-arm the survey, or a visitor who has
+  /// just rated would be asked again on every refresh. A DIFFERENT one means a
+  /// new visit has begun inside this conversation.
+  String? _sessionMarkerId;
+
+  /// Forget that this conversation was rated once a new visit opens inside it.
+  ///
+  /// [_ratedConversations] and [_closedHandled] are keyed by conversation id,
+  /// and a returning customer lands back in the thread they already have — so
+  /// the id stopped being one-per-visit. Rating a chat once then suppressed the
+  /// survey for the life of the thread: the visitor ended their second chat and
+  /// it simply closed, having never been asked, and `endChat()` returned false
+  /// so the host UI dismissed its confirmation and did nothing visible.
+  ///
+  /// The clearing was documented on those sets but never actually implemented.
+  void _noteSessionBoundary(List<ChatMessage> next) {
+    final id = _conversationId;
+    if (id == null) return;
+    final newest = newestSessionStartMarker(next);
+    if (newest == null || newest.id == _sessionMarkerId) return;
+    _sessionMarkerId = newest.id;
+    _closedHandled.remove(id);
+    _ratedConversations.remove(id);
   }
 
   void _appendMessage(ChatMessage msg) {
@@ -1457,4 +1486,21 @@ class SessionController {
     agentTyping.dispose();
     unreadCount.dispose();
   }
+}
+
+/// The newest "new chat" marker in [messages], or null when there is none.
+///
+/// Top-level rather than private so the boundary rule can be exercised without
+/// a socket. The rule reads as trivial and is not: what matters is the marker's
+/// IDENTITY, never its presence. The same marker arrives again on every resume,
+/// backfill and reconnect, and treating that as a new visit would re-ask a
+/// visitor who has just rated. Only a marker we have not accounted for means a
+/// visit has begun.
+ChatMessage? newestSessionStartMarker(Iterable<ChatMessage> messages) {
+  ChatMessage? newest;
+  for (final m in messages) {
+    if (m.systemI18nKey != 'conversation.session.started') continue;
+    if (newest == null || m.createdAt.isAfter(newest.createdAt)) newest = m;
+  }
+  return newest;
 }

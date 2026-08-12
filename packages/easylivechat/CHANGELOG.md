@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.1.45
+
+- "Close chat" works on a second visit. The post-chat survey is offered once per
+  VISIT, but the bookkeeping that remembers a chat was rated is keyed by
+  conversation id — and a returning customer lands back in the thread they
+  already have. Rating once therefore suppressed the survey for the life of the
+  conversation: `endChat()` reported there was nothing left to ask, so the host
+  UI dismissed its confirmation dialog and nothing happened at all.
+  The clearing this needs was described in a doc comment and never implemented;
+  it now runs when a new session marker appears in the thread, and is covered by
+  a test. Keyed on the marker's identity rather than its presence, so a resume
+  or a reconnect re-delivering the same marker cannot re-ask someone who has
+  just answered.
+
 ## 0.1.44
 
 - Activated the lints. `lints` has been a dev-dependency all along with no
