@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.1.53
+
+- Session-divider dates and times are formatted in this package instead of
+  through the host's `MaterialLocalizations`. Two of the 13 chrome languages —
+  ckb and kmr — have no Flutter Material localizations, so a host supporting
+  them must supply its own delegate, and one with a bad pattern rendered a date
+  as literal format characters (`٠٨/٢٢٤/YY`) with no way for the SDK to tell
+  that from a real date. Now built from the parts: `dd/MM/yyyy` and `HH:mm`,
+  Western digits, wrapped in a Unicode isolate so a numeric run keeps its own
+  reading order inside right-to-left copy.
+- The post-chat form's Submit button is full width, matching the fields above
+  it, instead of shrinking to its label in the middle of the sheet.
+
 ## 0.1.52
 
 - The date on a session divider reads correctly in right-to-left locales.

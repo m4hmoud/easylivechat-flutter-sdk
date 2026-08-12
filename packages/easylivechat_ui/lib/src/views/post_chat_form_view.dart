@@ -433,6 +433,10 @@ class _PostChatFormViewState extends State<PostChatFormView> {
   Widget _buildSubmitButton() {
     final t = _theme;
     return SizedBox(
+      // Full width, like the fields it sits under. Sized to its label, the
+      // primary action of the form read as a small chip adrift in the middle
+      // of the sheet, narrower than every input above it.
+      width: double.infinity,
       height: 50,
       child: ElevatedButton(
         onPressed: _submitting ? null : _submit,

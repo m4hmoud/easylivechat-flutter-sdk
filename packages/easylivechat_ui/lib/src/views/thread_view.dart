@@ -685,40 +685,37 @@ class MessageBubble extends StatelessWidget {
   /// Localized clock time, for the line a visitor's own exit leaves behind.
   ///
   /// Same reasoning as [_sessionDate]: the host app's MaterialLocalizations
-  /// decide the format (12- vs 24-hour included), and a host without them gets
-  /// an unambiguous zero-padded 24-hour fallback rather than nothing.
+  /// Always 24-hour and zero-padded, matching the bubble timestamps, rather
+  /// than whatever the host's delegates would return.
   static String _sessionTime(BuildContext context, DateTime dt) {
     final local = dt.toLocal();
-    final l10n = Localizations.of<MaterialLocalizations>(
-      context,
-      MaterialLocalizations,
-    );
-    if (l10n != null) {
-      return _isolate(l10n.formatTimeOfDay(TimeOfDay.fromDateTime(local)));
-    }
+    // Formatted here for the same reason as the date: a host delegate that
+    // mis-implements this returns literal pattern characters, and the SDK
+    // cannot tell that from a real time. 24h, since that is what the bubble
+    // timestamps already use.
     final h = local.hour.toString().padLeft(2, '0');
     final m = local.minute.toString().padLeft(2, '0');
-    // Isolated for the same reason as the date: this one is dropped into an
-    // RTL sentence too, where `15:52` is a neutral-joined numeric run.
     return _isolate('$h:$m');
   }
 
-  /// Localized short date for a session divider.
+  /// Short date for a session divider — formatted here, not by the host.
   ///
-  /// [MaterialLocalizations] comes from the host app's delegates, so the format
-  /// follows the app's locale without this package taking an intl dependency.
-  /// A host without Material localizations falls back to an unambiguous
-  /// year-month-day rather than to nothing.
+  /// This used to call `MaterialLocalizations.formatShortDate`, on the
+  /// reasoning that the host's delegates already know the app's locale. But the
+  /// SDK ships chrome in 13 languages, and two of them — ckb and kmr — have no
+  /// Flutter Material localizations at all, so a host that supports them must
+  /// supply its own delegate. When one of those returns a bad pattern the date
+  /// arrives as literal format characters (`٠٨/٢٢٤/YY`), and the SDK had no way
+  /// to tell that from a real date.
+  ///
+  /// A widget in someone else's app cannot be at the mercy of that, so the date
+  /// is built from the parts: day/month/year, Western digits, isolated. Plain,
+  /// unambiguous, and identical in every locale.
   static String _sessionDate(BuildContext context, DateTime dt) {
     final local = dt.toLocal();
-    final l10n = Localizations.of<MaterialLocalizations>(
-      context,
-      MaterialLocalizations,
-    );
-    if (l10n != null) return _isolate(l10n.formatShortDate(local));
-    final m = local.month.toString().padLeft(2, '0');
     final d = local.day.toString().padLeft(2, '0');
-    return _isolate('${local.year}-$m-$d');
+    final m = local.month.toString().padLeft(2, '0');
+    return _isolate('$d/$m/${local.year}');
   }
 
   /// Wrap a number-and-separator run so it keeps its own reading order inside a
