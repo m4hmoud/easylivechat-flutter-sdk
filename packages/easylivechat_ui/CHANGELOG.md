@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.1.48
+
+- The auto-greeting shows a face and a name again. An inbound bubble now always
+  gets an avatar when the workspace has the switch on, instead of only when the
+  message already carries a name or a photo. A chat opened before it is assigned
+  has a greeting attributed to nobody, so the very first bubble of the thread
+  was blank while every later one had a photo — and it stayed blank for the life
+  of the conversation. The web widget has always drawn a circle here and fallen
+  back to an initial; this matches it. System notices are unaffected: they
+  render as centred lines and never reach the avatar path.
+- Needs the matching server change to put a name on a greeting that was written
+  while nobody was assigned — the client half only guarantees the circle.
+
 ## 0.1.47
 
 - **Web is no longer a supported platform.** The package declares android,

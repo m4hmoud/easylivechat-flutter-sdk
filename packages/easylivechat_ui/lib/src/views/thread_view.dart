@@ -362,12 +362,18 @@ class MessageBubble extends StatelessWidget {
 
     final body = (message.body ?? '').trim();
     final tiles = _attachmentTiles(textColor);
-    // An avatar sits beside an inbound bubble when the workspace has the
-    // switch on AND we know who sent it. The identity check is what keeps a
-    // faceless system line from rendering an anonymous "A" circle — while
-    // still letting the auto-greeting show a face, since the server now
-    // attributes it to the agent the chat was routed to.
-    final withAvatar = !_isCustomer && showAgentAvatar && _hasSenderIdentity;
+    // An avatar sits beside every inbound bubble when the workspace has the
+    // switch on. System notices never reach here — they return above — so what
+    // is left is the team talking, and the team gets a face.
+    //
+    // This used to also require knowing WHO sent it, which meant the
+    // auto-greeting of a chat opened while everyone was offline had no face at
+    // all: the server stamps the greeting with the assignee, and there wasn't
+    // one yet. The first bubble of the conversation was blank while every later
+    // one had a photo. `_AgentAvatar` already degrades to an initial, and to a
+    // neutral circle when there is no name either, which is what the web widget
+    // has always drawn in the same situation.
+    final withAvatar = !_isCustomer && showAgentAvatar;
     // Leave room for the face so a narrow phone doesn't overflow the row.
     final maxBubble =
         MediaQuery.of(context).size.width * (withAvatar ? 0.68 : 0.78);
@@ -464,13 +470,6 @@ class MessageBubble extends StatelessWidget {
           : column,
     );
   }
-
-  /// Do we know who this came from? Either field is enough — an agent with no
-  /// photo still gets the initial circle, and a photo with the name switch off
-  /// still gets the photo.
-  bool get _hasSenderIdentity =>
-      (message.senderAvatarUrl?.trim().isNotEmpty ?? false) ||
-      _agentName != null;
 
   String? get _agentName {
     final n = message.senderName?.trim();
