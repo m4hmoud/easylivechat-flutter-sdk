@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.51
+
+- Kurmanji (kmr): corrected the wording of the failed-send retry line.
+
 ## 0.1.50
 
 - Requires `easylivechat` ^0.1.45. The floor moves because behaviour this

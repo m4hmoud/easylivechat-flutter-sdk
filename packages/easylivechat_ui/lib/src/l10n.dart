@@ -684,7 +684,7 @@ class ElcStrings {
       'download': 'داگرتن',
       'image': 'وێنە',
       'attachment': 'فایل',
-      'sendFailedRetry': 'نەهاتە فرێکرن. کلیکبکە بە دوبارە هەولدانێ .',
+      'sendFailedRetry': 'نەهاتە فرێکرن. کلیکبکە بۆ دوبارە هەولدانێ .',
       'sending': 'د هنێریت…',
       'startChat': 'دەستپێکرنا چاتی',
       'fieldRequired': 'ئەڤ خانە یا پێدڤی یە',
