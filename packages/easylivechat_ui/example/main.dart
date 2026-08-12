@@ -48,16 +48,16 @@ class ExampleApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
+    return const MaterialApp(
       title: 'EasyLiveChat UI example',
       home: Stack(
         children: [
-          const HomePage(),
+          HomePage(),
           // The bubble positions itself from the workspace's widget config
           // (bottom-left / bottom-right) and carries its own unread badge.
           // `themeOverride:` would let this app's brand colors win over the
           // server config; left off here so the workspace theme shows through.
-          const EasyLiveChatLauncher(),
+          EasyLiveChatLauncher(),
         ],
       ),
     );

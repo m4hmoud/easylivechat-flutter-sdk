@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.1.44
+
+- Activated the lints. `lints` has been a dev-dependency all along with no
+  `analysis_options.yaml` to include it, so `dart analyze` ran with no rules
+  and stayed green while pub.dev — which analyses every package against
+  lints_core regardless of what the package configures — deducted points for
+  issues nothing local could see. Now on `lints/recommended`, a superset of the
+  set pub.dev scores.
+- Fixed what that surfaced: the socket import used an upper-case `IO` prefix,
+  and a test imported a library it already had through the public entry point.
+  No behaviour change.
+
 ## 0.1.43
 
 Documentation and packaging only — no behaviour change.

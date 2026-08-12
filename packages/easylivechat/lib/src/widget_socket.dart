@@ -1,6 +1,6 @@
 import 'dart:async';
 
-import 'package:socket_io_client/socket_io_client.dart' as IO;
+import 'package:socket_io_client/socket_io_client.dart' as io;
 
 import 'models/chat_message.dart';
 import 'models/results.dart';
@@ -23,7 +23,7 @@ class WidgetSocket {
 
   WidgetSocket({required this.apiBase, required String token}) : _token = token;
 
-  IO.Socket? _socket;
+  io.Socket? _socket;
   bool _disposed = false;
 
   // ── inbound streams (broadcast) ──
@@ -90,9 +90,9 @@ class WidgetSocket {
       return;
     }
 
-    final socket = IO.io(
+    final socket = io.io(
       '$apiBase/widgets',
-      IO.OptionBuilder()
+      io.OptionBuilder()
           .setTransports(['websocket', 'polling'])
           // Re-mintable JWT in the handshake auth payload (NOT query/header).
           .setAuth({'token': _token})
@@ -113,7 +113,7 @@ class WidgetSocket {
     socket.connect();
   }
 
-  void _wire(IO.Socket socket) {
+  void _wire(io.Socket socket) {
     // ── connection lifecycle ──
     socket.onConnect((_) {
       if (!_onConnectionChange.isClosed) _onConnectionChange.add(true);

@@ -11,8 +11,9 @@ String _defaultNotice(ElcStrings strings) {
   final elc = EasyLiveChat.instance;
   if (!elc.isBooted) return strings.closedNotice;
 
-  if (elc.availabilityReason.value == 'NO_AGENTS')
+  if (elc.availabilityReason.value == 'NO_AGENTS') {
     return strings.noAgentsNotice;
+  }
 
   // A named closure ("Closed for Eid al-Adha") tells the visitor far more than
   // a generic "we're offline", so prefer it when the server sent one.

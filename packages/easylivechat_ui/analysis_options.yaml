@@ -1,0 +1,5 @@
+# See the note in ../easylivechat/analysis_options.yaml: flutter_lints was a
+# dev-dependency that did nothing, because there was no file including it.
+# flutter.yaml already pulls in lints/recommended, which is a superset of the
+# lints_core set pub.dev scores against.
+include: package:flutter_lints/flutter.yaml

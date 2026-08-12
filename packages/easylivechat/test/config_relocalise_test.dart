@@ -9,7 +9,6 @@ library;
 
 import 'package:easylivechat/easylivechat.dart';
 import 'package:easylivechat/src/session_controller.dart';
-import 'package:easylivechat/src/storage.dart';
 import 'package:test/test.dart';
 
 SessionController controllerFor(String contentLocale) => SessionController(

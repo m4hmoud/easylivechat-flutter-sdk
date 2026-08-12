@@ -1,0 +1,5 @@
+# The `lints` dev-dependency was declared but never activated — without this
+# file `dart analyze` runs with no rules at all, so it stayed green while
+# pub.dev, which analyses every package against lints_core regardless of what
+# the package configures, deducted points for issues nothing here could see.
+include: package:lints/recommended.yaml

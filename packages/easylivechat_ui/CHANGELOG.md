@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.1.49
+
+- Activated the lints. `flutter_lints` was a dev-dependency with no
+  `analysis_options.yaml` including it, so local analysis had no rules at all
+  while pub.dev scored against lints_core — which is how a missing pair of
+  braces cost 10 points with every local check passing.
+- Fixed the guard clause it flagged in the closed-notice view, and three
+  `const` opportunities in the example. No behaviour change.
+
 ## 0.1.48
 
 - The auto-greeting shows a face and a name again. An inbound bubble now always
