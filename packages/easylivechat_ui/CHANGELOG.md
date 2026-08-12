@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.1.47
+
+- **Web is no longer a supported platform.** The package declares android,
+  ios, linux, macos and windows. It is not that the UI cannot run on web — it
+  does under the JS compiler — but it is not a platform we test or support, and
+  `dart compile wasm` genuinely fails: cached_network_image pulls
+  flutter_cache_manager, which reaches for dart:io, and neither has a
+  WASM-ready release. The web product is the embeddable script-tag widget.
+  **A Flutter app targeting web will now be told this dependency does not
+  support that platform.**
+- Added `example/`, which pub.dev requires and which this package never had.
+  It shows both integrations: the launcher in a `Stack`, and the screen pushed
+  as a route with the end-chat button.
+- README rewritten as a guide rather than a summary: install, a complete
+  runnable `main.dart`, the iOS `Info.plist` keys that attachments require
+  (without them the picker silently fails), a phase table, recipes for
+  identify / unread badge / theming / ending a chat / locales / custom picker,
+  and troubleshooting for the failures people actually hit.
+- `description` shortened to fit pana's 180-character limit; added `topics`;
+  formatted with `dart format`.
+
 ## 0.1.46
 
 - Requires `easylivechat` ^0.1.42. The thread reads

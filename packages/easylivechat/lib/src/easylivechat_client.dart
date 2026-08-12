@@ -96,7 +96,8 @@ class EasyLiveChat {
       _controller.workspaceTimezone;
 
   /// Why: `OPEN`, `AFTER_HOURS` or `NO_AGENTS`.
-  ValueListenable<String> get availabilityReason => _controller.availabilityReason;
+  ValueListenable<String> get availabilityReason =>
+      _controller.availabilityReason;
 
   /// When we next open — lets the UI say "back at 09:00". Null when open.
   ValueListenable<DateTime?> get nextOpenAt => _controller.nextOpenAt;

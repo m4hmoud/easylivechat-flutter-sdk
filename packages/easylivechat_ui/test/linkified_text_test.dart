@@ -24,7 +24,8 @@ void main() {
 
     test('detects a bare domain with an allowlisted TLD', () {
       expect(texts('visit livechattools.com'), ['livechattools.com']);
-      expect(texts('docs.easylivechat.io/start'), ['docs.easylivechat.io/start']);
+      expect(
+          texts('docs.easylivechat.io/start'), ['docs.easylivechat.io/start']);
     });
 
     test('leaves filenames and version numbers alone', () {
@@ -97,7 +98,8 @@ void main() {
     test('ignores short numbers and quantities', () {
       expect(texts('order 123456'), isEmpty);
       expect(texts('I need 25 units'), isEmpty);
-      expect(texts('ref 1234567'), isEmpty, reason: '7 bare digits is ambiguous');
+      expect(texts('ref 1234567'), isEmpty,
+          reason: '7 bare digits is ambiguous');
     });
 
     test('ignores ISO dates', () {

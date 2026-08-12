@@ -32,8 +32,7 @@ class WidgetSocket {
   final _onAgentTyping = StreamController<bool>.broadcast();
   final _onAvailability = StreamController<bool>.broadcast();
   final _onAgentsAccepting = StreamController<bool>.broadcast();
-  final _onWorkspaceMode =
-      StreamController<WorkspaceAvailability>.broadcast();
+  final _onWorkspaceMode = StreamController<WorkspaceAvailability>.broadcast();
   final _onConversationClosed = StreamController<String>.broadcast();
   final _onProactive = StreamController<ProactiveMessage>.broadcast();
   final _onConnectionChange = StreamController<bool>.broadcast();
@@ -291,8 +290,9 @@ class WidgetSocket {
     }
     try {
       final raw = await socket
-          .emitWithAckAsync('conversation:end', <String, dynamic>{})
-          .timeout(const Duration(seconds: 15), onTimeout: () => null);
+          .emitWithAckAsync('conversation:end', <String, dynamic>{}).timeout(
+              const Duration(seconds: 15),
+              onTimeout: () => null);
       return SendAck.fromAck(raw);
     } catch (e) {
       return SendAck(ok: false, error: _describeError(e));

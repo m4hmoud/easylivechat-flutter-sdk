@@ -31,7 +31,11 @@ void main() {
     test('stays silent for bot and system rows', () {
       // Auto-greetings and "transferred to X" notices are not someone
       // reaching the visitor — the web widget ignores them too.
-      for (final from in [SenderType.bot, SenderType.system, SenderType.unknown]) {
+      for (final from in [
+        SenderType.bot,
+        SenderType.system,
+        SenderType.unknown
+      ]) {
         expect(
           ElcChime.shouldChime(_message(from), soundEnabled: true),
           isFalse,

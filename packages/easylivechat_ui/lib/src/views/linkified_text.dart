@@ -45,7 +45,8 @@ class ElcLinkSpan {
   Uri? get uri {
     switch (kind) {
       case ElcLinkKind.url:
-        final hasScheme = text.startsWith('http://') || text.startsWith('https://');
+        final hasScheme =
+            text.startsWith('http://') || text.startsWith('https://');
         return Uri.tryParse(hasScheme ? text : 'https://$text');
       case ElcLinkKind.email:
         return Uri.tryParse('mailto:$text');
@@ -98,7 +99,9 @@ const Set<String> _bareLinkTlds = {
 /// as a phone number.
 final RegExp _entityPattern = RegExp(
   // 1 — URL with an explicit scheme or a `www.` prefix.
-  r'(?<surl>(?:https?://|www\.)[^\s<>"' "'" r'`‏‎]+)'
+  r'(?<surl>(?:https?://|www\.)[^\s<>"'
+  "'"
+  r'`‏‎]+)'
   r'|'
   // 2 — email address.
   r'(?<email>[A-Za-z0-9._%+\-]+@[A-Za-z0-9](?:[A-Za-z0-9\-]*[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9\-]*[A-Za-z0-9])?)*\.[A-Za-z]{2,24})'
@@ -109,7 +112,9 @@ final RegExp _entityPattern = RegExp(
   r'(?<!(?:[\w@.\-]))'
   r'(?<bare>(?:[A-Za-z0-9](?:[A-Za-z0-9\-]*[A-Za-z0-9])?\.)+(?<tld>[A-Za-z]{2,24})'
   r'(?![A-Za-z0-9\-])'
-  r'(?:[/?#][^\s<>"' "'" r'`‏‎]*)?)'
+  r'(?:[/?#][^\s<>"'
+  "'"
+  r'`‏‎]*)?)'
   r'|'
   // 4 — phone number: optional `+` or area-code bracket, then digits with
   //     common separators. Shape validated in `_isPhoneLike`.
@@ -163,7 +168,9 @@ List<ElcLinkSpan> detectLinks(String input) {
     var text = raw;
     if (kind == ElcLinkKind.url) {
       text = _trimUrlTail(text);
-    } else if (kind == ElcLinkKind.phone && text.startsWith('(') && !text.contains(')')) {
+    } else if (kind == ElcLinkKind.phone &&
+        text.startsWith('(') &&
+        !text.contains(')')) {
       // `(555-1234)` — the opening bracket is the sentence's, not an area
       // code's, since its partner fell outside the match.
       text = text.substring(1);

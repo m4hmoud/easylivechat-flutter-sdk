@@ -1,12 +1,40 @@
 name: easylivechat_ui
+# pana caps the description at 180 characters — anything longer costs the
+# "valid pubspec.yaml" points and is truncated in search results anyway. The
+# fuller pitch lives in README.md.
 description: >-
-  Prebuilt, themeable Flutter UI for EasyLiveChat — a launcher bubble and full
-  chat screen (pre-chat form, thread, composer, attachments, CSAT, offline
-  form) driven by the server widget config. Built on the headless easylivechat
-  core. Embed live support in a few lines.
-version: 0.1.46
+  Prebuilt, themeable Flutter chat UI for EasyLiveChat live customer support:
+  launcher bubble, chat screen, pre-chat form, attachments and CSAT, driven by
+  your widget config.
+version: 0.1.47
 homepage: https://livechattools.com
 repository: https://github.com/m4hmoud/easylivechat-flutter-sdk
+topics:
+  - chat
+  - live-chat
+  - customer-support
+  - messaging
+  - widget
+
+# Supported platforms, declared rather than inferred.
+#
+# Web is deliberately absent. It is not that the UI cannot run there — it does,
+# under the JS compiler — but it is not a platform we support or test, and
+# `dart compile wasm` genuinely fails on it: cached_network_image pulls
+# flutter_cache_manager, which reaches for dart:io, and neither has a
+# WASM-ready release. Declaring web anyway advertised support we do not offer.
+#
+# The web product is the embeddable widget (a script tag), not this package.
+#
+# Consequence, so nobody re-adds it by accident: easylivechat_ui no longer
+# appears in pub.dev's web platform search, and a Flutter app targeting web
+# will now be told this dependency does not support that platform.
+platforms:
+  android:
+  ios:
+  linux:
+  macos:
+  windows:
 
 environment:
   # toARGB32()/withValues() require Flutter 3.27+ (Dart 3.6+).
@@ -19,10 +47,24 @@ dependencies:
   # Hosted for consumers; in-repo development resolves the sibling via
   # pubspec_overrides.yaml (not published), so both stay in lockstep locally.
   easylivechat: ^0.1.42
-  flutter_secure_storage: ^9.2.0   # default durable EasyLiveChatStorage (JWT)
+  # Default durable EasyLiveChatStorage (JWT). Held at 9.x deliberately, which
+  # costs pana's "dependencies are supported in the latest version" points:
+  # 10.0.0 replaced the Android Jetpack-Crypto backend with custom ciphers and
+  # auto-migrates existing entries, and 11.0.0 deleted the
+  # `encryptedSharedPreferences` option this file passes and raised minSdk to
+  # 24. Moving up rewrites where every installed app's JWT lives, so it is a
+  # release decision, not a metadata one.
+  flutter_secure_storage: ^9.2.0
   shared_preferences: ^2.3.0       # default visitorId + profile persistence
   image_picker: ^1.1.2
+  # Same trade-off: 11.0.0 made `FilePicker` static, so the
+  # `FilePicker.platform.pickFiles(...)` call in composer_bar.dart does not
+  # compile against it; 9.0.0 also changed web picks to load blobs. Widening
+  # the range would hand consumers a version this code cannot build against.
   file_picker: ^8.1.0
+  # Keeps the package off WASM (pana: 10/20 platform support) — flutter_cache_manager
+  # imports dart:io and has no wasm-ready release. Kept anyway: dropping it
+  # means losing disk caching for avatars and image attachments.
   cached_network_image: ^3.4.0
   url_launcher: ^6.3.0             # tap-to-open links / emails / phone numbers
   # Incoming-message chime. 6.5.0 is the first release that allows this

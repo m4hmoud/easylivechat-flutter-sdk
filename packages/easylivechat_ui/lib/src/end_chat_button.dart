@@ -63,8 +63,9 @@ class EasyLiveChatEndChatButton extends StatelessWidget {
                 surface: Color(0xFFF1F5F9),
                 text: Color(0xFF0F172A),
               ));
-    final onPrimary =
-        t.primary.computeLuminance() > 0.5 ? const Color(0xFF0F172A) : Colors.white;
+    final onPrimary = t.primary.computeLuminance() > 0.5
+        ? const Color(0xFF0F172A)
+        : Colors.white;
 
     // Take the host app's typeface with us. `styleFrom(textStyle:)` REPLACES
     // a button's text style, so a bare TextStyle here drops the app's
@@ -72,8 +73,10 @@ class EasyLiveChatEndChatButton extends StatelessWidget {
     // the two buttons could render in different faces from each other and from
     // the rest of the app. Deriving from the ambient theme keeps the family
     // (and its package) and overrides only size and weight.
-    final buttonBase = Theme.of(context).textTheme.labelLarge ?? const TextStyle();
-    final titleBase = Theme.of(context).textTheme.titleMedium ?? const TextStyle();
+    final buttonBase =
+        Theme.of(context).textTheme.labelLarge ?? const TextStyle();
+    final titleBase =
+        Theme.of(context).textTheme.titleMedium ?? const TextStyle();
 
     final answer = await showDialog<bool>(
       context: context,

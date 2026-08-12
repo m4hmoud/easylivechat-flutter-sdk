@@ -28,7 +28,8 @@ class ElcChime {
   /// assets carry a `packages/<name>/` prefix once bundled into a host app,
   /// which is already the whole key, hence the empty [AudioCache] prefix
   /// below (the default `assets/` would look for `assets/packages/…`).
-  static const _bundledAsset = 'packages/easylivechat_ui/assets/sounds/message.mp3';
+  static const _bundledAsset =
+      'packages/easylivechat_ui/assets/sounds/message.mp3';
 
   /// Matches the web widget's `audioRef.volume = 0.5`: audible without
   /// startling someone holding the phone to their ear.

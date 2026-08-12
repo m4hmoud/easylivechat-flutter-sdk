@@ -39,6 +39,7 @@ class _ThreadViewState extends State<ThreadView> {
   final ScrollController _scroll = ScrollController();
   int _lastCount = 0;
   bool _loadingOlder = false;
+
   /// Read through to the controller rather than mirrored locally: the cursor
   /// is what actually knows whether earlier visits exist, and a copy of it here
   /// only creates two answers that can disagree.
@@ -292,8 +293,8 @@ class MessageBubble extends StatelessWidget {
         // may span months.
         final left = sessionKey == 'conversation.session.ended.customer';
         final label = left
-            ? strings.systemSessionLeft.replaceAll(
-                '{time}', _sessionTime(context, message.createdAt))
+            ? strings.systemSessionLeft
+                .replaceAll('{time}', _sessionTime(context, message.createdAt))
             : (started
                     ? strings.systemSessionStarted
                     : strings.systemSessionEnded)
@@ -335,8 +336,7 @@ class MessageBubble extends StatelessWidget {
         child: Center(
           child: Container(
             constraints: const BoxConstraints(maxWidth: 280),
-            padding:
-                const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
             decoration: BoxDecoration(
               color: theme.text.withValues(alpha: 0.06),
               borderRadius: BorderRadius.circular(12),
@@ -373,78 +373,78 @@ class MessageBubble extends StatelessWidget {
         MediaQuery.of(context).size.width * (withAvatar ? 0.68 : 0.78);
 
     final column = Column(
-        crossAxisAlignment: align,
-        children: [
-          if (!_isCustomer && showAgentName && _agentName != null)
-            Padding(
-              padding: const EdgeInsets.only(left: 4, bottom: 2),
-              child: Text(
-                _agentLine!,
-                style: TextStyle(
-                  color: theme.text.withValues(alpha: 0.6),
-                  fontSize: 11,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-          ConstrainedBox(
-            constraints: BoxConstraints(
-              maxWidth: maxBubble,
-            ),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-              decoration: BoxDecoration(
-                color: bubbleColor,
-                // Logical corners: the tail hugs the sender's own side in RTL
-                // as well — bottomStart/bottomEnd flip with the layout,
-                // physical left/right did not.
-                borderRadius: BorderRadiusDirectional.only(
-                  topStart: const Radius.circular(16),
-                  topEnd: const Radius.circular(16),
-                  bottomStart: Radius.circular(_isCustomer ? 16 : 4),
-                  bottomEnd: Radius.circular(_isCustomer ? 4 : 16),
-                ),
-                border: _isCustomer
-                    ? null
-                    : Border.all(color: theme.text.withValues(alpha: 0.08)),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  if (tiles.isNotEmpty) ...[
-                    ...tiles,
-                    if (body.isNotEmpty) const SizedBox(height: 8),
-                  ],
-                  if (body.isNotEmpty)
-                    LinkifiedText(
-                      text: body,
-                      style: TextStyle(
-                          color: textColor, fontSize: 15, height: 1.35),
-                      // On the accent-colored customer bubble the accent is the
-                      // background, so a link there keeps the bubble's own
-                      // foreground and relies on the underline; agent bubbles
-                      // sit on `surface`, where the accent reads correctly.
-                      linkColor: _isCustomer ? textColor : theme.primary,
-                    ),
-                  // Attachment-only message with no resolvable media still
-                  // needs *something* visible so it never renders empty.
-                  if (body.isEmpty && tiles.isEmpty)
-                    Text(
-                      strings.attachment,
-                      style: TextStyle(
-                          color: textColor.withValues(alpha: 0.7),
-                          fontSize: 14,
-                          fontStyle: FontStyle.italic),
-                    ),
-                ],
+      crossAxisAlignment: align,
+      children: [
+        if (!_isCustomer && showAgentName && _agentName != null)
+          Padding(
+            padding: const EdgeInsets.only(left: 4, bottom: 2),
+            child: Text(
+              _agentLine!,
+              style: TextStyle(
+                color: theme.text.withValues(alpha: 0.6),
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
               ),
             ),
           ),
-          const SizedBox(height: 2),
-          _meta(textColorMuted: theme.text.withValues(alpha: 0.45)),
-        ],
-      );
+        ConstrainedBox(
+          constraints: BoxConstraints(
+            maxWidth: maxBubble,
+          ),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            decoration: BoxDecoration(
+              color: bubbleColor,
+              // Logical corners: the tail hugs the sender's own side in RTL
+              // as well — bottomStart/bottomEnd flip with the layout,
+              // physical left/right did not.
+              borderRadius: BorderRadiusDirectional.only(
+                topStart: const Radius.circular(16),
+                topEnd: const Radius.circular(16),
+                bottomStart: Radius.circular(_isCustomer ? 16 : 4),
+                bottomEnd: Radius.circular(_isCustomer ? 4 : 16),
+              ),
+              border: _isCustomer
+                  ? null
+                  : Border.all(color: theme.text.withValues(alpha: 0.08)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (tiles.isNotEmpty) ...[
+                  ...tiles,
+                  if (body.isNotEmpty) const SizedBox(height: 8),
+                ],
+                if (body.isNotEmpty)
+                  LinkifiedText(
+                    text: body,
+                    style:
+                        TextStyle(color: textColor, fontSize: 15, height: 1.35),
+                    // On the accent-colored customer bubble the accent is the
+                    // background, so a link there keeps the bubble's own
+                    // foreground and relies on the underline; agent bubbles
+                    // sit on `surface`, where the accent reads correctly.
+                    linkColor: _isCustomer ? textColor : theme.primary,
+                  ),
+                // Attachment-only message with no resolvable media still
+                // needs *something* visible so it never renders empty.
+                if (body.isEmpty && tiles.isEmpty)
+                  Text(
+                    strings.attachment,
+                    style: TextStyle(
+                        color: textColor.withValues(alpha: 0.7),
+                        fontSize: 14,
+                        fontStyle: FontStyle.italic),
+                  ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 2),
+        _meta(textColorMuted: theme.text.withValues(alpha: 0.45)),
+      ],
+    );
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
@@ -738,15 +738,17 @@ class _AgentAvatar extends StatelessWidget {
   final String? name;
   final EasyLiveChatTheme theme;
 
-  const _AgentAvatar({required this.url, required this.name, required this.theme});
+  const _AgentAvatar(
+      {required this.url, required this.name, required this.theme});
 
   static const double _size = 28;
 
   @override
   Widget build(BuildContext context) {
     final raw = url?.trim();
-    final initial =
-        (name?.trim().isNotEmpty ?? false) ? name!.trim()[0].toUpperCase() : 'A';
+    final initial = (name?.trim().isNotEmpty ?? false)
+        ? name!.trim()[0].toUpperCase()
+        : 'A';
 
     final fallback = Container(
       width: _size,
@@ -859,8 +861,7 @@ class _TypingRowState extends State<_TypingRow>
   /// flat synchronized fade.
   Widget _dot(EasyLiveChatTheme t, int i) {
     final phase = (_c.value - i * 0.15) % 1.0;
-    final active =
-        phase < 0.45 ? math.sin(phase / 0.45 * math.pi) : 0.0;
+    final active = phase < 0.45 ? math.sin(phase / 0.45 * math.pi) : 0.0;
     return Transform.translate(
       // Hop stays inside the bubble's 12px vertical padding.
       offset: Offset(0, -3.5 * active),
@@ -880,7 +881,6 @@ class _TypingRowState extends State<_TypingRow>
 abstract final class _ThreadErrorColor {
   static const Color color = Color(0xFFDC2626);
 }
-
 
 /// The post-chat survey as it appears in the thread.
 ///

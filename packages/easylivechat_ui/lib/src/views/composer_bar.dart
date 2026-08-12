@@ -111,8 +111,8 @@ class _ComposerBarState extends State<ComposerBar> {
   /// Read through [_lockListenable] rather than once at build time: a visitor
   /// already sitting on the chat screen when closing time arrives has to see
   /// the composer lock, and a plain getter never rebuilds.
-  bool get _locked => EasyLiveChat.instance.isBooted &&
-      EasyLiveChat.instance.composerLocked;
+  bool get _locked =>
+      EasyLiveChat.instance.isBooted && EasyLiveChat.instance.composerLocked;
 
   /// Rebuild trigger for [_locked] — the server pushes visitorMode on every
   /// availability change.

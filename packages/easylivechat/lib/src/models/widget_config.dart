@@ -311,8 +311,9 @@ String substituteVisitorVariables(
   String? name,
   String? defaultName,
 }) {
-  final resolved =
-      (name?.trim().isNotEmpty ?? false) ? name!.trim() : (defaultName?.trim() ?? '');
+  final resolved = (name?.trim().isNotEmpty ?? false)
+      ? name!.trim()
+      : (defaultName?.trim() ?? '');
   final first = resolved.isEmpty ? '' : resolved.split(RegExp(r'\s+')).first;
   return template.replaceAllMapped(
     RegExp(r'%(name|first_name)%|\{\{\s*(name|first_name)\s*\}\}',

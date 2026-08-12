@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.1.43
+
+Documentation and packaging only — no behaviour change.
+
+- The README's quick start called `EasyLiveChat.instance.sendText(...)`, which
+  is not a method on this package. The advertised copy-paste did not compile.
+  It is `sendMessage`.
+- README rewritten for someone arriving from pub.dev: install, the
+  `boot → open → phase` shape, a table of every listenable and what to render
+  from it, `SendResult` semantics, the `hasOlderHistory` rule for paging, forms,
+  errors, and troubleshooting. It now states plainly that the default
+  `InMemoryStorage` is NOT durable and shows the interface to implement.
+- `description` shortened to fit pana's 180-character limit, which the previous
+  284-character one exceeded — that alone forfeited the pubspec points.
+- Added `topics` for pub.dev discovery, and formatted with `dart format`.
+
 ## 0.1.42
 
 - A resumed chat opens on the visit it is in. A returning customer lands back

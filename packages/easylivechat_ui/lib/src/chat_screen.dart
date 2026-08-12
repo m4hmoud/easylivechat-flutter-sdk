@@ -277,9 +277,7 @@ class _EasyLiveChatScreenState extends State<EasyLiveChatScreen>
                     if (widget.showAppBar)
                       _ChatAppBar(
                         theme: theme,
-                        title: widget.appBarTitle ??
-                            config?.welcomeTitle ??
-                            '',
+                        title: widget.appBarTitle ?? config?.welcomeTitle ?? '',
                         locale: widget.locale,
                       ),
                     Expanded(

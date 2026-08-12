@@ -22,8 +22,18 @@ Map<String, dynamic> formJson() => {
           'required': true,
           'options': ['Yes', 'No'],
         },
-        {'id': 'rating', 'label': 'Rate this chat', 'type': 'rating', 'required': true},
-        {'id': 'subscribe', 'label': 'Email me a transcript', 'type': 'checkbox', 'required': false},
+        {
+          'id': 'rating',
+          'label': 'Rate this chat',
+          'type': 'rating',
+          'required': true
+        },
+        {
+          'id': 'subscribe',
+          'label': 'Email me a transcript',
+          'type': 'checkbox',
+          'required': false
+        },
         {
           'id': 'comment',
           'label': 'Anything else?',
@@ -50,7 +60,9 @@ void main() {
       expect(form.fields[3].placeholder, 'Optional');
     });
 
-    test('an unknown field type degrades to text rather than dropping the question', () {
+    test(
+        'an unknown field type degrades to text rather than dropping the question',
+        () {
       final form = PostChatForm.fromJson({
         'enabled': true,
         'fields': [
@@ -61,11 +73,14 @@ void main() {
       expect(form.fields.single.type, PostChatFieldType.text);
     });
 
-    test('hasFields is what decides between the survey and the built-in CSAT', () {
-      expect(PostChatForm.fromJson({'enabled': false, 'fields': []}).hasFields, isFalse);
+    test('hasFields is what decides between the survey and the built-in CSAT',
+        () {
+      expect(PostChatForm.fromJson({'enabled': false, 'fields': []}).hasFields,
+          isFalse);
       // Enabled but empty is the trap: it must NOT show a survey with no
       // questions, it must fall back.
-      expect(PostChatForm.fromJson({'enabled': true, 'fields': []}).hasFields, isFalse);
+      expect(PostChatForm.fromJson({'enabled': true, 'fields': []}).hasFields,
+          isFalse);
       expect(PostChatForm.disabled.hasFields, isFalse);
     });
 
@@ -112,14 +127,21 @@ void main() {
       expect(byId('resolved').validate('Maybe'), 'INVALID_OPTION');
     });
 
-    test('email and number are checked the same way the server checks them', () {
+    test('email and number are checked the same way the server checks them',
+        () {
       const email = PostChatField(
-        id: 'e', label: 'Email', type: PostChatFieldType.email, required: false);
+          id: 'e',
+          label: 'Email',
+          type: PostChatFieldType.email,
+          required: false);
       expect(email.validate('someone@example.com'), isNull);
       expect(email.validate('someone@'), 'INVALID_EMAIL');
 
       const number = PostChatField(
-        id: 'n', label: 'How many?', type: PostChatFieldType.number, required: false);
+          id: 'n',
+          label: 'How many?',
+          type: PostChatFieldType.number,
+          required: false);
       expect(number.validate('42'), isNull);
       expect(number.validate('-3.5'), isNull);
       expect(number.validate('lots'), 'INVALID_NUMBER');

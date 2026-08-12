@@ -74,7 +74,9 @@ void main() {
     span.visitChildren((InlineSpan child) {
       if (child is TextSpan) {
         final len = child.text?.length ?? 0;
-        if (index >= cursor && index < cursor + len && child.recognizer != null) {
+        if (index >= cursor &&
+            index < cursor + len &&
+            child.recognizer != null) {
           found = child.recognizer;
           return false;
         }
@@ -82,7 +84,8 @@ void main() {
       }
       return true;
     });
-    expect(found, isNotNull, reason: 'no tappable span covers index $index of "$body"');
+    expect(found, isNotNull,
+        reason: 'no tappable span covers index $index of "$body"');
     (found! as TapGestureRecognizer).onTap!();
     await tester.pump();
   }
@@ -101,7 +104,8 @@ void main() {
     expect(launcher.launched, ['https://livechattools.com/docs']);
   });
 
-  testWidgets('tapping a scheme-less domain opens it over https', (tester) async {
+  testWidgets('tapping a scheme-less domain opens it over https',
+      (tester) async {
     const body = 'see livechattools.com';
     await tester.pumpWidget(_host(body));
     await tapAt(tester, body, body.indexOf('livechattools'));
@@ -138,7 +142,8 @@ void main() {
     expect(link!.style!.decoration, TextDecoration.underline);
   });
 
-  testWidgets('non-link text around a link is preserved verbatim', (tester) async {
+  testWidgets('non-link text around a link is preserved verbatim',
+      (tester) async {
     const body = 'ping https://example.com then reply';
     await tester.pumpWidget(_host(body));
     final text = tester.widget<Text>(find.byType(Text));

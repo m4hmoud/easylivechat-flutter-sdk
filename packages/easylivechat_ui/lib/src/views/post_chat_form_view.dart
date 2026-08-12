@@ -562,7 +562,9 @@ class _RadioRow extends StatelessWidget {
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     border: Border.all(
-                      color: selected ? theme.primary : theme.text.withValues(alpha: 0.35),
+                      color: selected
+                          ? theme.primary
+                          : theme.text.withValues(alpha: 0.35),
                       width: 2,
                     ),
                   ),

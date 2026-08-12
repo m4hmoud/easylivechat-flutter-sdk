@@ -30,11 +30,13 @@ void main() {
 
     test('an anonymous visitor gets the tenant default', () {
       expect(
-        substituteVisitorVariables('Hi %name%', name: null, defaultName: 'بەرێز'),
+        substituteVisitorVariables('Hi %name%',
+            name: null, defaultName: 'بەرێز'),
         'Hi بەرێز',
       );
       expect(
-        substituteVisitorVariables('Hi %name%', name: '   ', defaultName: 'there'),
+        substituteVisitorVariables('Hi %name%',
+            name: '   ', defaultName: 'there'),
         'Hi there',
       );
     });

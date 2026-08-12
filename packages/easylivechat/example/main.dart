@@ -68,8 +68,11 @@ class _ExampleAppState extends State<_ExampleApp> {
                     final m = msgs[i];
                     return ListTile(
                       title: Text(m.body ?? '(attachment)'),
-                      subtitle: Text(m.isFromCustomer ? 'you' : (m.senderName ?? 'agent')),
-                      trailing: m.failed ? const Icon(Icons.error, color: Colors.red) : null,
+                      subtitle: Text(
+                          m.isFromCustomer ? 'you' : (m.senderName ?? 'agent')),
+                      trailing: m.failed
+                          ? const Icon(Icons.error, color: Colors.red)
+                          : null,
                     );
                   },
                 ),
@@ -78,8 +81,11 @@ class _ExampleAppState extends State<_ExampleApp> {
             // Agent typing.
             ValueListenableBuilder<bool>(
               valueListenable: _chat.agentTyping,
-              builder: (_, typing, __) =>
-                  typing ? const Padding(padding: EdgeInsets.all(8), child: Text('agent is typing…')) : const SizedBox.shrink(),
+              builder: (_, typing, __) => typing
+                  ? const Padding(
+                      padding: EdgeInsets.all(8),
+                      child: Text('agent is typing…'))
+                  : const SizedBox.shrink(),
             ),
             // Composer.
             Padding(
@@ -89,7 +95,8 @@ class _ExampleAppState extends State<_ExampleApp> {
                   child: TextField(
                     controller: _input,
                     onChanged: (v) => _chat.setTyping(v.isNotEmpty),
-                    decoration: const InputDecoration(hintText: 'Type a message'),
+                    decoration:
+                        const InputDecoration(hintText: 'Type a message'),
                   ),
                 ),
                 IconButton(
