@@ -85,6 +85,22 @@ class ChatMessage {
   final List<RehostedAttachment> attachments;
 
   final MessageDeliveryStatus deliveryStatus;
+
+  /// An agent has opened this message and seen it.
+  ///
+  /// Only ever true for the visitor's own messages — it is the read half of
+  /// their sent/read ticks. The server sends it two ways and both are parsed:
+  /// `read` on the trimmed REST rows, `readByAgentAt` on the raw row that comes
+  /// down the socket.
+  ///
+  /// A per-message flag AND a conversation-level watermark
+  /// (`SessionController.agentLastReadAt`) both exist because they answer
+  /// different questions: this one is history — true for messages already read
+  /// when the thread loaded — while the watermark is what advances live, for
+  /// messages already on screen when the agent opens the conversation.
+  /// [receiptFor] folds the two together; prefer it over reading either alone.
+  final bool readByAgent;
+
   final DateTime createdAt;
 
   /// True only for a locally-created optimistic message (id starts `tmp-`),
@@ -114,6 +130,7 @@ class ChatMessage {
     this.attachmentUrls = const [],
     this.attachments = const [],
     this.deliveryStatus = MessageDeliveryStatus.sent,
+    this.readByAgent = false,
     required this.createdAt,
     this.isOptimistic = false,
     this.failed = false,
@@ -146,6 +163,41 @@ class ChatMessage {
 
   bool get isFromCustomer => senderType == SenderType.customer;
   bool get isFromAgent => senderType == SenderType.agent;
+
+  /// What to show next to this message: nothing, or one of the four states of
+  /// the visitor's own send.
+  ///
+  /// Null for anything the visitor did not write — an agent's message has no
+  /// receipt to show the visitor, and a system notice has no sender at all.
+  ///
+  /// [agentLastReadAt] is the conversation-level watermark from
+  /// `SessionController.agentLastReadAt`; pass null if you are not tracking it
+  /// and only [readByAgent] decides.
+  ///
+  /// The watermark is deliberately not applied to a message still carrying its
+  /// local `tmp-` id. Its timestamp came from the device clock while the
+  /// watermark comes from the server's, and comparing the two across even a few
+  /// seconds of skew would show a message as read that no one has opened. Once
+  /// the server row replaces it — moments later — both sides are server time
+  /// and the comparison is sound.
+  MessageReceipt? receiptFor(DateTime? agentLastReadAt) {
+    if (!isFromCustomer) return null;
+    if (failed || deliveryStatus == MessageDeliveryStatus.failed) {
+      return MessageReceipt.failed;
+    }
+    if (isOptimistic || deliveryStatus == MessageDeliveryStatus.pending) {
+      return MessageReceipt.pending;
+    }
+    if (readByAgent || deliveryStatus == MessageDeliveryStatus.read) {
+      return MessageReceipt.read;
+    }
+    if (!isLocalTemp &&
+        agentLastReadAt != null &&
+        !createdAt.isAfter(agentLastReadAt)) {
+      return MessageReceipt.read;
+    }
+    return MessageReceipt.sent;
+  }
 
   /// True while this row still carries its local `tmp-` id — an optimistic send
   /// not yet reconciled to a server id (even if already ack'd via `_markSent`,
@@ -188,6 +240,9 @@ class ChatMessage {
       attachments: attachments,
       deliveryStatus:
           MessageDeliveryStatus.fromWire(j['deliveryStatus'] ?? j['status']),
+      // `read` on the trimmed REST rows; `readByAgentAt` on the raw Prisma row
+      // from the socket, where a timestamp means read and null means not.
+      readByAgent: j['read'] == true || j['readByAgentAt'] != null,
       createdAt: _parseDate(j['createdAt'] ?? j['created_at']),
       isOptimistic: false,
       metadata: j['metadata'] is Map
@@ -222,6 +277,7 @@ class ChatMessage {
   ChatMessage copyWith({
     String? id,
     MessageDeliveryStatus? deliveryStatus,
+    bool? readByAgent,
     bool? isOptimistic,
     bool? failed,
     List<RehostedAttachment>? attachments,
@@ -240,6 +296,7 @@ class ChatMessage {
       attachmentUrls: attachmentUrls,
       attachments: attachments ?? this.attachments,
       deliveryStatus: deliveryStatus ?? this.deliveryStatus,
+      readByAgent: readByAgent ?? this.readByAgent,
       createdAt: createdAt,
       isOptimistic: isOptimistic ?? this.isOptimistic,
       failed: failed ?? this.failed,

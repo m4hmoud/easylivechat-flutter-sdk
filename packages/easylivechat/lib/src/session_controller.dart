@@ -80,6 +80,19 @@ class SessionController {
   final ValueNotifier<bool> agentTyping = ValueNotifier(false);
   final ValueNotifier<int> unreadCount = ValueNotifier(0);
 
+  /// How far into the thread an agent has read: everything the visitor sent at
+  /// or before this instant has been seen.
+  ///
+  /// Server time, not device time — it arrives on `messages:read` and is seeded
+  /// from the read flags on history. Only ever moves forward, because the
+  /// events are per-agent: a second agent opening the thread reports the moment
+  /// *they* read it, which can be earlier than a colleague's, and taking that
+  /// literally would un-read messages the visitor has already watched turn
+  /// read.
+  ///
+  /// Pass it to `ChatMessage.receiptFor` rather than comparing by hand.
+  final ValueNotifier<DateTime?> agentLastReadAt = ValueNotifier(null);
+
   final _onMessage = StreamController<ChatMessage>.broadcast();
   final _onProactive = StreamController<ProactiveMessage>.broadcast();
   final _onError = StreamController<EasyLiveChatError>.broadcast();
@@ -558,6 +571,11 @@ class SessionController {
       await storage.write(StorageKeys.conversationId, res.conversationId!);
     }
 
+    // Cleared before the seed, not after: the watermark only ever moves
+    // forward, so one carried over from a previous conversation would outrank
+    // anything this thread's history has to say and show its first messages as
+    // already read.
+    agentLastReadAt.value = null;
     _setMessages(_dedupSort(res.messages));
     _connectSocket();
     // Presence (`/widget-presence`) is the pre-chat proactive channel. Once the
@@ -875,6 +893,9 @@ class SessionController {
     _socketConversationId = null;
     _conversationId = null;
     _token = null;
+    // Belongs to the conversation being let go of, and only moves forward —
+    // left set, it would rule the next one's opening messages already read.
+    agentLastReadAt.value = null;
   }
 
   // ── presence / lifecycle ──
@@ -955,6 +976,7 @@ class SessionController {
     // The verdict itself, so a workspace that closes (or reopens) mid-session
     // reaches the visitor without waiting for them to reopen the screen.
     _socketSubs.add(socket.onWorkspaceMode.listen(_applyWorkspaceAvailability));
+    _socketSubs.add(socket.onMessagesRead.listen(_advanceReadWatermark));
     _socketSubs
         .add(socket.onConversationClosed.listen(_handleConversationClosed));
     _socketSubs.add(socket.onProactive.listen(_handleProactive));
@@ -1300,6 +1322,33 @@ class SessionController {
   void _setMessages(List<ChatMessage> next) {
     messages.value = List<ChatMessage>.unmodifiable(next);
     _noteSessionBoundary(next);
+    _seedReadWatermark(next);
+  }
+
+  /// Move the read watermark forward, never back. See [agentLastReadAt].
+  void _advanceReadWatermark(DateTime at) {
+    if (_disposed) return;
+    final current = agentLastReadAt.value;
+    if (current == null || at.isAfter(current)) {
+      agentLastReadAt.value = at;
+    }
+  }
+
+  /// Recover the watermark from history's per-message read flags.
+  ///
+  /// `messages:read` only fires while the visitor is connected to hear it. A
+  /// visitor who closes the app, has their messages read, and comes back gets
+  /// no event — the read happened in their absence. Their history still carries
+  /// `read` per message, so the newest read message dates the watermark and the
+  /// ticks are already correct on the first frame instead of resolving only
+  /// after the next agent action.
+  void _seedReadWatermark(List<ChatMessage> next) {
+    DateTime? newest;
+    for (final m in next) {
+      if (!m.isFromCustomer || !m.readByAgent) continue;
+      if (newest == null || m.createdAt.isAfter(newest)) newest = m.createdAt;
+    }
+    if (newest != null) _advanceReadWatermark(newest);
   }
 
   /// The session marker the current post-chat state belongs to.

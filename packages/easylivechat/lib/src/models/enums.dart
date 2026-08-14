@@ -16,6 +16,31 @@ T _parse<T extends Enum>(Iterable<T> values, Object? wire, T fallback) {
   return fallback;
 }
 
+/// What a visitor is shown about the fate of their own message.
+///
+/// Not a wire enum — there is no server field with these four values. It is the
+/// answer `ChatMessage.receiptFor` computes from the delivery status, the
+/// optimistic flags and the conversation's read watermark, so that every host
+/// renders the same four states from one rule instead of each re-deriving them.
+///
+/// There is no `delivered` here on purpose. The other channels get that from a
+/// provider webhook (WhatsApp, Telegram); a message to an SDK visitor is stored
+/// by our own server, so "stored" and "delivered" are the same instant and a
+/// third tick state would be a distinction the visitor could never observe.
+enum MessageReceipt {
+  /// Written locally, not yet acknowledged by the server.
+  pending,
+
+  /// Stored server-side. No agent has opened it yet.
+  sent,
+
+  /// An agent has opened the conversation and seen it.
+  read,
+
+  /// The send failed and can be retried.
+  failed,
+}
+
 /// Who sent a message. Server (Prisma `SenderType`): AGENT | CUSTOMER | SYSTEM | BOT.
 enum SenderType {
   agent,

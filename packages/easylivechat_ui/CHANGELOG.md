@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.1.54
+
+- The thread shows sent/read ticks on the visitor's own messages: a clock while
+  the send is in flight, one tick once the server has it, two in the workspace
+  accent once an agent has read it. Matches the web widget, so a customer who
+  uses both surfaces reads the same marks. A failed send keeps its worded retry
+  link — it is the only state the visitor can act on, so it stays a sentence
+  rather than becoming an icon to interpret.
+  Each state carries a screen-reader label (`messageSent`, `messageRead`, and
+  the existing `sending`), translated into all 13 locales — the tick is the
+  entire visual, so without them it announced nothing at all.
+  `MessageBubble` takes an optional `agentLastReadAt` for hosts embedding it
+  directly; omitted, it simply never shows the read state.
+
 ## 0.1.53
 
 - Session-divider dates and times are formatted in this package instead of

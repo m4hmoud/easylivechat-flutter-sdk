@@ -162,34 +162,43 @@ class _ThreadViewState extends State<ThreadView> {
         child: ValueListenableBuilder<List<ChatMessage>>(
           valueListenable: EasyLiveChat.instance.messages,
           builder: (context, messages, _) {
-            return ValueListenableBuilder<bool>(
-              valueListenable: EasyLiveChat.instance.agentTyping,
-              builder: (context, typing, _) {
-                // Header row (load-older) + messages + optional typing row.
-                final itemCount = messages.length + 1 + (typing ? 1 : 0);
-                return ListView.builder(
-                  controller: _scroll,
-                  // So the thread can be pulled even when it fits the screen —
-                  // that drag is how a visitor reaches earlier visits.
-                  physics: const AlwaysScrollableScrollPhysics(),
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                  itemCount: itemCount,
-                  itemBuilder: (context, index) {
-                    if (index == 0) return _buildLoadOlder();
-                    final msgIndex = index - 1;
-                    if (msgIndex < messages.length) {
-                      final m = messages[msgIndex];
-                      return MessageBubble(
-                        key: ValueKey(m.id),
-                        message: m,
-                        theme: t,
-                        showAgentName: _showAgentNames,
-                        showAgentAvatar: _showAgentAvatars,
-                        strings: _s,
-                      );
-                    }
-                    // Trailing typing indicator.
-                    return _TypingRow(theme: t, label: _s.agentTyping);
+            return ValueListenableBuilder<DateTime?>(
+              // Rebuilds the thread when an agent reads it, which is what turns
+              // the ticks over on messages already on screen.
+              valueListenable: EasyLiveChat.instance.agentLastReadAt,
+              builder: (context, lastReadAt, _) {
+                return ValueListenableBuilder<bool>(
+                  valueListenable: EasyLiveChat.instance.agentTyping,
+                  builder: (context, typing, _) {
+                    // Header row (load-older) + messages + optional typing row.
+                    final itemCount = messages.length + 1 + (typing ? 1 : 0);
+                    return ListView.builder(
+                      controller: _scroll,
+                      // So the thread can be pulled even when it fits the
+                      // screen — that drag is how a visitor reaches earlier
+                      // visits.
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      itemCount: itemCount,
+                      itemBuilder: (context, index) {
+                        if (index == 0) return _buildLoadOlder();
+                        final msgIndex = index - 1;
+                        if (msgIndex < messages.length) {
+                          final m = messages[msgIndex];
+                          return MessageBubble(
+                            key: ValueKey(m.id),
+                            message: m,
+                            theme: t,
+                            showAgentName: _showAgentNames,
+                            showAgentAvatar: _showAgentAvatars,
+                            strings: _s,
+                            agentLastReadAt: lastReadAt,
+                          );
+                        }
+                        // Trailing typing indicator.
+                        return _TypingRow(theme: t, label: _s.agentTyping);
+                      },
+                    );
                   },
                 );
               },
@@ -246,6 +255,13 @@ class MessageBubble extends StatelessWidget {
   final bool showAgentAvatar;
   final ElcStrings strings;
 
+  /// How far an agent has read, for the visitor's own sent/read ticks.
+  ///
+  /// Optional so a host embedding this widget on its own keeps compiling and
+  /// simply shows a single tick where it would otherwise show a double —
+  /// `EasyLiveChat.instance.agentLastReadAt` is the value to pass.
+  final DateTime? agentLastReadAt;
+
   const MessageBubble({
     super.key,
     required this.message,
@@ -253,6 +269,7 @@ class MessageBubble extends StatelessWidget {
     required this.showAgentName,
     this.showAgentAvatar = true,
     required this.strings,
+    this.agentLastReadAt,
   });
 
   bool get _isCustomer => message.isFromCustomer;
@@ -490,34 +507,39 @@ class MessageBubble extends StatelessWidget {
     final parts = <Widget>[
       Text(time, style: TextStyle(color: textColorMuted, fontSize: 10)),
     ];
-    if (_isCustomer) {
-      if (message.failed) {
-        parts
-          ..add(const SizedBox(width: 6))
-          ..add(GestureDetector(
-            onTap: () {
-              // Re-send and swallow the (already UI-reflected) failure future
-              // so a second failure isn't an unhandled async error.
-              EasyLiveChat.instance
-                  .resend(message)
-                  ?.serverMessageId
-                  .catchError((_) => '');
-            },
-            child: Text(strings.sendFailedRetry,
-                style: const TextStyle(
-                  color: _ThreadErrorColor.color,
-                  fontSize: 10,
-                  decoration: TextDecoration.underline,
-                  decorationColor: _ThreadErrorColor.color,
-                )),
-          ));
-      } else if (message.isOptimistic ||
-          message.deliveryStatus == MessageDeliveryStatus.pending) {
-        parts
-          ..add(const SizedBox(width: 6))
-          ..add(Text(strings.sending,
-              style: TextStyle(color: textColorMuted, fontSize: 10)));
-      }
+    final receipt = message.receiptFor(agentLastReadAt);
+    if (receipt == MessageReceipt.failed) {
+      // The one state that is not a tick. It is the only one the visitor can
+      // act on, so it stays a worded, tappable affordance rather than an icon
+      // they would have to guess at.
+      parts
+        ..add(const SizedBox(width: 6))
+        ..add(GestureDetector(
+          onTap: () {
+            // Re-send and swallow the (already UI-reflected) failure future
+            // so a second failure isn't an unhandled async error.
+            EasyLiveChat.instance
+                .resend(message)
+                ?.serverMessageId
+                .catchError((_) => '');
+          },
+          child: Text(strings.sendFailedRetry,
+              style: const TextStyle(
+                color: _ThreadErrorColor.color,
+                fontSize: 10,
+                decoration: TextDecoration.underline,
+                decorationColor: _ThreadErrorColor.color,
+              )),
+        ));
+    } else if (receipt != null) {
+      parts
+        ..add(const SizedBox(width: 4))
+        ..add(_ReceiptTicks(
+          receipt: receipt,
+          mutedColor: textColorMuted,
+          readColor: theme.primary,
+          strings: strings,
+        ));
     }
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 4),
@@ -893,6 +915,53 @@ class _TypingRowState extends State<_TypingRow>
 /// Destructive color for failed-send markers (kept local to the thread view).
 abstract final class _ThreadErrorColor {
   static const Color color = Color(0xFFDC2626);
+}
+
+/// The visitor's own send status, in the idiom every messaging app uses:
+/// a clock while it is in flight, one tick once the server has it, two in the
+/// workspace's accent once an agent has read it.
+///
+/// Matches the web widget so a customer who uses both surfaces reads the same
+/// marks. `Icons.done`/`done_all` are shape-symmetric, so unlike a chevron they
+/// need no mirroring in Arabic, Sorani, Badini or Urdu — the surrounding Row
+/// already flips their position for those layouts.
+class _ReceiptTicks extends StatelessWidget {
+  final MessageReceipt receipt;
+  final Color mutedColor;
+  final Color readColor;
+  final ElcStrings strings;
+
+  const _ReceiptTicks({
+    required this.receipt,
+    required this.mutedColor,
+    required this.readColor,
+    required this.strings,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final isRead = receipt == MessageReceipt.read;
+    final (IconData icon, String label) = switch (receipt) {
+      MessageReceipt.pending => (Icons.schedule_rounded, strings.sending),
+      MessageReceipt.read => (Icons.done_all_rounded, strings.messageRead),
+      // `failed` never reaches here — the meta row renders its retry link
+      // instead — but an exhaustive switch beats a default that would silently
+      // start ticking failed sends if that ever changed.
+      MessageReceipt.failed => (Icons.done_rounded, strings.messageSent),
+      MessageReceipt.sent => (Icons.done_rounded, strings.messageSent),
+    };
+    return Semantics(
+      label: label,
+      // The time next to it is already read out; the tick is one more fact
+      // about the same message, not a control.
+      excludeSemantics: true,
+      child: Icon(
+        icon,
+        size: 13,
+        color: isRead ? readColor : mutedColor,
+      ),
+    );
+  }
 }
 
 /// The post-chat survey as it appears in the thread.

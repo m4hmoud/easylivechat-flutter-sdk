@@ -111,6 +111,13 @@ class EasyLiveChat {
   ValueListenable<List<ChatMessage>> get messages => _controller.messages;
   ValueListenable<bool> get agentTyping => _controller.agentTyping;
   ValueListenable<int> get unreadCount => _controller.unreadCount;
+
+  /// How far into the thread an agent has read.
+  ///
+  /// Only needed when building your own thread UI — pair it with
+  /// `ChatMessage.receiptFor(agentLastReadAt.value)` to render sent/read ticks.
+  /// The bundled [EasyLiveChatScreen] already does this.
+  ValueListenable<DateTime?> get agentLastReadAt => _controller.agentLastReadAt;
   Stream<ChatMessage> get onMessage => _controller.onMessage;
   Stream<ProactiveMessage> get onProactiveMessage =>
       _controller.onProactiveMessage;

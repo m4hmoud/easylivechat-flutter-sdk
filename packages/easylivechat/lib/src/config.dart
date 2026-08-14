@@ -9,12 +9,15 @@ class EasyLiveChatConfig {
   /// `tenantSlug` on heartbeat/presence.
   final String tenantSlug;
 
-  /// Overrides the device locale sent to the server (`Contact.locale`) and
-  /// used for SDK chrome formatting. Null => device default.
+  /// Overrides the device locale sent to the server and used for SDK chrome
+  /// formatting. Null => device default.
   ///
   /// Free-form: hosts often send a readable language NAME here because it is
-  /// what agents see in the dashboard. Use [contentLocale] to pick the language
-  /// of the tenant's own copy.
+  /// what agents see in the dashboard. That is safe — the server stores a
+  /// locale CODE on the contact and takes it from [contentLocale], keeping an
+  /// unrecognised value for the agent to read rather than treating it as the
+  /// customer's language. Use [contentLocale] to pick the language of the
+  /// tenant's own copy.
   final String? locale;
 
   /// Language code (`en`, `ar`, `ku`, `kmr`…) the tenant's customer-facing copy

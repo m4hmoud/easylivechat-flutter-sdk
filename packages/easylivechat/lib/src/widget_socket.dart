@@ -33,6 +33,7 @@ class WidgetSocket {
   final _onAvailability = StreamController<bool>.broadcast();
   final _onAgentsAccepting = StreamController<bool>.broadcast();
   final _onWorkspaceMode = StreamController<WorkspaceAvailability>.broadcast();
+  final _onMessagesRead = StreamController<DateTime>.broadcast();
   final _onConversationClosed = StreamController<String>.broadcast();
   final _onProactive = StreamController<ProactiveMessage>.broadcast();
   final _onConnectionChange = StreamController<bool>.broadcast();
@@ -63,6 +64,15 @@ class WidgetSocket {
   /// and why. [onAvailability] and [onAgentsAccepting] are the raw gates that
   /// feed it; this is the answer they add up to, and it is the one to render.
   Stream<WorkspaceAvailability> get onWorkspaceMode => _onWorkspaceMode.stream;
+
+  /// `messages:read` — `{ conversationId, readAt }`, emitted when an agent
+  /// opens the conversation or reads into it live.
+  ///
+  /// A watermark, not a message id: the server stamps *every* unread visitor
+  /// message in one update and announces the instant it did so, so everything
+  /// the visitor sent at or before [readAt] has been read. The counterpart to
+  /// [reportSeen], which reports the same thing in the other direction.
+  Stream<DateTime> get onMessagesRead => _onMessagesRead.stream;
 
   /// `conversation:closed` — `{ conversationId }`. NOTE: the server emits on
   /// ANY *→CLOSED PATCH (not only OPEN→CLOSED) — consumers must guard against
@@ -169,6 +179,18 @@ class WidgetSocket {
       // to the permissive defaults inside WorkspaceAvailability.
       if (m != null && !_onWorkspaceMode.isClosed) {
         _onWorkspaceMode.add(WorkspaceAvailability.fromJson(m));
+      }
+    });
+
+    socket.on('messages:read', (data) {
+      final m = _asMap(data);
+      final raw = m?['readAt'];
+      // A malformed or missing timestamp is dropped rather than defaulted to
+      // now: "now" would mark every message in the thread read on the strength
+      // of a payload we could not read.
+      final at = raw is String ? DateTime.tryParse(raw) : null;
+      if (at != null && !_onMessagesRead.isClosed) {
+        _onMessagesRead.add(at.toLocal());
       }
     });
 
@@ -321,6 +343,7 @@ class WidgetSocket {
     _onAvailability.close();
     _onAgentsAccepting.close();
     _onWorkspaceMode.close();
+    _onMessagesRead.close();
     _onConversationClosed.close();
     _onProactive.close();
     _onConnectionChange.close();

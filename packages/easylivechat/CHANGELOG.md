@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.1.46
+
+- Sent/read receipts for the visitor's own messages. `ChatMessage.readByAgent`
+  parses the read flag the server already sends on history (`read` on the REST
+  rows, `readByAgentAt` on the raw socket row), the `messages:read` event is now
+  handled, and `SessionController.agentLastReadAt` — also on the public client —
+  tracks how far into the thread an agent has read.
+  `ChatMessage.receiptFor(agentLastReadAt)` turns the two into one of
+  `MessageReceipt.{pending,sent,read,failed}`, so a host building its own thread
+  renders the same states as the bundled UI instead of re-deriving them.
+  The reporting half of this (telling the server the visitor is looking) already
+  worked; only the display half was missing, so an SDK visitor could never see
+  whether anyone had read them.
+  The watermark is seeded from history as well as from live events, so a visitor
+  whose messages were read while the app was closed sees that on the first frame
+  rather than after the next agent action. It never moves backwards: the events
+  are per-agent, and a colleague opening the thread later reports the moment
+  *they* read it. It is not applied to a message still carrying its local `tmp-`
+  id, whose timestamp is the device's rather than the server's — comparing the
+  two across clock skew would show a message as read that nobody had opened.
+
 ## 0.1.45
 
 - "Close chat" works on a second visit. The post-chat survey is offered once per
