@@ -1,5 +1,45 @@
 # Changelog
 
+## 0.1.48
+
+- `EasyLiveChat.reset()` — forget who this visitor is. Call it from the host
+  app's logout path.
+  `shutdown()` only clears memory; the durable `visitorId` survives it, so the
+  next boot resolved the same server-side contact and resumed the same
+  conversation. That is right for a returning customer and wrong for a
+  signed-out one: the server keeps a name it already holds when a client sends
+  none — an anonymous resume knows only the id and must not wipe a real
+  customer's name — so the next person to open the chat on that device was
+  greeted by the previous person's name and carried on inside their transcript.
+  On a shared device, a restaurant tablet or a POS terminal, that is somebody
+  else's identity. There was previously no API that could say otherwise.
+  Drops the visitorId, token, cached profile and conversation id, then tears
+  down. The next boot mints a fresh visitorId, so the server sees a new contact
+  with nothing to resume: history comes back empty and the "load earlier"
+  affordance correctly stays hidden. The transcript is not deleted — this
+  abandons the identity, not the history, and agents keep the old thread.
+  Takes an optional `storage:` so it still works when the SDK was never booted
+  this session, which is the common case for a logout that never opened the
+  chat. `StorageKeys.identity` lists the durable keys it clears, so a new one
+  cannot be added and silently left behind.
+
+## 0.1.47
+
+- The agent's name and photo survive a `message:updated`. `senderName` /
+  `senderAvatarUrl` / `senderJobTitle` are resolved by the server per viewer
+  rather than stored on the message, and only some paths add them: a delivery
+  receipt or a media re-host re-broadcasts the raw row without them. Applying
+  one blanked a bubble that already had a face — and the visitor's own read
+  receipt fires exactly that update seconds after every reply lands, so the
+  agent appeared and then disappeared, coming back only on restart when history
+  was read again.
+  `ChatMessage.withIdentityFrom` inherits the identity a held row already has
+  when the incoming one carries none, applied on both `message:updated` and the
+  dedup path of `message:new`. A row that carries its own identity always keeps
+  it, so a workspace with the avatar/name switches off still renders faceless.
+  Fixed server-side too; this keeps an app already in the field correct against
+  a server that has not been updated yet.
+
 ## 0.1.46
 
 - Sent/read receipts for the visitor's own messages. `ChatMessage.readByAgent`

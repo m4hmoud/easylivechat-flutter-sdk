@@ -76,4 +76,40 @@ void main() {
       expect(m.senderJobTitle, 'Support Lead');
     });
   });
+
+  // `message:updated` re-broadcasts the raw row, which has no identity on it.
+  // Clients replace by id, so applying one blanked a bubble that already had a
+  // face — and the visitor's own read receipt fires one seconds after every
+  // reply lands, which is what made the agent appear and then disappear.
+  group('ChatMessage.withIdentityFrom — a bare update', () {
+    final held = ChatMessage.fromAny(agentMessage());
+    final bare = ChatMessage.fromAny({
+      ...agentMessage(name: null, avatar: null, jobTitle: null),
+      'deliveryStatus': 'READ',
+    });
+
+    test('inherits the face the held row already had', () {
+      final merged = bare.withIdentityFrom(held);
+      expect(merged.senderName, 'Ava');
+      expect(merged.senderAvatarUrl, '/uploads/t1/ava.jpg');
+      expect(merged.senderJobTitle, 'Support Lead');
+      // …without undoing what the update actually carried.
+      expect(merged.deliveryStatus, MessageDeliveryStatus.read);
+    });
+
+    test('a row that carries its own identity keeps it', () {
+      final named = ChatMessage.fromAny(agentMessage(name: 'Bea', avatar: null));
+      final merged = named.withIdentityFrom(held);
+      expect(merged.senderName, 'Bea');
+      expect(merged.senderAvatarUrl, isNull);
+    });
+
+    // Switches off means the server sends nulls on purpose; there is no earlier
+    // face to inherit, and none is invented.
+    test('stays faceless when neither row has an identity', () {
+      final merged = bare.withIdentityFrom(bare);
+      expect(merged.senderName, isNull);
+      expect(merged.senderAvatarUrl, isNull);
+    });
+  });
 }

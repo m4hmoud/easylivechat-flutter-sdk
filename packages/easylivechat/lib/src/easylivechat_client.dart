@@ -218,4 +218,42 @@ class EasyLiveChat {
     _c?.dispose();
     _c = null;
   }
+
+  /// Forget who this visitor is. Call this from your app's LOGOUT path.
+  ///
+  /// [shutdown] only clears memory; the durable `visitorId` survives it, so the
+  /// next [boot] resolves the same server-side contact and resumes the same
+  /// conversation. That is right for a returning customer and wrong for a
+  /// signed-out one: the contact keeps the name it already holds when a client
+  /// sends none, so the next person to open the chat on that device was greeted
+  /// by the previous person's name and carried on inside their transcript. On a
+  /// shared device — a restaurant tablet, a POS terminal — that is somebody
+  /// else's identity.
+  ///
+  /// This drops the visitorId, token, cached profile and conversation id, then
+  /// tears down. The next [boot] mints a fresh visitorId, so the server sees a
+  /// new contact with nothing to resume: no history, no "load earlier"
+  /// affordance, and the greeting resolves against the workspace's own
+  /// `defaultCustomerName` for the visitor's language instead of a stale name.
+  ///
+  /// The transcript is not deleted — this abandons the identity, not the
+  /// history. Agents keep the old thread.
+  ///
+  /// Safe to call when the SDK was never booted this session, which is the
+  /// common case for a logout that never opened the chat — pass the same
+  /// [storage] you pass to [boot] so the keys can still be cleared. When it IS
+  /// booted the controller's own storage is used and the argument is ignored.
+  Future<void> reset({EasyLiveChatStorage? storage}) async {
+    final c = _c;
+    if (c != null) {
+      await c.resetVisitor();
+      c.dispose();
+      _c = null;
+      return;
+    }
+    if (storage == null) return;
+    for (final key in StorageKeys.identity) {
+      await storage.delete(key);
+    }
+  }
 }

@@ -702,6 +702,34 @@ class SessionController {
   /// clearing the local copy keeps the two from disagreeing. The in-memory id
   /// and token stay put so the post-chat submission can still reach the
   /// conversation it belongs to.
+  /// Forget who this visitor is — everything that survives a cold start.
+  ///
+  /// [endChat] clears the session but deliberately keeps the `visitorId`,
+  /// because the same person coming back belongs in the thread they already
+  /// have. Signing OUT is the opposite: the next person to open the chat may
+  /// be someone else entirely, and on a shared device — a restaurant tablet,
+  /// a POS terminal — they must not inherit the last one's identity.
+  ///
+  /// Without this there was no way to say so. The contact is keyed on the
+  /// stored `visitorId`, and the server keeps a name it already holds when a
+  /// client sends none (an anonymous resume knows only the id, and must not
+  /// wipe a real customer's name). So a signed-out visitor was still greeted
+  /// by the name from their last signed-in session, and their chat continued
+  /// inside the previous person's contact and transcript.
+  ///
+  /// The transcript is NOT deleted — this abandons the identity, not the
+  /// history. Agents keep the old thread; the visitor simply starts a new one.
+  ///
+  /// Call it from the host app's logout path, then [boot] again (or let the
+  /// next [open] do it). The next boot mints a fresh `visitorId`, so the
+  /// server sees a new contact with no conversation to resume: history comes
+  /// back empty and the "load earlier" affordance correctly stays hidden.
+  Future<void> resetVisitor() async {
+    for (final key in StorageKeys.identity) {
+      await storage.delete(key);
+    }
+  }
+
   Future<bool> endChat() async {
     final socket = _socket;
     final id = _conversationId;
@@ -1028,8 +1056,10 @@ class SessionController {
     final list = messages.value;
     final existingIdx = list.indexWhere((m) => m.id == msg.id);
     if (existingIdx != -1) {
-      // Already have it (e.g. our own echo already reconciled) — refresh row.
-      final next = List<ChatMessage>.of(list)..[existingIdx] = msg;
+      // Already have it (e.g. our own echo already reconciled) — refresh row,
+      // keeping the sender's face if the refresh arrived without one.
+      final next = List<ChatMessage>.of(list)
+        ..[existingIdx] = msg.withIdentityFrom(list[existingIdx]);
       _setMessages(_dedupSort(next));
       return;
     }
@@ -1075,7 +1105,11 @@ class SessionController {
       _appendMessage(msg);
       return;
     }
-    final next = List<ChatMessage>.of(list)..[idx] = msg;
+    // A media re-host or a delivery receipt patches the row and re-broadcasts
+    // it; on older servers that copy carries no sender name or photo. Replacing
+    // wholesale erased the agent's face from a bubble that already had one —
+    // see [ChatMessage.withIdentityFrom].
+    final next = List<ChatMessage>.of(list)..[idx] = msg.withIdentityFrom(list[idx]);
     _setMessages(_dedupSort(next));
   }
 

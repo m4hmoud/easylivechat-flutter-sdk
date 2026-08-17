@@ -19,6 +19,15 @@ abstract final class StorageKeys {
   static const profile = 'livechattools:visitorProfile';
   static const token = 'easylivechat:widgetToken';
   static const conversationId = 'easylivechat:conversationId';
+
+  /// Everything that says WHO this visitor is, in the order it should be
+  /// dropped — the `visitorId` last, because it is the one the server keys the
+  /// contact on and the others are meaningless without it.
+  ///
+  /// Used by `EasyLiveChat.reset()`. Kept here so the list cannot drift from
+  /// the keys above: a new durable key added and not listed would survive a
+  /// logout and quietly re-identify the next person on the device.
+  static const identity = <String>[token, conversationId, profile, visitorId];
 }
 
 /// Ephemeral, process-lifetime storage. Do NOT use in production — the

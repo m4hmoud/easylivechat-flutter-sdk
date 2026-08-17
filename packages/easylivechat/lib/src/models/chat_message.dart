@@ -274,6 +274,49 @@ class ChatMessage {
     );
   }
 
+  /// True when this row says nothing about who sent it.
+  bool get _hasNoIdentity =>
+      senderName == null && senderAvatarUrl == null && senderJobTitle == null;
+
+  /// Keep the face that a bare row would erase.
+  ///
+  /// `senderName` / `senderAvatarUrl` / `senderJobTitle` are not columns — the
+  /// server resolves them per viewer and adds them on the way out. Only some
+  /// paths do: `message:updated` (a delivery receipt, a media re-host) fans out
+  /// the raw row, and since clients replace by id, applying it blanked the
+  /// agent's name and photo on a bubble that already had them. The visitor's
+  /// own read receipt fires that update seconds after every reply lands, so the
+  /// face appeared and then vanished, and only came back on restart when
+  /// history was read again.
+  ///
+  /// Fixed server-side; this keeps an app already in the field from being
+  /// blanked by a server that hasn't been updated yet. Identity never changes
+  /// for a given message, so inheriting it is always sound — and a row that
+  /// does carry its own always keeps it.
+  ChatMessage withIdentityFrom(ChatMessage previous) {
+    if (!_hasNoIdentity || previous._hasNoIdentity) return this;
+    return ChatMessage(
+      id: id,
+      conversationId: conversationId,
+      tenantId: tenantId,
+      senderAgentId: senderAgentId ?? previous.senderAgentId,
+      senderName: previous.senderName,
+      senderAvatarUrl: previous.senderAvatarUrl,
+      senderJobTitle: previous.senderJobTitle,
+      body: body,
+      senderType: senderType,
+      contentType: contentType,
+      attachmentUrls: attachmentUrls,
+      attachments: attachments,
+      deliveryStatus: deliveryStatus,
+      readByAgent: readByAgent,
+      createdAt: createdAt,
+      isOptimistic: isOptimistic,
+      failed: failed,
+      metadata: metadata,
+    );
+  }
+
   ChatMessage copyWith({
     String? id,
     MessageDeliveryStatus? deliveryStatus,

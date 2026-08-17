@@ -1,5 +1,45 @@
 # Changelog
 
+## 0.1.58
+
+- Requires `easylivechat` 0.1.48 for `EasyLiveChat.reset()`. Nothing in this
+  package changed; raising the constraint is what guarantees a host resolving
+  fresh gets the new API rather than a version without it.
+
+## 0.1.57
+
+- A message that is only pictures no longer sits in a bubble. The bubble exists
+  to put a surface behind text, and wrapped around a photo it read as a thick
+  coloured frame — on the visitor's own side that is the full accent colour, so
+  their own images arrived matted in it. The tile already rounds its own
+  corners, so the photo now renders bare, the way every other messenger draws
+  one.
+  Deliberately narrow: a caption still gets its bubble, and so do file chips and
+  unavailable-media placeholders, which read as controls and would float loose
+  without a surface behind them.
+
+## 0.1.56
+
+- The thread follows the visitor's own message down again. Auto-scroll was gated
+  on already being near the bottom, on the assumption that a send always comes
+  from there — it doesn't. Scroll up to re-read something, answer it from where
+  you are, and the message landed off screen, so the thread looked like it had
+  swallowed what you just sent. The keyboard opening moves the scroll extent
+  too, which could push a visitor out of the window without their having
+  scrolled at all.
+  Their own message now always scrolls into view. An incoming one still respects
+  the gate, so an agent's reply cannot yank someone out of history they are in
+  the middle of reading.
+
+## 0.1.55
+
+- Requires `easylivechat` 0.1.47, which stops the replying agent's name and
+  photo being wiped off a bubble by the delivery receipt the visitor's own
+  client sends moments later. Nothing in this package changed: `MessageBubble`
+  renders whatever identity the message carries, and it was the message losing
+  it. Raising the constraint is what guarantees a host resolving fresh picks up
+  the fix rather than staying on 0.1.46.
+
 ## 0.1.54
 
 - The thread shows sent/read ticks on the visitor's own messages: a clock while

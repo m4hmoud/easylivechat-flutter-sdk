@@ -83,14 +83,27 @@ class _ThreadViewState extends State<ThreadView> {
   }
 
   void _onMessages() {
-    final count = EasyLiveChat.instance.messages.value.length;
-    // Auto-scroll only when a *new* (appended) message arrives, not when
-    // older history is prepended — and only if the user is already near the
-    // bottom, so an incoming reply doesn't yank them away from history they're
-    // reading. (Their own send is from the bottom, so it still scrolls.)
+    final msgs = EasyLiveChat.instance.messages.value;
+    final count = msgs.length;
+    // Auto-scroll only when a *new* (appended) message arrives, not when older
+    // history is prepended.
     final appended = count > _lastCount && !_loadingOlder;
     _lastCount = count;
-    if (appended && _isNearBottom()) {
+    if (!appended) return;
+
+    // The visitor's OWN message always follows itself down. This used to be
+    // gated on `_isNearBottom()` alone, on the assumption — written into the
+    // comment here — that "their own send is from the bottom, so it still
+    // scrolls". It isn't: they can scroll up to re-read something, type a
+    // reply to it, and send from there. The gate then failed and their message
+    // landed off-screen, so the thread looked like it had swallowed it. The
+    // keyboard opening moves `maxScrollExtent` too, which could push them out
+    // of the 160px window without their having scrolled at all.
+    //
+    // An INBOUND message still respects the gate: an agent's reply must not
+    // yank the visitor out of history they are in the middle of reading.
+    final own = msgs.isNotEmpty && msgs.last.isFromCustomer;
+    if (own || _isNearBottom()) {
       WidgetsBinding.instance.addPostFrameCallback((_) => _animateToBottom());
     }
   }
@@ -415,9 +428,17 @@ class MessageBubble extends StatelessWidget {
             maxWidth: maxBubble,
           ),
           child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            // A message that is only pictures gets no bubble. The bubble exists
+            // to put a surface behind text; wrapped around a photo it becomes a
+            // thick coloured frame — on the visitor's own side that is the full
+            // accent colour, so their own images arrived matted in orange.
+            // Every other messenger renders a bare photo, and the tile already
+            // rounds its own corners.
+            padding: _isImageOnly
+                ? EdgeInsets.zero
+                : const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
             decoration: BoxDecoration(
-              color: bubbleColor,
+              color: _isImageOnly ? Colors.transparent : bubbleColor,
               // Logical corners: the tail hugs the sender's own side in RTL
               // as well — bottomStart/bottomEnd flip with the layout,
               // physical left/right did not.
@@ -427,7 +448,7 @@ class MessageBubble extends StatelessWidget {
                 bottomStart: Radius.circular(_isCustomer ? 16 : 4),
                 bottomEnd: Radius.circular(_isCustomer ? 4 : 16),
               ),
-              border: _isCustomer
+              border: _isCustomer || _isImageOnly
                   ? null
                   : Border.all(color: theme.text.withValues(alpha: 0.08)),
             ),
@@ -550,6 +571,26 @@ class MessageBubble extends StatelessWidget {
   // ── attachment rendering ──
 
   /// Build attachment tiles, preferring the rich rehosted list when present.
+  /// True when this message is nothing but pictures that will actually render.
+  ///
+  /// Deliberately strict. A caption needs the bubble behind it, and so does a
+  /// file chip or an unavailable-media placeholder — those read as controls and
+  /// would float loose without a surface. Only when every tile is a real,
+  /// resolvable image and there is no text does the bubble stop earning its
+  /// place.
+  bool get _isImageOnly {
+    if ((message.body ?? '').trim().isNotEmpty) return false;
+    if (message.attachments.isNotEmpty) {
+      return message.attachments
+          .every((a) => a.isResolvable && a.kind == AttachmentKind.image);
+    }
+    if (message.attachmentUrls.isNotEmpty) {
+      return message.attachmentUrls
+          .every((u) => _isResolvableUrl(u) && _looksLikeImage(u));
+    }
+    return false;
+  }
+
   List<Widget> _attachmentTiles(Color fg) {
     final tiles = <Widget>[];
     if (message.attachments.isNotEmpty) {
