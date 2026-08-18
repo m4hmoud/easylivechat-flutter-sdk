@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.1.59
+
+- The keyboard stays up when you send. Flutter's default finalize-editing
+  unfocuses the field for `TextInputAction.send`, so tapping the keyboard's
+  send key collapsed the keyboard on every message — and made the thread shake:
+  the viewport grew as the keyboard left while the auto-scroll was already
+  animating to the old extent, so the list scrolled, resized and settled again.
+  Supplying `onEditingComplete` replaces that default, which is the documented
+  way to keep focus; the send stays on `onSubmitted` so nothing sends twice,
+  and `clearComposing()` still runs so an in-progress IME composition does not
+  survive the send.
+
 ## 0.1.58
 
 - Requires `easylivechat` 0.1.48 for `EasyLiveChat.reset()`. Nothing in this

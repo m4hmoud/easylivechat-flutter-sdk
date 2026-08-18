@@ -382,6 +382,23 @@ class _ComposerBarState extends State<ComposerBar> {
         // asked for something the composer would then refuse.
         enabled: !_locked,
         textInputAction: TextInputAction.send,
+        // Keep the keyboard up across a send, the way every messenger does.
+        //
+        // Flutter's default finalize-editing UNFOCUSES the field for
+        // `TextInputAction.send`, so tapping the keyboard's send key collapsed
+        // the keyboard on every message. That also made the thread lurch: the
+        // viewport grew as the keyboard left while the auto-scroll was already
+        // animating to the old extent, so the list scrolled, resized, and
+        // settled again — a visible shake on each send.
+        //
+        // Supplying `onEditingComplete` REPLACES that default wholesale (see
+        // EditableText._finalizeEditing), which is the documented way to keep
+        // focus. `clearComposing()` is the rest of what the default did and
+        // still has to happen — without it an in-progress IME composition
+        // survives the send. The send itself stays on `onSubmitted`, which
+        // fires unconditionally afterwards; doing it here as well would send
+        // the message twice.
+        onEditingComplete: () => _controller.clearComposing(),
         onSubmitted: (_) => _send(),
         style: TextStyle(color: t.text, fontSize: 15),
         decoration: InputDecoration(
