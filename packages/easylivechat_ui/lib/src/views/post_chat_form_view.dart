@@ -432,6 +432,17 @@ class _PostChatFormViewState extends State<PostChatFormView> {
 
   Widget _buildSubmitButton() {
     final t = _theme;
+    // Take the host app's typeface with us.
+    //
+    // `styleFrom(textStyle:)` REPLACES a button's text style rather than
+    // merging into it, so a bare TextStyle here drops the app's fontFamily
+    // (and the package it ships in) and falls back to Material's default —
+    // which is why Submit could render in a different face from the rest of
+    // the form. Deriving from the ambient theme keeps the family and overrides
+    // only size and weight. Same reasoning as the end-chat dialog, which
+    // already does this for its two buttons.
+    final buttonBase =
+        Theme.of(context).textTheme.labelLarge ?? const TextStyle();
     return SizedBox(
       // Full width, like the fields it sits under. Sized to its label, the
       // primary action of the form read as a small chip adrift in the middle
@@ -446,6 +457,10 @@ class _PostChatFormViewState extends State<PostChatFormView> {
           disabledBackgroundColor: t.primary.withValues(alpha: 0.5),
           elevation: 0,
           padding: EdgeInsets.zero,
+          textStyle: buttonBase.copyWith(
+            fontSize: 15,
+            fontWeight: FontWeight.w600,
+          ),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
           ),
@@ -460,13 +475,7 @@ class _PostChatFormViewState extends State<PostChatFormView> {
                       AlwaysStoppedAnimation<Color>(_onColor(t.primary)),
                 ),
               )
-            : Text(
-                _s.submit,
-                style: const TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
+            : Text(_s.submit),
       ),
     );
   }

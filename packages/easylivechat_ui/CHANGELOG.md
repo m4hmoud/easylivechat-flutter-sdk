@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.1.60
+
+- The post-chat form's Submit button takes the host app's typeface. Its label
+  carried a bare `TextStyle`, and `ElevatedButton.styleFrom(textStyle:)`
+  replaces a button's text style rather than merging into it — so the family
+  the app had set was dropped and Submit could render in a different face from
+  the form around it. The style is now derived from the ambient
+  `textTheme.labelLarge`, keeping the family (and the package it ships in) and
+  overriding only size and weight, the way the end-chat dialog already did.
+
 ## 0.1.59
 
 - The keyboard stays up when you send. Flutter's default finalize-editing
