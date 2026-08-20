@@ -1,7 +1,8 @@
 import 'dart:async';
 
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:easylivechat/easylivechat.dart';
-import 'package:flutter/foundation.dart' show ValueListenable;
+import 'package:flutter/foundation.dart' show ValueListenable, Uint8List;
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
@@ -9,6 +10,7 @@ import 'package:image_picker/image_picker.dart';
 import '../l10n.dart';
 import '../picked_file.dart';
 import '../theme.dart';
+import 'image_viewer.dart';
 
 /// The message composer (native analog of the web `Composer.tsx`).
 ///
@@ -45,8 +47,9 @@ class _ComposerBarState extends State<ComposerBar> {
   Timer? _typingKeepAlive;
   bool _typingActive = false;
 
-  /// Pending uploaded attachment URLs awaiting send.
-  final List<UploadedFile> _pending = [];
+  /// Uploaded attachments awaiting send, each with the bytes it was uploaded
+  /// from so the strip can draw the picture rather than name it.
+  final List<_PendingAttachment> _pending = [];
   bool _uploading = false;
   String? _attachError;
 
@@ -121,7 +124,7 @@ class _ComposerBarState extends State<ComposerBar> {
 
   void _send() {
     final text = _controller.text.trim();
-    final urls = _pending.map((f) => f.url).toList(growable: false);
+    final urls = _pending.map((p) => p.file.url).toList(growable: false);
     if (text.isEmpty && urls.isEmpty) return;
 
     _stopTyping();
@@ -213,7 +216,16 @@ class _ComposerBarState extends State<ComposerBar> {
         contentType: contentType,
       );
       if (!mounted) return;
-      setState(() => _pending.add(uploaded));
+      setState(() => _pending.add(
+            // Keep the bytes we already read: the thumbnail is then instant and
+            // offline, instead of pulling the visitor's own photo back down
+            // from the server to show it to them.
+            _PendingAttachment(
+              file: uploaded,
+              bytes: bytes is Uint8List ? bytes : Uint8List.fromList(bytes),
+              pickedContentType: contentType,
+            ),
+          ));
     } on EasyLiveChatError catch (e) {
       _showAttachError(message: _s.forErrorCode(e.code));
     } catch (_) {
@@ -430,50 +442,148 @@ class _ComposerBarState extends State<ComposerBar> {
     );
   }
 
+  /// The row of attachments waiting to be sent.
+  ///
+  /// Pictures show as pictures. This used to be a paperclip chip carrying
+  /// `IMG_20260814_113255.jpg`, which told the visitor nothing about which of
+  /// four screenshots they had just picked — the one thing they need to check
+  /// before hitting send. Non-images keep the chip, because a filename IS what
+  /// identifies a PDF.
   Widget _pendingStrip() {
-    final t = _theme;
     return SizedBox(
-      height: 56,
+      // 12 + 56 (tile) + 4, with the top padding leaving room for the remove
+      // badge that overhangs the corner.
+      height: 72,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
+        padding: const EdgeInsets.fromLTRB(12, 12, 12, 4),
         itemCount: _pending.length,
         separatorBuilder: (_, __) => const SizedBox(width: 8),
         itemBuilder: (context, i) {
-          final f = _pending[i];
-          return Container(
-            padding: const EdgeInsetsDirectional.only(start: 10, end: 4),
-            decoration: BoxDecoration(
-              color: t.surface,
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: t.text.withValues(alpha: 0.12)),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(Icons.insert_drive_file_outlined,
-                    size: 16, color: t.text.withValues(alpha: 0.7)),
-                const SizedBox(width: 6),
-                ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 120),
-                  child: Text(
-                    f.filename ?? _s.attachment,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(color: t.text, fontSize: 13),
-                  ),
-                ),
-                IconButton(
-                  visualDensity: VisualDensity.compact,
-                  iconSize: 16,
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(),
-                  onPressed: () => _removePending(i),
-                  icon: Icon(Icons.close, color: t.text.withValues(alpha: 0.6)),
-                ),
-              ],
-            ),
-          );
+          final p = _pending[i];
+          final thumb = p.thumbnail;
+          return thumb == null ? _pendingChip(p, i) : _pendingThumb(p, thumb, i);
         },
+      ),
+    );
+  }
+
+  Widget _pendingThumb(_PendingAttachment p, ImageProvider thumb, int index) {
+    const size = 56.0;
+    return SizedBox(
+      width: size,
+      height: size,
+      child: Stack(
+        // The remove badge sits on the corner, half outside the tile.
+        clipBehavior: Clip.none,
+        children: [
+          Positioned.fill(
+            child: GestureDetector(
+              // Same affordance as a sent image: tap to see it full-size,
+              // which is the only way to be sure it is the right screenshot.
+              onTap: () => ElcImageViewer.show(
+                context,
+                image: p.fullImage!,
+                theme: _theme,
+                strings: _s,
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(10),
+                child: Image(
+                  // Decoded at tile size — a 12MP camera photo decoded to fill
+                  // a 56px box would cost ~50MB of image cache per attachment.
+                  image: ResizeImage(thumb, width: (size * 3).round()),
+                  fit: BoxFit.cover,
+                  width: size,
+                  height: size,
+                  errorBuilder: (_, __, ___) => _thumbFallback(),
+                ),
+              ),
+            ),
+          ),
+          PositionedDirectional(top: -12, end: -12, child: _removeBadge(index)),
+        ],
+      ),
+    );
+  }
+
+  Widget _thumbFallback() {
+    final t = _theme;
+    return Container(
+      color: t.surface,
+      alignment: Alignment.center,
+      child: Icon(Icons.broken_image_outlined,
+          size: 20, color: t.text.withValues(alpha: 0.5)),
+    );
+  }
+
+  /// A 20px badge in a 32px touch target, so the corner × is hittable without
+  /// covering the picture it sits on.
+  Widget _removeBadge(int index) {
+    final t = _theme;
+    return Semantics(
+      button: true,
+      label: _s.removeAttachment,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: () => _removePending(index),
+        child: SizedBox(
+          width: 32,
+          height: 32,
+          child: Center(
+            child: Container(
+              width: 20,
+              height: 20,
+              decoration: BoxDecoration(
+                color: const Color(0xFF0F172A).withValues(alpha: 0.72),
+                shape: BoxShape.circle,
+                // Ring in the composer's own background so the badge separates
+                // from a dark photo underneath it.
+                border: Border.all(color: t.background, width: 1.5),
+              ),
+              child: const Icon(Icons.close, size: 12, color: Colors.white),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _pendingChip(_PendingAttachment p, int index) {
+    final t = _theme;
+    return Center(
+      child: Container(
+        padding: const EdgeInsetsDirectional.only(start: 10, end: 4),
+        decoration: BoxDecoration(
+          color: t.surface,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: t.text.withValues(alpha: 0.12)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.insert_drive_file_outlined,
+                size: 16, color: t.text.withValues(alpha: 0.7)),
+            const SizedBox(width: 6),
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 120),
+              child: Text(
+                p.file.filename ?? _s.attachment,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(color: t.text, fontSize: 13),
+              ),
+            ),
+            IconButton(
+              visualDensity: VisualDensity.compact,
+              iconSize: 16,
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(),
+              tooltip: _s.removeAttachment,
+              onPressed: () => _removePending(index),
+              icon: Icon(Icons.close, color: t.text.withValues(alpha: 0.6)),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -488,5 +598,58 @@ class _ComposerBarState extends State<ComposerBar> {
         style: const TextStyle(color: Color(0xFFDC2626), fontSize: 12),
       ),
     );
+  }
+}
+
+/// One uploaded-but-not-yet-sent attachment, plus what it takes to preview it.
+class _PendingAttachment {
+  final UploadedFile file;
+
+  /// The bytes the file was uploaded from, kept until send so the strip can
+  /// draw a thumbnail without a round trip. Dropped with the whole record when
+  /// the message goes out or the visitor removes it.
+  final Uint8List? bytes;
+
+  /// Content type as reported by the picker. The server's echoed `mimeType` is
+  /// preferred over it, but `file_picker` hands back neither for some sources,
+  /// which is why the extension check below still exists.
+  final String? pickedContentType;
+
+  const _PendingAttachment({
+    required this.file,
+    this.bytes,
+    this.pickedContentType,
+  });
+
+  bool get isImage {
+    final mime = (file.mimeType ?? pickedContentType ?? '').toLowerCase();
+    if (mime.isNotEmpty) return mime.startsWith('image/');
+    return _looksLikeImage(file.filename ?? file.url);
+  }
+
+  /// Thumbnail source: local bytes when we have them, else the uploaded copy.
+  /// Null for anything that is not a picture — the caller draws a chip.
+  ImageProvider? get thumbnail {
+    if (!isImage) return null;
+    final b = bytes;
+    if (b != null && b.isNotEmpty) return MemoryImage(b);
+    return CachedNetworkImageProvider(
+      EasyLiveChat.instance.resolveUrl(file.url),
+    );
+  }
+
+  /// Full-resolution provider for the tap-to-enlarge viewer. Same source as
+  /// [thumbnail]; separate getter because the thumbnail is decoded downsized.
+  ImageProvider? get fullImage => thumbnail;
+
+  static bool _looksLikeImage(String name) {
+    final path = name.toLowerCase().split('?').first;
+    return path.endsWith('.png') ||
+        path.endsWith('.jpg') ||
+        path.endsWith('.jpeg') ||
+        path.endsWith('.gif') ||
+        path.endsWith('.webp') ||
+        path.endsWith('.bmp') ||
+        path.endsWith('.heic');
   }
 }

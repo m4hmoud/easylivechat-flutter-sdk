@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 
 import '../l10n.dart';
 import '../theme.dart';
+import 'image_viewer.dart';
 import 'linkified_text.dart';
 
 /// The message thread (native analog of the web `Thread.tsx`).
@@ -391,7 +392,7 @@ class MessageBubble extends StatelessWidget {
         _isCustomer ? CrossAxisAlignment.end : CrossAxisAlignment.start;
 
     final body = (message.body ?? '').trim();
-    final tiles = _attachmentTiles(textColor);
+    final tiles = _attachmentTiles(context, textColor);
     // An avatar sits beside every inbound bubble when the workspace has the
     // switch on. System notices never reach here — they return above — so what
     // is left is the team talking, and the team gets a face.
@@ -591,70 +592,83 @@ class MessageBubble extends StatelessWidget {
     return false;
   }
 
-  List<Widget> _attachmentTiles(Color fg) {
+  List<Widget> _attachmentTiles(BuildContext context, Color fg) {
     final tiles = <Widget>[];
     if (message.attachments.isNotEmpty) {
       for (final a in message.attachments) {
-        tiles.add(_richTile(a, fg));
+        tiles.add(_richTile(context, a, fg));
       }
       return tiles;
     }
     for (final raw in message.attachmentUrls) {
-      tiles.add(_urlTile(raw, fg));
+      tiles.add(_urlTile(context, raw, fg));
     }
     return tiles;
   }
 
-  Widget _richTile(RehostedAttachment a, Color fg) {
+  Widget _richTile(BuildContext context, RehostedAttachment a, Color fg) {
     if (!a.isResolvable) {
       return _unavailableChip(fg);
     }
     final url = EasyLiveChat.instance.resolveUrl(a.url);
     if (a.kind == AttachmentKind.image) {
-      return _inlineImage(url, fg);
+      return _inlineImage(context, url, fg);
     }
     return _fileChip(a.filename ?? _basename(a.url), fg);
   }
 
-  Widget _urlTile(String raw, Color fg) {
+  Widget _urlTile(BuildContext context, String raw, Color fg) {
     if (!_isResolvableUrl(raw)) {
       // wa:media:{id} and similar placeholders.
       return _unavailableChip(fg);
     }
     final url = EasyLiveChat.instance.resolveUrl(raw);
     if (_looksLikeImage(raw)) {
-      return _inlineImage(url, fg);
+      return _inlineImage(context, url, fg);
     }
     return _fileChip(_basename(raw), fg);
   }
 
-  Widget _inlineImage(String url, Color fg) {
+  Widget _inlineImage(BuildContext context, String url, Color fg) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 4),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(10),
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxHeight: 220, maxWidth: 240),
-          child: CachedNetworkImage(
-            imageUrl: url,
-            fit: BoxFit.cover,
-            placeholder: (context, _) => Container(
-              width: 200,
-              height: 140,
-              color: fg.withValues(alpha: 0.08),
-              alignment: Alignment.center,
-              child: SizedBox(
-                width: 18,
-                height: 18,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  valueColor:
-                      AlwaysStoppedAnimation<Color>(fg.withValues(alpha: 0.4)),
+      // The tile is a thumbnail — cropped to `cover` and capped at 240×220 —
+      // so tapping it opens the picture full-screen, where it can be pinched,
+      // panned and double-tapped. Without this a screenshot of the very error
+      // the visitor is writing in about was unreadable in the thread and there
+      // was nothing to do about it.
+      child: GestureDetector(
+        onTap: () => ElcImageViewer.show(
+          context,
+          image: CachedNetworkImageProvider(url),
+          theme: theme,
+          strings: strings,
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(10),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxHeight: 220, maxWidth: 240),
+            child: CachedNetworkImage(
+              imageUrl: url,
+              fit: BoxFit.cover,
+              placeholder: (context, _) => Container(
+                width: 200,
+                height: 140,
+                color: fg.withValues(alpha: 0.08),
+                alignment: Alignment.center,
+                child: SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    valueColor: AlwaysStoppedAnimation<Color>(
+                        fg.withValues(alpha: 0.4)),
+                  ),
                 ),
               ),
+              // A broken/blocked image must never throw — degrade to a chip.
+              errorWidget: (context, _, __) => _fileChip(strings.image, fg),
             ),
-            // A broken/blocked image must never throw — degrade to a chip.
-            errorWidget: (context, _, __) => _fileChip(strings.image, fg),
           ),
         ),
       ),

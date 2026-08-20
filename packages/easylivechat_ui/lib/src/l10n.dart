@@ -136,6 +136,14 @@ class ElcStrings {
   String get download => _t('download');
   String get image => _t('image');
   String get attachment => _t('attachment');
+
+  /// Screen-reader label / tooltip on the × that drops a not-yet-sent
+  /// attachment from the composer strip. The badge is the whole control, so
+  /// without this it announces as nothing.
+  String get removeAttachment => _t('removeAttachment');
+
+  /// Leave the full-screen image viewer.
+  String get close => _t('close');
   String get sendFailedRetry => _t('sendFailedRetry');
   String get sending => _t('sending');
 
@@ -256,6 +264,8 @@ class ElcStrings {
       'download': 'Download',
       'image': 'Image',
       'attachment': 'Attachment',
+      'close': 'Close',
+      'removeAttachment': 'Remove attachment',
       'sendFailedRetry': 'Not sent. Tap to retry.',
       'sending': 'Sending…',
       'messageSent': 'Sent',
@@ -309,6 +319,8 @@ class ElcStrings {
       'download': 'تنزيل',
       'image': 'صورة',
       'attachment': 'مرفق',
+      'close': 'إغلاق',
+      'removeAttachment': 'إزالة المرفق',
       'sendFailedRetry': 'لم يتم الإرسال. اضغط لإعادة المحاولة.',
       'sending': 'جارٍ الإرسال…',
       'messageSent': 'تم الإرسال',
@@ -362,6 +374,8 @@ class ElcStrings {
       'download': 'داگرتن',
       'image': 'وێنە',
       'attachment': 'هاوپێچ',
+      'close': 'داخستن',
+      'removeAttachment': 'لابردنی هاوپێچ',
       'sendFailedRetry': 'نەنێردرا. بۆ دووبارەکردنەوە کلیک بکە.',
       'sending': 'دەنێردرێت…',
       'messageSent': 'نێردرا',
@@ -415,6 +429,8 @@ class ElcStrings {
       'download': 'Herunterladen',
       'image': 'Bild',
       'attachment': 'Anhang',
+      'close': 'Schließen',
+      'removeAttachment': 'Anhang entfernen',
       'sendFailedRetry': 'Nicht gesendet. Zum Wiederholen tippen.',
       'sending': 'Senden…',
       'messageSent': 'Gesendet',
@@ -468,6 +484,8 @@ class ElcStrings {
       'download': 'Descargar',
       'image': 'Imagen',
       'attachment': 'Adjunto',
+      'close': 'Cerrar',
+      'removeAttachment': 'Quitar adjunto',
       'sendFailedRetry': 'No enviado. Toca para reintentar.',
       'sending': 'Enviando…',
       'messageSent': 'Enviado',
@@ -521,6 +539,8 @@ class ElcStrings {
       'download': 'Télécharger',
       'image': 'Image',
       'attachment': 'Pièce jointe',
+      'close': 'Fermer',
+      'removeAttachment': 'Supprimer la pièce jointe',
       'sendFailedRetry': 'Non envoyé. Touchez pour réessayer.',
       'sending': 'Envoi…',
       'messageSent': 'Envoyé',
@@ -574,6 +594,8 @@ class ElcStrings {
       'download': 'डाउनलोड',
       'image': 'छवि',
       'attachment': 'अनुलग्नक',
+      'close': 'बंद करें',
+      'removeAttachment': 'अनुलग्नक हटाएँ',
       'sendFailedRetry': 'भेजा नहीं गया। पुनः प्रयास के लिए टैप करें।',
       'sending': 'भेजा जा रहा है…',
       'messageSent': 'भेजा गया',
@@ -627,6 +649,8 @@ class ElcStrings {
       'download': 'Scarica',
       'image': 'Immagine',
       'attachment': 'Allegato',
+      'close': 'Chiudi',
+      'removeAttachment': 'Rimuovi allegato',
       'sendFailedRetry': 'Non inviato. Tocca per riprovare.',
       'sending': 'Invio…',
       'messageSent': 'Inviato',
@@ -680,6 +704,8 @@ class ElcStrings {
       'download': 'داگرتن',
       'image': 'وێنە',
       'attachment': 'فایل',
+      'close': 'گرتن',
+      'removeAttachment': 'ژێبرنا فایلی',
       'sendFailedRetry': 'نەهاتە فرێکرن. کلیکبکە بۆ دوبارە هەولدانێ .',
       'sending': 'د هنێریت…',
       'messageSent': 'هاتە فرێکرن',
@@ -733,6 +759,8 @@ class ElcStrings {
       'download': 'Baixar',
       'image': 'Imagem',
       'attachment': 'Anexo',
+      'close': 'Fechar',
+      'removeAttachment': 'Remover anexo',
       'sendFailedRetry': 'Não enviado. Toque para tentar de novo.',
       'sending': 'Enviando…',
       'messageSent': 'Enviado',
@@ -786,6 +814,8 @@ class ElcStrings {
       'download': 'İndir',
       'image': 'Görsel',
       'attachment': 'Ek',
+      'close': 'Kapat',
+      'removeAttachment': 'Eki kaldır',
       'sendFailedRetry': 'Gönderilmedi. Yeniden denemek için dokunun.',
       'sending': 'Gönderiliyor…',
       'messageSent': 'Gönderildi',
@@ -839,6 +869,8 @@ class ElcStrings {
       'download': 'ڈاؤن لوڈ',
       'image': 'تصویر',
       'attachment': 'منسلکہ',
+      'close': 'بند کریں',
+      'removeAttachment': 'منسلکہ ہٹائیں',
       'sendFailedRetry': 'نہیں بھیجا گیا۔ دوبارہ کوشش کے لیے ٹیپ کریں۔',
       'sending': 'بھیجا جا رہا ہے…',
       'messageSent': 'بھیج دیا گیا',
@@ -892,6 +924,8 @@ class ElcStrings {
       'download': '下载',
       'image': '图片',
       'attachment': '附件',
+      'close': '关闭',
+      'removeAttachment': '移除附件',
       'sendFailedRetry': '未发送。点按重试。',
       'sending': '发送中…',
       'messageSent': '已发送',

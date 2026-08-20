@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.1.61
+
+- Images in the thread open full-screen. Attachments only ever rendered as
+  240×220 `cover` tiles, which is a thumbnail — a screenshot of the error the
+  visitor is writing in about was unreadable, and no gesture enlarged it.
+  Tapping one now opens a viewer with pinch-zoom, pan and double-tap-to-zoom
+  (toward the point tapped, not the middle). A tap on the backdrop leaves, but
+  not while zoomed in — there a tap is how a pan ends — and the × closes at any
+  scale.
+- The composer shows the picture you picked, not its filename. A pending image
+  attachment was a paperclip chip reading `IMG_20260814_113255.jpg`, which
+  says nothing about which of four screenshots was attached — the one thing
+  worth checking before hitting send. It is now a 56px thumbnail, drawn from
+  the bytes already read for the upload (so it appears instantly and costs no
+  second download), tappable to preview full-size, with the remove × on its
+  corner. Non-images keep the chip: a filename IS what identifies a PDF.
+- New chrome strings `close` and `removeAttachment` in all 12 locales.
+
 ## 0.1.60
 
 - The post-chat form's Submit button takes the host app's typeface. Its label

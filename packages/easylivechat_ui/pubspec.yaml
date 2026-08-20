@@ -6,7 +6,7 @@ description: >-
   Prebuilt, themeable Flutter chat UI for EasyLiveChat live customer support:
   launcher bubble, chat screen, pre-chat form, attachments and CSAT, driven by
   your widget config.
-version: 0.1.60
+version: 0.1.61
 homepage: https://livechattools.com
 repository: https://github.com/m4hmoud/easylivechat-flutter-sdk
 topics:
