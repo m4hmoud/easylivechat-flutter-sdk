@@ -226,6 +226,9 @@ class SessionController {
         final decoded = jsonDecode(rawProfile);
         if (decoded is Map) {
           _profile = StoredProfile.fromJson(decoded.cast<String, dynamic>());
+          // A cold start has no identify() behind it yet; the cached profile is
+          // the only thing that knows who this visitor is.
+          _phone ??= _profile?.phone;
         }
       } catch (_) {
         // Corrupt cache — ignore; treat as no profile.
@@ -260,6 +263,7 @@ class SessionController {
     _profile = StoredProfile(
       name: name,
       email: email,
+      phone: phone,
       preChat: fields,
     );
   }
@@ -367,6 +371,13 @@ class SessionController {
             visitorId: visitorId,
             name: _profile?.name,
             email: _profile?.email,
+            // Was omitted here while the create path sent it, so a visitor who
+            // already had a live conversation when the host identified them —
+            // opening the chat from a login screen, signing in, coming back —
+            // handed the agent a name and no phone number. The server adopts
+            // whatever a resume carries (`adoptIdentityOnResume`); it can only
+            // adopt what is sent.
+            phone: _phone ?? _profile?.phone,
             locale: _effectiveLocale,
             resumeOnly: true,
           ));
@@ -534,7 +545,7 @@ class SessionController {
             visitorId: visitorId,
             name: name ?? _profile?.name,
             email: email ?? _profile?.email,
-            phone: phone ?? _phone,
+            phone: phone ?? _phone ?? _profile?.phone,
             locale: _effectiveLocale,
             fields: fields,
           ));
@@ -1243,6 +1254,7 @@ class SessionController {
           visitorId: visitorId,
           name: _profile?.name,
           email: _profile?.email,
+          phone: _phone ?? _profile?.phone,
           locale: _effectiveLocale,
           resumeOnly: true,
         );

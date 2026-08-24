@@ -106,22 +106,31 @@ class ProactiveMessage {
 }
 
 /// The visitor's locally-cached identity/profile, persisted across launches.
+///
+/// [phone] is here for the same reason [name] and [email] are: `identify()`
+/// used to keep it in memory only, so it survived neither an app restart nor
+/// the resume path — a host that named a signed-in customer got the name
+/// through and the phone nowhere. A key absent from an older cache simply
+/// decodes to null.
 class StoredProfile {
   final String? name;
   final String? email;
+  final String? phone;
   final Map<String, String>? preChat;
 
-  const StoredProfile({this.name, this.email, this.preChat});
+  const StoredProfile({this.name, this.email, this.phone, this.preChat});
 
   Map<String, dynamic> toJson() => {
         if (name != null) 'name': name,
         if (email != null) 'email': email,
+        if (phone != null) 'phone': phone,
         if (preChat != null) 'preChat': preChat,
       };
 
   factory StoredProfile.fromJson(Map<String, dynamic> j) => StoredProfile(
         name: j['name'] as String?,
         email: j['email'] as String?,
+        phone: j['phone'] as String?,
         preChat: (j['preChat'] is Map)
             ? (j['preChat'] as Map)
                 .map((k, v) => MapEntry(k.toString(), v.toString()))

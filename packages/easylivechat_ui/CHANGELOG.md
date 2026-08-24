@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.62
+
+- Requires `easylivechat` 0.1.49, which sends an identified visitor's phone
+  number on the resume path and persists it. Nothing in this package changed;
+  raising the constraint is what stops a host resolving fresh from getting the
+  old core and wondering why the agent still sees no phone.
+
 ## 0.1.61
 
 - Images in the thread open full-screen. Attachments only ever rendered as

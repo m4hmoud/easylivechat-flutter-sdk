@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.1.49
+
+- A phone number passed to `identify()` now reaches the agent on every path.
+  It was sent when a session was CREATED and dropped when one was RESUMED, so
+  a visitor who already had a live conversation at the moment the host
+  identified them — opened the chat from a login screen, signed in, came back
+  — arrived with a name and no phone number. The server adopts whatever a
+  resume carries; it could only adopt what was sent.
+- `identify()`'s phone is also persisted now. `StoredProfile` held name and
+  email but not phone, so the number lived in memory alone and was gone after
+  an app restart until the host called `identify()` again. Older caches
+  without the key decode as before.
+
 ## 0.1.48
 
 - `EasyLiveChat.reset()` — forget who this visitor is. Call it from the host
