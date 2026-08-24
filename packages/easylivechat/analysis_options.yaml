@@ -2,4 +2,13 @@
 # file `dart analyze` runs with no rules at all, so it stayed green while
 # pub.dev, which analyses every package against lints_core regardless of what
 # the package configures, deducted points for issues nothing here could see.
+analyzer:
+  exclude:
+    - build/**
+    - android/**
+    - ios/**
+    - web/**
+    - windows/**
+    - macos/**
+    - linux/**
 include: package:lints/recommended.yaml

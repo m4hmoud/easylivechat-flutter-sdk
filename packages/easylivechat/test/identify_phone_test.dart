@@ -8,7 +8,6 @@
 library;
 
 import 'package:easylivechat/easylivechat.dart';
-import 'package:easylivechat/src/models/results.dart';
 import 'package:easylivechat/src/rest_client.dart';
 import 'package:easylivechat/src/session_controller.dart';
 import 'package:test/test.dart';

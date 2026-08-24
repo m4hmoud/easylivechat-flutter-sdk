@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.63
+
+- Requires `easylivechat` 0.1.50, which asks the server for the host inbox's
+  configuration rather than the workspace default. Nothing in this package
+  changed; the constraint is what stops a host resolving fresh from getting a
+  core that still ignores its channel.
+
 ## 0.1.62
 
 - Requires `easylivechat` 0.1.49, which sends an identified visitor's phone

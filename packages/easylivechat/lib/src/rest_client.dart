@@ -48,13 +48,22 @@ class RestClient {
     return const <String, dynamic>{};
   }
 
-  /// `GET /:slug/config?origin=` — public. Soft `allowedOrigins` gate only when
-  /// an origin is supplied (native should usually omit it).
+  /// `GET /:slug/config?channel=&origin=` — public. Soft `allowedOrigins` gate
+  /// only when an origin is supplied (native should usually omit it).
   Future<ConfigResponse> getConfig() async {
     try {
       final res = await _dio.get<dynamic>(
         '$_base/$_slug/config',
         queryParameters: {
+          // The INBOX this host routes to. Sessions have always carried it, so
+          // the conversation landed in the right inbox — but the config did
+          // not, and the server resolves per-channel overrides from exactly
+          // this parameter. So an app got the workspace defaults for the
+          // welcome screen, the queue and offline text, and the pre-chat form,
+          // while the dashboard showed an inbox configured differently and
+          // nobody could see why it made no difference.
+          if (config.channel != null && config.channel!.isNotEmpty)
+            'channel': config.channel,
           if (config.originHeader != null && config.originHeader!.isNotEmpty)
             'origin': config.originHeader,
           if (config.contentLocale != null && config.contentLocale!.isNotEmpty)

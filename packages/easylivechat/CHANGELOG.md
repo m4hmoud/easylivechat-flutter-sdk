@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.1.50
+
+- `GET /config` now carries the host's `channel`, so an app receives ITS
+  inbox's configuration. Sessions have always carried it — the conversation
+  landed in the right inbox — but the config request did not, so every
+  per-channel override the server resolves from that parameter (welcome
+  screen, queue and offline text, and now the pre-chat form) was invisible to
+  native hosts: the dashboard showed an inbox configured one way and the app
+  showed the workspace default, with nothing to explain the difference.
+- Pairs with the server's per-inbox pre-chat form: a workspace can now ask a
+  stranger on its website who they are while its app, which already knows its
+  signed-in users, shows no form at all.
+
 ## 0.1.49
 
 - A phone number passed to `identify()` now reaches the agent on every path.
