@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart' show ValueListenable, Uint8List;
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../bidi.dart';
 import '../l10n.dart';
@@ -44,6 +45,23 @@ class _ComposerBarState extends State<ComposerBar> {
   final FocusNode _focus = FocusNode();
   final ImagePicker _imagePicker = ImagePicker();
 
+  /// Which way the visitor writes, remembered for when the box is EMPTY.
+  ///
+  /// With text in it the text decides (see [textDirectionOf]). With nothing in
+  /// it there is nothing to read, and the keyboard's language — the thing that
+  /// would actually answer this — is not exposed to a Flutter app by either
+  /// platform. So the last thing this visitor wrote stands in for it: type one
+  /// Kurdish message and the box stays right-to-left for the next one, and for
+  /// the next visit, rather than snapping back to the workspace's direction
+  /// every time it clears.
+  TextDirection? _rememberedDirection;
+
+  /// Where that memory lives. Not in `EasyLiveChatStorage`: this is a UI
+  /// preference on this device, not part of the visitor's identity, and it
+  /// must not be swept by `reset()` when somebody signs out — the next person
+  /// on a shared phone probably writes the same language.
+  static const _directionKey = 'easylivechat:composer_direction';
+
   /// Repeats `true` while the field has text; cancelled when it empties.
   Timer? _typingKeepAlive;
   bool _typingActive = false;
@@ -62,6 +80,31 @@ class _ComposerBarState extends State<ComposerBar> {
   void initState() {
     super.initState();
     _controller.addListener(_onTextChanged);
+    _restoreDirection();
+  }
+
+  Future<void> _restoreDirection() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final saved = prefs.getString(_directionKey);
+      if (saved == null || !mounted) return;
+      setState(() {
+        _rememberedDirection =
+            saved == 'rtl' ? TextDirection.rtl : TextDirection.ltr;
+      });
+    } catch (_) {
+      // A preference we cannot read just means we fall back a step further.
+    }
+  }
+
+  /// Remember what the visitor is writing in, so the empty box keeps facing
+  /// that way. Only called with a direction the TEXT actually established.
+  void _rememberDirection(TextDirection d) {
+    if (_rememberedDirection == d) return;
+    setState(() => _rememberedDirection = d);
+    SharedPreferences.getInstance()
+        .then((p) => p.setString(_directionKey, d == TextDirection.rtl ? 'rtl' : 'ltr'))
+        .catchError((_) => false);
   }
 
   @override
@@ -80,6 +123,8 @@ class _ComposerBarState extends State<ComposerBar> {
   // ── typing presence ──
 
   void _onTextChanged() {
+    final written = textDirectionOf(_controller.text);
+    if (written != null) _rememberDirection(written);
     final hasText = _controller.text.trim().isNotEmpty;
     if (!hasText) {
       _stopTyping();
@@ -392,7 +437,13 @@ class _ComposerBarState extends State<ComposerBar> {
     // Neither iOS nor Android exposes the keyboard's language, so the first
     // strong character decides — as it does in every other messenger, and as
     // `dir="auto"` does on the web.
-    final direction = textDirectionOf(draft) ?? t.direction;
+    // Text first; then what this visitor last wrote; then the phone's own
+    // language; then the workspace's. Each step is a worse guess than the one
+    // before it, and the first two are usually all it takes.
+    final direction = textDirectionOf(draft) ??
+        _rememberedDirection ??
+        deviceTextDirection() ??
+        t.direction;
     // Fixed-height (44, matching the round buttons) TRANSPARENT box so the text
     // centres on the same line as the attach/send buttons — no fill, no border.
     return Container(

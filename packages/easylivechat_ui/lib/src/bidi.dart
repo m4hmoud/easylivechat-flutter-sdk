@@ -1,3 +1,5 @@
+import 'dart:ui' show PlatformDispatcher;
+
 import 'package:flutter/widgets.dart';
 
 /// The direction a piece of text wants to be laid out in, from its own
@@ -51,3 +53,32 @@ bool _isStrongLtr(int c) =>
     (c >= 0x2C00 && c <= 0xD7FF) || // Glagolitic … Hangul
     (c >= 0xF900 && c <= 0xFB17) || // CJK compatibility … Alphabetic pres.
     (c >= 0x10000 && c <= 0x10FFF); // Linear B and friends
+
+/// The languages that are written right-to-left, by subtag.
+///
+/// `ckb` and `kmr` are the product's two Kurdish codes and `ku` the
+/// deprecated macrolanguage some platforms still report for Sorani.
+const _rtlLanguages = <String>{
+  'ar', 'fa', 'he', 'iw', 'ur', 'ps', 'sd', 'ug', 'yi', 'ji', 'dv', 'ku',
+  'ckb', 'kmr', 'arc', 'syr', 'nqo', 'rhg',
+};
+
+bool isRtlLanguage(String languageCode) =>
+    _rtlLanguages.contains(languageCode.trim().toLowerCase().split(RegExp(r'[-_]')).first);
+
+/// Which way the visitor's PHONE is written, for an empty composer.
+///
+/// The keyboard's language would be the right answer and there is no way to
+/// ask for it: Flutter surfaces no API for the active input method, and
+/// reading `UITextInputMode` / `InputMethodManager` means native code, which
+/// would make this package a plugin and change the build of every app that
+/// embeds it. The device's own language is the closest thing that costs
+/// nothing — someone whose phone is in Kurdish is typing Kurdish.
+///
+/// Only the PRIMARY locale counts. Someone with an English phone who also has
+/// an Arabic keyboard installed has Arabic somewhere in their locale list, and
+/// turning their composer around on that would be wrong more often than right.
+TextDirection? deviceTextDirection() {
+  final code = PlatformDispatcher.instance.locale.languageCode;
+  return isRtlLanguage(code) ? TextDirection.rtl : null;
+}

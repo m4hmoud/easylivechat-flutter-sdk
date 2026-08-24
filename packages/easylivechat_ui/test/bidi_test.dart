@@ -73,4 +73,24 @@ void main() {
     // Arabic Presentation Forms — what some keyboards and older systems emit.
     expect(textDirectionOf('ﻟﺎ'), TextDirection.rtl);
   });
+
+  group('isRtlLanguage', () {
+    test('covers the locales the product ships', () {
+      // ar/ckb/ur are the three RTL locales in the dashboard's twelve; `ku` is
+      // the deprecated code some platforms still report for Sorani, and `kmr`
+      // is Badini, which this product writes in Arabic script.
+      for (final code in ['ar', 'ckb', 'ku', 'kmr', 'ur', 'fa', 'he']) {
+        expect(isRtlLanguage(code), isTrue, reason: code);
+      }
+      for (final code in ['en', 'de', 'tr', 'hi', 'zh', 'pt', 'es', 'fr', 'it']) {
+        expect(isRtlLanguage(code), isFalse, reason: code);
+      }
+    });
+
+    test('accepts a full locale tag, not just a bare subtag', () {
+      expect(isRtlLanguage('ar-IQ'), isTrue);
+      expect(isRtlLanguage('ckb_IQ'), isTrue);
+      expect(isRtlLanguage('en-US'), isFalse);
+    });
+  });
 }

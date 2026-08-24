@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.1.65
+
+- An EMPTY composer keeps facing the way the visitor writes. 0.1.64 turned the
+  box around from the text in it, which left the moment before the first
+  character — and every moment after a send cleared it — back on the
+  workspace's direction. The keyboard's language would settle it and no
+  Flutter API exposes it (reading `UITextInputMode` / `InputMethodManager`
+  needs native code, which would make this a plugin), so the box now remembers
+  what was last written in it, persisted per device, and falls back to the
+  phone's own language before the workspace's. Type one Kurdish message and it
+  stays right-to-left — next message, next visit.
+
 ## 0.1.64
 
 - The composer faces the way you are typing. It took the workspace's
