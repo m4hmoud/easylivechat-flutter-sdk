@@ -7,6 +7,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
+import '../bidi.dart';
 import '../l10n.dart';
 import '../picked_file.dart';
 import '../theme.dart';
@@ -372,7 +373,26 @@ class _ComposerBarState extends State<ComposerBar> {
   }
 
   Widget _textField() {
+    // Rebuilt per keystroke so the field can turn around under the text as it
+    // is typed — see [textDirectionOf]. A ValueListenableBuilder rather than
+    // setState: only this box depends on the draft, and rebuilding the whole
+    // composer (attach button, send button, pending strip) on every character
+    // is work nobody asked for.
+    return ValueListenableBuilder<TextEditingValue>(
+      valueListenable: _controller,
+      builder: (context, value, _) => _textFieldFor(value.text),
+    );
+  }
+
+  Widget _textFieldFor(String draft) {
     final t = _theme;
+    // The workspace's direction is the starting point, not the answer. A
+    // visitor typing Arabic into an English workspace was writing into a
+    // left-to-right box: caret on the wrong end, text against the wrong edge.
+    // Neither iOS nor Android exposes the keyboard's language, so the first
+    // strong character decides — as it does in every other messenger, and as
+    // `dir="auto"` does on the web.
+    final direction = textDirectionOf(draft) ?? t.direction;
     // Fixed-height (44, matching the round buttons) TRANSPARENT box so the text
     // centres on the same line as the attach/send buttons — no fill, no border.
     return Container(
@@ -382,6 +402,10 @@ class _ComposerBarState extends State<ComposerBar> {
       child: TextField(
         controller: _controller,
         focusNode: _focus,
+        textDirection: direction,
+        // Resolved against the line above, so it follows the text rather than
+        // the workspace.
+        textAlign: TextAlign.start,
         minLines: 1,
         maxLines: 5,
         // NOTICE_ONLY tenants take nothing while closed. Disabled rather than

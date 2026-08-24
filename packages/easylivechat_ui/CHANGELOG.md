@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.1.64
+
+- The composer faces the way you are typing. It took the workspace's
+  direction, so a visitor writing Arabic, Sorani or Urdu into a left-to-right
+  workspace typed into a box pointing the wrong way: caret on the wrong end,
+  text against the wrong edge, punctuation on the wrong side. Neither iOS nor
+  Android tells an app what language the keyboard is in, so the first strongly
+  directional character decides — the rule `dir="auto"` uses on the web. An
+  empty box, or one holding only digits or emoji, keeps the workspace's
+  direction.
+- Message bubbles do the same with their own text, so a thread where the
+  visitor writes Arabic and the agent answers in English reads correctly on
+  both sides instead of forcing one direction on the whole conversation.
+
 ## 0.1.63
 
 - Requires `easylivechat` 0.1.50, which asks the server for the host inbox's

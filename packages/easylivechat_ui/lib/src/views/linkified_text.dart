@@ -4,6 +4,8 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../bidi.dart';
+
 /// Auto-linking for message bodies: URLs, email addresses and phone numbers
 /// inside plain text become tappable.
 ///
@@ -339,6 +341,14 @@ class _LinkifiedTextState extends State<LinkifiedText> {
       children.add(TextSpan(text: widget.text.substring(cursor)));
     }
 
-    return Text.rich(TextSpan(style: widget.style, children: children));
+    // Each message faces the way ITS OWN text reads, not the way the
+    // workspace does. A thread where the visitor writes Arabic and the agent
+    // answers in English is the normal case in a bilingual workspace, and
+    // forcing one direction on both put half of it against the wrong edge with
+    // the punctuation on the wrong end.
+    return Text.rich(
+      TextSpan(style: widget.style, children: children),
+      textDirection: textDirectionOf(widget.text),
+    );
   }
 }
