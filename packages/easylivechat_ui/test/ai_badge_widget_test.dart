@@ -19,7 +19,7 @@ void main() {
     text: Color(0xFF111827),
   );
 
-  ChatMessage message(SenderType type, {String? name}) => ChatMessage(
+  ChatMessage message(SenderType type, {String? name, bool assistant = false}) => ChatMessage(
         id: 'm1',
         conversationId: 'c1',
         body: 'The Pro plan is \$15 per month.',
@@ -27,6 +27,7 @@ void main() {
         senderName: name,
         contentType: MessageContentType.text,
         createdAt: DateTime.utc(2026, 9, 13, 10),
+        metadata: assistant ? const {'assistant': true} : null,
       );
 
   Future<void> pump(WidgetTester tester, ChatMessage m,
@@ -46,7 +47,7 @@ void main() {
 
   testWidgets('an assistant reply carries its name and an AI badge, names off or not',
       (tester) async {
-    await pump(tester, message(SenderType.bot, name: 'eMenu Assistant'));
+    await pump(tester, message(SenderType.bot, name: 'eMenu Assistant', assistant: true));
     expect(find.byType(AiBadge), findsOneWidget);
     expect(find.text('AI'), findsOneWidget);
     expect(find.text('eMenu Assistant'), findsOneWidget);
@@ -54,8 +55,16 @@ void main() {
 
   testWidgets('the badge stands on its own when the assistant has no name',
       (tester) async {
-    await pump(tester, message(SenderType.bot));
+    await pump(tester, message(SenderType.bot, assistant: true));
     expect(find.byType(AiBadge), findsOneWidget);
+  });
+
+  testWidgets('the automatic greeting is not badged', (tester) async {
+    // A greeting is a BOT message too. Seen on zirak, which never switched the
+    // assistant on: "Zirak · AI" above its own greeting.
+    await pump(tester, message(SenderType.bot, name: 'Zirak'), showAgentName: true);
+    expect(find.byType(AiBadge), findsNothing);
+    expect(find.text('AI'), findsNothing);
   });
 
   testWidgets('a person is never badged', (tester) async {
@@ -65,7 +74,7 @@ void main() {
   });
 
   testWidgets('the badge is in the visitor\'s language', (tester) async {
-    await pump(tester, message(SenderType.bot, name: 'eMenu'), locale: 'ar');
+    await pump(tester, message(SenderType.bot, name: 'eMenu', assistant: true), locale: 'ar');
     expect(find.text('ذكاء اصطناعي'), findsOneWidget);
   });
 }

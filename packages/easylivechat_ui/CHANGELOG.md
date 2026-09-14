@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.67
+
+- The "AI" badge and the assistant's name appear only on the AI assistant's
+  replies. The automatic greeting was badged "AI" too (for example
+  "Zirak · AI" above a workspace's own greeting, with no assistant switched on).
+  Greetings now render like any other message from the business.
+- Requires `easylivechat` 0.1.52.
+
 ## 0.1.66
 
 - **Voice messages.** When the workspace turns them on (dashboard → Widget), the

@@ -40,18 +40,55 @@ void main() {
     });
   });
 
-  test('a BOT message is from the assistant; an agent message is not', () {
-    ChatMessage m(SenderType type) => ChatMessage(
+  group('isFromAssistant', () {
+    ChatMessage m(SenderType type, [Map<String, dynamic>? metadata]) => ChatMessage(
           id: 'm1',
           conversationId: 'c1',
           body: 'hi',
           senderType: type,
           contentType: MessageContentType.text,
           createdAt: DateTime.utc(2026, 9, 13),
+          metadata: metadata,
         );
-    expect(m(SenderType.bot).isFromAssistant, isTrue);
-    expect(m(SenderType.agent).isFromAssistant, isFalse);
-    expect(m(SenderType.customer).isFromAssistant, isFalse);
+
+    test('is true for a reply the server marked as the assistant\'s', () {
+      expect(m(SenderType.bot, {'assistant': true}).isFromAssistant, isTrue);
+    });
+
+    test('is false for the automatic greeting, which is a BOT message too', () {
+      // Seen on zirak, which never switched the assistant on: its greeting
+      // arrived badged "AI".
+      expect(m(SenderType.bot).isFromAssistant, isFalse);
+      expect(m(SenderType.bot, {'i18n': {'key': 'x'}}).isFromAssistant, isFalse);
+      expect(m(SenderType.bot, {'assistant': 'true'}).isFromAssistant, isFalse);
+    });
+
+    test('is false for people', () {
+      expect(m(SenderType.agent, {'assistant': true}).isFromAssistant, isFalse);
+      expect(m(SenderType.customer).isFromAssistant, isFalse);
+    });
+
+    test('survives the wire: parsed from the JSON the server sends', () {
+      final reply = ChatMessage.fromAny({
+        'id': 'm2',
+        'conversationId': 'c1',
+        'body': 'The Pro plan is \$15.',
+        'senderType': 'BOT',
+        'contentType': 'TEXT',
+        'createdAt': '2026-09-13T10:00:00.000Z',
+        'metadata': {'assistant': true},
+      });
+      final greeting = ChatMessage.fromAny({
+        'id': 'm3',
+        'conversationId': 'c1',
+        'body': 'Hello, how can I help?',
+        'senderType': 'BOT',
+        'contentType': 'TEXT',
+        'createdAt': '2026-09-13T10:00:00.000Z',
+      });
+      expect(reply.isFromAssistant, isTrue);
+      expect(greeting.isFromAssistant, isFalse);
+    });
   });
 
   group('assistant typing', () {

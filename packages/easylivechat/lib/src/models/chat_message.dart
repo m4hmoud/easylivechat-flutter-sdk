@@ -168,9 +168,15 @@ class ChatMessage {
   ///
   /// Say so wherever it is shown: a visitor decides whether to trust an answer,
   /// wait for a person or repeat themselves based on who they think is talking,
-  /// and several jurisdictions now require the disclosure outright. Matches the
-  /// web widget, which badges every `BOT` message.
-  bool get isFromAssistant => senderType == SenderType.bot;
+  /// and several jurisdictions now require the disclosure outright.
+  ///
+  /// Read from the server's `metadata.assistant`, which it sets only on replies
+  /// the assistant wrote. `senderType` alone cannot tell: the workspace's
+  /// automatic greeting is a `BOT` message too, and treating every one as the
+  /// assistant badged greetings "AI" in workspaces that never switched the
+  /// assistant on.
+  bool get isFromAssistant =>
+      senderType == SenderType.bot && metadata?['assistant'] == true;
 
   /// What to show next to this message: nothing, or one of the four states of
   /// the visitor's own send.

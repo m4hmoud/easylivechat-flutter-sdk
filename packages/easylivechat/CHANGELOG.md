@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.52
+
+- `ChatMessage.isFromAssistant` is true only for replies the AI assistant wrote,
+  read from the server's `metadata.assistant`. It was true for every `BOT`
+  message, and the workspace's automatic greeting is a `BOT` message too — so
+  greetings were treated as the assistant's, in workspaces that never switched
+  the assistant on.
+
 ## 0.1.51
 
 - The AI assistant, as the SDK sees it. The server has answered SDK visitors
