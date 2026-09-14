@@ -6,7 +6,7 @@ description: >-
   Prebuilt, themeable Flutter chat UI for EasyLiveChat live customer support:
   launcher bubble, chat screen, pre-chat form, attachments and CSAT, driven by
   your widget config.
-version: 0.1.65
+version: 0.1.66
 homepage: https://livechattools.com
 repository: https://github.com/m4hmoud/easylivechat-flutter-sdk
 topics:
@@ -46,7 +46,7 @@ dependencies:
     sdk: flutter
   # Hosted for consumers; in-repo development resolves the sibling via
   # pubspec_overrides.yaml (not published), so both stay in lockstep locally.
-  easylivechat: ^0.1.50
+  easylivechat: ^0.1.51
   # Default durable EasyLiveChatStorage (JWT). Held at 9.x deliberately, which
   # costs pana's "dependencies are supported in the latest version" points:
   # 10.0.0 replaced the Android Jetpack-Crypto backend with custom ciphers and
@@ -57,11 +57,16 @@ dependencies:
   flutter_secure_storage: ^9.2.0
   shared_preferences: ^2.3.0       # default visitorId + profile persistence
   image_picker: ^1.1.2
-  # Same trade-off: 11.0.0 made `FilePicker` static, so the
-  # `FilePicker.platform.pickFiles(...)` call in composer_bar.dart does not
-  # compile against it; 9.0.0 also changed web picks to load blobs. Widening
-  # the range would hand consumers a version this code cannot build against.
-  file_picker: ^8.1.0
+  # ^10.3.3, not ^8: 8.x (and 9.x) compile against Android API 34, and
+  # flutter_plugin_android_lifecycle 2.0.35 requires every plugin depending on
+  # it to compile against 36 — so a fresh Android build of any host failed in
+  # `:file_picker:checkDebugAarMetadata`. 10.3.3 compiles against the host's
+  # own `flutter.compileSdkVersion`. Capped below 11: 11.0.0 made `FilePicker`
+  # static, and the `FilePicker.platform.pickFiles(...)` call in
+  # composer_bar.dart does not compile against it. (10.0.0 turned image
+  # compression off by default and 9.0.0 changed web picks to blobs; neither
+  # matters here.)
+  file_picker: ^10.3.3
   # Keeps the package off WASM (pana: 10/20 platform support) — flutter_cache_manager
   # imports dart:io and has no wasm-ready release. Kept anyway: dropping it
   # means losing disk caching for avatars and image attachments.
@@ -70,6 +75,18 @@ dependencies:
   # Incoming-message chime. 6.5.0 is the first release that allows this
   # package's Flutter floor (3.27); pub picks a newer one on newer Flutter.
   audioplayers: ^6.5.0
+  # Voice messages. Adding this puts RECORD_AUDIO into every host app's merged
+  # Android manifest, whether or not the workspace ever turns voice messages on
+  # — a host that will never use them can drop it with
+  # `<uses-permission android:name="android.permission.RECORD_AUDIO"
+  #   tools:node="remove" />`. iOS hosts need NSMicrophoneUsageDescription in
+  # Info.plist; without it the app is terminated the moment recording starts.
+  # ^6.2.1, not ^5: record 5.x accepts record_linux 0.7.x, which does not
+  # implement record_platform_interface 1.6.0 (published 2026-05-22), so any
+  # fresh resolution of this package failed to COMPILE on every platform — Dart
+  # builds the Linux implementation's code for an iOS or Android app too.
+  # 6.2.1 pins a matching record_linux; 7.x needs Flutter 3.44.
+  record: ^6.2.1
 
 dev_dependencies:
   flutter_test:

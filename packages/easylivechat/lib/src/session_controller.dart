@@ -78,6 +78,16 @@ class SessionController {
       ValueNotifier(ConnectionState.disconnected);
   final ValueNotifier<List<ChatMessage>> messages = ValueNotifier(const []);
   final ValueNotifier<bool> agentTyping = ValueNotifier(false);
+
+  /// True while the typing shown in [agentTyping] is the AI assistant composing
+  /// a reply, so the UI can say "Assistant is typing" rather than implying a
+  /// person is there.
+  final ValueNotifier<bool> assistantTyping = ValueNotifier(false);
+
+  /// Whether the AI assistant answers a message sent right now. Bind it to
+  /// replace "we're offline, leave a message" with "our assistant can help in
+  /// the meantime" — the first is untrue while the assistant is answering.
+  final ValueNotifier<bool> assistantCovers = ValueNotifier(false);
   final ValueNotifier<int> unreadCount = ValueNotifier(0);
 
   /// How far into the thread an agent has read: everything the visitor sent at
@@ -286,6 +296,7 @@ class SessionController {
     closureLabel.value = res.closureLabel;
     nextOpenLocal.value = res.nextOpenLocal;
     workspaceTimezone.value = res.timezone;
+    assistantCovers.value = res.assistantCovers;
     // Deliberately NOT ChatPhase.offline. A visitor who arrives out of hours
     // continues into the ordinary chat and simply sees a notice (bind
     // [workspaceClosed]) — their message becomes a PENDING conversation that is
@@ -422,6 +433,7 @@ class SessionController {
       closureLabel.value = res.closureLabel;
       nextOpenLocal.value = res.nextOpenLocal;
       workspaceTimezone.value = res.timezone;
+      assistantCovers.value = res.assistantCovers;
       _chatAvailabilityMode = res.chatAvailabilityMode;
       _asyncEnabled = res.asyncEnabled;
 
@@ -497,6 +509,7 @@ class SessionController {
     closureLabel.value = a.closureLabel;
     nextOpenLocal.value = a.nextOpenLocal;
     workspaceTimezone.value = a.timezone;
+    assistantCovers.value = a.assistantCovers;
     // Same rule as refreshAvailability(): a visitor with a conversation keeps
     // it (minus the composer); one without gets the notice.
     if (composerLocked &&
@@ -1004,6 +1017,7 @@ class SessionController {
     _socketSubs.add(socket.onMessageNew.listen(_handleMessageNew));
     _socketSubs.add(socket.onMessageUpdated.listen(_handleMessageUpdated));
     _socketSubs.add(socket.onAgentTyping.listen(_handleAgentTyping));
+    _socketSubs.add(socket.onAssistantTyping.listen(handleAssistantTyping));
     _socketSubs.add(socket.onAvailability.listen((open) {
       isOpen.value = open;
       _applyAvailabilityChange();
@@ -1063,6 +1077,14 @@ class SessionController {
   // ── inbound handlers ──
 
   void _handleMessageNew(ChatMessage msg) {
+    // The assistant's reply is its own "done typing": clear the indicator now
+    // rather than waiting on a stop event that may have been lost.
+    if (msg.isFromAssistant && assistantTyping.value) {
+      _typingTimer?.cancel();
+      agentTyping.value = false;
+      assistantTyping.value = false;
+    }
+
     // 1) Dedup by id.
     final list = messages.value;
     final existingIdx = list.indexWhere((m) => m.id == msg.id);
@@ -1126,6 +1148,7 @@ class SessionController {
 
   void _handleAgentTyping(bool isTyping) {
     _typingTimer?.cancel();
+    assistantTyping.value = false;
     if (!isTyping) {
       agentTyping.value = false;
       return;
@@ -1134,6 +1157,26 @@ class SessionController {
     // The server only ever sends `isTyping:true`, so arm a 4s auto-clear.
     _typingTimer = Timer(const Duration(seconds: 4), () {
       agentTyping.value = false;
+    });
+  }
+
+  /// The assistant started or finished composing a reply.
+  ///
+  /// It sends an explicit stop when the reply is ready, and a reply can take
+  /// ten seconds or more, so the 4-second clear used for a person would drop
+  /// the indicator halfway and leave the visitor watching a silent thread. The
+  /// backstop is long instead — only for a stop lost to a dropped connection.
+  /// Its reply arriving also clears it (see [_handleMessageNew]).
+  @visibleForTesting
+  void handleAssistantTyping(bool isTyping) {
+    _typingTimer?.cancel();
+    // The label flag first, so a row built from the typing change reads it.
+    assistantTyping.value = isTyping;
+    agentTyping.value = isTyping;
+    if (!isTyping) return;
+    _typingTimer = Timer(const Duration(seconds: 45), () {
+      agentTyping.value = false;
+      assistantTyping.value = false;
     });
   }
 
@@ -1574,6 +1617,8 @@ class SessionController {
     nextOpenLocal.dispose();
     workspaceTimezone.dispose();
     availabilityReason.dispose();
+    assistantTyping.dispose();
+    assistantCovers.dispose();
     nextOpenAt.dispose();
     closureLabel.dispose();
     connection.dispose();

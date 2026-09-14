@@ -11,18 +11,25 @@ String _defaultNotice(ElcStrings strings) {
   final elc = EasyLiveChat.instance;
   if (!elc.isBooted) return strings.closedNotice;
 
+  // With the assistant answering, "leave a message and we'll reply when we're
+  // back" is untrue — a reply arrives in seconds. The reopening time still
+  // matters: it is when a PERSON is back, so it stays.
+  final covers = elc.assistantCovers.value;
+
   if (elc.availabilityReason.value == 'NO_AGENTS') {
-    return strings.noAgentsNotice;
+    return covers ? strings.noAgentsAssistantNotice : strings.noAgentsNotice;
   }
 
   // A named closure ("Closed for Eid al-Adha") tells the visitor far more than
   // a generic "we're offline", so prefer it when the server sent one.
   final label = elc.closureLabel.value;
-  final head = (elc.availabilityReason.value == 'HOLIDAY' &&
-          label != null &&
-          label.isNotEmpty)
-      ? strings.closedForLabel.replaceAll('{label}', label)
-      : strings.closedNotice;
+  final head = covers
+      ? strings.closedAssistantNotice
+      : (elc.availabilityReason.value == 'HOLIDAY' &&
+              label != null &&
+              label.isNotEmpty)
+          ? strings.closedForLabel.replaceAll('{label}', label)
+          : strings.closedNotice;
 
   // The BUSINESS's clock, formatted server-side. Rendering the instant here
   // would use the device's zone — "back at 09:00" would read 07:00 to a
@@ -169,7 +176,11 @@ class ClosedNoticeBanner extends StatelessWidget {
   Widget build(BuildContext context) {
     final cfg = config;
     final strings = ElcStrings.of(cfg?.locale ?? 'en');
-    final message = (cfg != null && cfg.offlineMessage.trim().isNotEmpty)
+    // The tenant's own offline copy is a leave-a-message prompt, and the same
+    // untruth while the assistant covers, so the assistant notice wins then.
+    final covers =
+        EasyLiveChat.instance.isBooted && EasyLiveChat.instance.assistantCovers.value;
+    final message = (!covers && cfg != null && cfg.offlineMessage.trim().isNotEmpty)
         ? substituteVisitorVariables(cfg.offlineMessage.trim(),
             name: EasyLiveChat.instance.visitorName,
             defaultName: cfg.defaultCustomerName)

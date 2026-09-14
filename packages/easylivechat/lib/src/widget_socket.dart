@@ -30,6 +30,7 @@ class WidgetSocket {
   final _onMessageNew = StreamController<ChatMessage>.broadcast();
   final _onMessageUpdated = StreamController<ChatMessage>.broadcast();
   final _onAgentTyping = StreamController<bool>.broadcast();
+  final _onAssistantTyping = StreamController<bool>.broadcast();
   final _onAvailability = StreamController<bool>.broadcast();
   final _onAgentsAccepting = StreamController<bool>.broadcast();
   final _onWorkspaceMode = StreamController<WorkspaceAvailability>.broadcast();
@@ -49,6 +50,12 @@ class WidgetSocket {
   /// `agent:typing` — payload is `{ isTyping }` only; never an explicit false,
   /// so the controller arms a ~4s auto-clear.
   Stream<bool> get onAgentTyping => _onAgentTyping.stream;
+
+  /// `agent:typing` from the AI assistant (`actor: 'assistant'`). Kept apart
+  /// from [onAgentTyping] because the two behave differently: the assistant
+  /// sends an explicit stop when its reply is ready, and a reply can take ten
+  /// seconds, so the short auto-clear meant for a person typing must not apply.
+  Stream<bool> get onAssistantTyping => _onAssistantTyping.stream;
 
   /// `workspace:availability` — the working-hours gate, fired on connect and
   /// whenever it changes (a shift boundary, or an admin editing the schedule).
@@ -164,6 +171,10 @@ class WidgetSocket {
       // "agent is typing"; the timeout stays as a backstop for a dropped stop.
       final m = _asMap(data);
       final isTyping = m?['isTyping'] == true;
+      if (m?['actor'] == 'assistant') {
+        if (!_onAssistantTyping.isClosed) _onAssistantTyping.add(isTyping);
+        return;
+      }
       if (!_onAgentTyping.isClosed) _onAgentTyping.add(isTyping);
     });
 
@@ -340,6 +351,7 @@ class WidgetSocket {
     _onMessageNew.close();
     _onMessageUpdated.close();
     _onAgentTyping.close();
+    _onAssistantTyping.close();
     _onAvailability.close();
     _onAgentsAccepting.close();
     _onWorkspaceMode.close();

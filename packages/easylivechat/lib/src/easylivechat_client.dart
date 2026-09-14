@@ -110,6 +110,13 @@ class EasyLiveChat {
   ValueListenable<ConnectionState> get connection => _controller.connection;
   ValueListenable<List<ChatMessage>> get messages => _controller.messages;
   ValueListenable<bool> get agentTyping => _controller.agentTyping;
+
+  /// True while that typing is the AI assistant composing a reply.
+  ValueListenable<bool> get assistantTyping => _controller.assistantTyping;
+
+  /// Whether the AI assistant answers a message sent right now — use it to
+  /// swap the closed/busy notice for "our assistant can help in the meantime".
+  ValueListenable<bool> get assistantCovers => _controller.assistantCovers;
   ValueListenable<int> get unreadCount => _controller.unreadCount;
 
   /// How far into the thread an agent has read.

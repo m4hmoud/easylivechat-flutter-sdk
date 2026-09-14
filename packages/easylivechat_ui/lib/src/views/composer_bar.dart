@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io' show Directory, File;
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:easylivechat/easylivechat.dart';
@@ -6,6 +7,7 @@ import 'package:flutter/foundation.dart' show ValueListenable, Uint8List;
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:record/record.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../bidi.dart';
@@ -44,6 +46,15 @@ class _ComposerBarState extends State<ComposerBar> {
   final TextEditingController _controller = TextEditingController();
   final FocusNode _focus = FocusNode();
   final ImagePicker _imagePicker = ImagePicker();
+
+  /// Voice messages. The recorder is created lazily so a workspace that never
+  /// turns them on pays nothing for it, and disposed on the way out — a
+  /// recorder left holding the microphone keeps the OS indicator lit.
+  AudioRecorder? _recorder;
+  bool _recording = false;
+  int _recordSeconds = 0;
+  Timer? _recordTicker;
+  String? _recordPath;
 
   /// Which way the visitor writes, remembered for when the box is EMPTY.
   ///
@@ -117,6 +128,8 @@ class _ComposerBarState extends State<ComposerBar> {
     _controller.removeListener(_onTextChanged);
     _controller.dispose();
     _focus.dispose();
+    _recordTicker?.cancel();
+    _recorder?.dispose();
     super.dispose();
   }
 
@@ -246,6 +259,126 @@ class _ComposerBarState extends State<ComposerBar> {
     }
   }
 
+  /// `m:ss` — voice messages are short, so no hours component.
+  static String formatRecordDuration(int seconds) {
+    final s = seconds < 0 ? 0 : seconds;
+    return '${s ~/ 60}:${(s % 60).toString().padLeft(2, '0')}';
+  }
+
+  /// Hard stop, so a forgotten open microphone cannot upload something huge.
+  static const int maxRecordSeconds = 5 * 60;
+
+  Future<void> _startRecording() async {
+    if (_recording || _uploading) return;
+    final recorder = _recorder ??= AudioRecorder();
+    try {
+      if (!await recorder.hasPermission()) {
+        setState(() => _attachError = _s.micDenied);
+        return;
+      }
+      // systemTemp rather than a path_provider dependency: on iOS and Android
+      // it already resolves inside the app's own sandbox.
+      final dir = Directory.systemTemp;
+      final stamp = DateTime.now().toIso8601String().replaceAll(RegExp(r'[:.]'), '-');
+      final path = '${dir.path}/voice-$stamp.m4a';
+      // AAC in m4a: the container every channel accepts, so a voice message
+      // sent from here needs none of the server-side rewrapping a browser
+      // recording does.
+      await recorder.start(
+        const RecordConfig(encoder: AudioEncoder.aacLc, numChannels: 1),
+        path: path,
+      );
+      _recordPath = path;
+      setState(() {
+        _recording = true;
+        _recordSeconds = 0;
+        _attachError = null;
+      });
+      _recordTicker?.cancel();
+      _recordTicker = Timer.periodic(const Duration(seconds: 1), (_) {
+        if (!mounted || !_recording) return;
+        setState(() => _recordSeconds++);
+        if (_recordSeconds >= maxRecordSeconds) _stopRecordingAndSend();
+      });
+    } catch (_) {
+      setState(() => _attachError = _s.micFailed);
+      await _teardownRecorder(deleteFile: true);
+    }
+  }
+
+  /// Stopping sends: a voice message is finished when you stop talking, and a
+  /// visitor is unlikely to hunt for a second button to make it leave.
+  Future<void> _stopRecordingAndSend() async {
+    if (!_recording) return;
+    _recordTicker?.cancel();
+    _recordTicker = null;
+    String? path;
+    try {
+      path = await _recorder?.stop();
+    } catch (_) {
+      path = null;
+    }
+    if (mounted) setState(() => _recording = false);
+    final file = File(path ?? _recordPath ?? '');
+    if (!await file.exists()) {
+      await _teardownRecorder(deleteFile: true);
+      return;
+    }
+    final bytes = await file.readAsBytes();
+    final name = file.uri.pathSegments.last;
+    await _teardownRecorder(deleteFile: true);
+    if (bytes.isEmpty) return;
+
+    // Sent, not parked in the pending strip: a voice message is finished when
+    // you stop talking, and a visitor is unlikely to hunt for a second button
+    // to make it leave.
+    if (mounted) setState(() => _uploading = true);
+    try {
+      final uploaded = await EasyLiveChat.instance.uploadBytes(
+        bytes: bytes,
+        filename: name,
+        contentType: 'audio/mp4',
+      );
+      _stopTyping();
+      EasyLiveChat.instance
+          .sendMessage('', attachmentUrls: [uploaded.url])
+          .serverMessageId
+          .catchError((_) => '');
+    } on EasyLiveChatError catch (e) {
+      _showAttachError(message: _s.forErrorCode(e.code));
+    } catch (_) {
+      _showAttachError();
+    } finally {
+      if (mounted) {
+        setState(() => _uploading = false);
+      } else {
+        _uploading = false;
+      }
+    }
+  }
+
+  Future<void> _cancelRecording() async {
+    _recordTicker?.cancel();
+    _recordTicker = null;
+    try {
+      await _recorder?.stop();
+    } catch (_) {}
+    if (mounted) setState(() => _recording = false);
+    await _teardownRecorder(deleteFile: true);
+  }
+
+  Future<void> _teardownRecorder({required bool deleteFile}) async {
+    final path = _recordPath;
+    _recordPath = null;
+    if (mounted) setState(() => _recordSeconds = 0);
+    if (deleteFile && path != null) {
+      try {
+        final f = File(path);
+        if (await f.exists()) await f.delete();
+      } catch (_) {}
+    }
+  }
+
   Future<void> _upload({
     required List<int> bytes,
     required String filename,
@@ -371,18 +504,27 @@ class _ComposerBarState extends State<ComposerBar> {
                     // Hidden rather than dimmed while locked: a greyed
                     // paperclip still reads as "attach something", and there
                     // is nothing to attach to a composer that cannot send.
-                    if (!_locked) ...[
+                    if (!_locked && !_recording) ...[
                       _attachButton(),
                       const SizedBox(width: 4),
                     ],
-                    Expanded(child: _textField()),
+                    if (!_locked && !_recording && _voiceNotesEnabled) ...[
+                      _micButton(),
+                      const SizedBox(width: 4),
+                    ],
+                    // While the microphone is live there is nothing to type,
+                    // so the bar stands in for the field and the only two
+                    // things to press are discard and send.
+                    Expanded(
+                      child: _recording ? _recordingBar() : _textField(),
+                    ),
                     // Same reasoning as the paperclip: a live accent-colored
                     // send button beside a disabled field promised something
                     // the composer would then refuse. While locked the row is
                     // just the field and its explanatory hint.
                     if (!_locked) ...[
                       const SizedBox(width: 8),
-                      _sendButton(),
+                      _recording ? _stopButton() : _sendButton(),
                     ],
                   ],
                 ),
@@ -390,6 +532,73 @@ class _ComposerBarState extends State<ComposerBar> {
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  /// Workspace-wide switch, off unless somebody turned it on.
+  bool get _voiceNotesEnabled =>
+      EasyLiveChat.instance.widgetConfig.value?.voiceNotesEnabled ?? false;
+
+  Widget _micButton() {
+    final t = _theme;
+    return IconButton(
+      onPressed: _uploading ? null : _startRecording,
+      tooltip: _s.recordVoice,
+      padding: EdgeInsets.zero,
+      constraints: const BoxConstraints.tightFor(width: 44, height: 44),
+      icon: Icon(Icons.mic_none_outlined,
+          color: t.text.withValues(alpha: _uploading ? 0.4 : 0.75)),
+    );
+  }
+
+  Widget _recordingBar() {
+    final t = _theme;
+    return Row(
+      children: [
+        Container(
+          width: 9,
+          height: 9,
+          decoration: const BoxDecoration(
+              color: Color(0xFFE11D48), shape: BoxShape.circle),
+        ),
+        const SizedBox(width: 10),
+        Text(
+          formatRecordDuration(_recordSeconds),
+          style: TextStyle(
+              color: t.text, fontFeatures: const [FontFeature.tabularFigures()]),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Text(
+            _s.recordingVoice,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(color: t.text.withValues(alpha: 0.6), fontSize: 13),
+          ),
+        ),
+        IconButton(
+          onPressed: _cancelRecording,
+          tooltip: _s.discardVoice,
+          padding: EdgeInsets.zero,
+          constraints: const BoxConstraints.tightFor(width: 36, height: 36),
+          icon: Icon(Icons.close, size: 18, color: t.text.withValues(alpha: 0.6)),
+        ),
+      ],
+    );
+  }
+
+  Widget _stopButton() {
+    final t = _theme;
+    return IconButton(
+      onPressed: _stopRecordingAndSend,
+      tooltip: _s.sendVoice,
+      padding: EdgeInsets.zero,
+      constraints: const BoxConstraints.tightFor(width: 44, height: 44),
+      icon: Container(
+        width: 34,
+        height: 34,
+        decoration: BoxDecoration(color: t.primary, shape: BoxShape.circle),
+        child: const Icon(Icons.stop, size: 16, color: Colors.white),
       ),
     );
   }

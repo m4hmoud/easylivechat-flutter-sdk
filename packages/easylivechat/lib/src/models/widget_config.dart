@@ -37,6 +37,14 @@ class WidgetConfigModel {
   final String locale;
   final LocaleDirection direction;
   final bool soundEnabled;
+
+  /// Whether visitors may record and send voice messages.
+  ///
+  /// Off unless the workspace turned it on: a microphone prompt is a large
+  /// thing to spring on someone who only opened a chat, and plenty of hosts
+  /// should never ask. Defaults to false when the server omits it, so an older
+  /// server keeps the SDK quiet rather than guessing.
+  final bool voiceNotesEnabled;
   final bool showAgentAvatars;
   final bool showAgentNames;
   final bool collectEmailPreChat; // legacy fallback flag
@@ -66,6 +74,7 @@ class WidgetConfigModel {
     required this.locale,
     required this.direction,
     required this.soundEnabled,
+    this.voiceNotesEnabled = false,
     required this.showAgentAvatars,
     required this.showAgentNames,
     required this.collectEmailPreChat,
@@ -95,6 +104,7 @@ class WidgetConfigModel {
       locale: s('locale', 'en'),
       direction: LocaleDirection.fromWire(j['direction']),
       soundEnabled: j['soundEnabled'] != false,
+      voiceNotesEnabled: j['voiceNotesEnabled'] == true,
       showAgentAvatars: j['showAgentAvatars'] != false,
       showAgentNames: j['showAgentNames'] != false,
       collectEmailPreChat: j['collectEmailPreChat'] == true,
@@ -148,6 +158,13 @@ class WorkspaceAvailability {
   /// The tenant's configured IANA timezone, e.g. `Asia/Baghdad`.
   final String? timezone;
 
+  /// Whether the workspace's AI assistant answers a message sent right now.
+  ///
+  /// When it does, "we're offline, leave a message" is untrue — someone replies
+  /// in seconds — so the closed and busy notices say the assistant can help in
+  /// the meantime instead. Absent on older servers, which read as false.
+  final bool assistantCovers;
+
   const WorkspaceAvailability({
     required this.isOpen,
     this.agentsAccepting = true,
@@ -157,6 +174,7 @@ class WorkspaceAvailability {
     this.closureLabel,
     this.nextOpenLocal,
     this.timezone,
+    this.assistantCovers = false,
   });
 
   /// Every field is optional: a server that predates them must not be read as
@@ -173,6 +191,7 @@ class WorkspaceAvailability {
           (label is String && label.trim().isNotEmpty) ? label.trim() : null,
       nextOpenLocal: _trimmedOrNull(j['nextOpenLocal']),
       timezone: _trimmedOrNull(j['timezone']),
+      assistantCovers: j['assistantCovers'] == true,
     );
   }
 }
@@ -230,6 +249,10 @@ class ConfigResponse {
   /// The tenant's configured IANA timezone, e.g. `Asia/Baghdad`.
   final String? timezone;
 
+  /// Whether the AI assistant answers a message sent right now. See
+  /// [WorkspaceAvailability.assistantCovers].
+  final bool assistantCovers;
+
   const ConfigResponse({
     required this.tenantId,
     required this.config,
@@ -243,6 +266,7 @@ class ConfigResponse {
     this.closureLabel,
     this.nextOpenLocal,
     this.timezone,
+    this.assistantCovers = false,
   });
 
   /// True when the tenant chose to show a notice and take nothing.
@@ -289,6 +313,7 @@ class ConfigResponse {
           : (j['closureLabel'] as String).trim(),
       nextOpenLocal: _trimmedOrNull(j['nextOpenLocal']),
       timezone: _trimmedOrNull(j['timezone']),
+      assistantCovers: j['assistantCovers'] == true,
     );
   }
 }

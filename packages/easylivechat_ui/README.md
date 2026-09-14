@@ -87,18 +87,36 @@ you like. Both integrations are in [`example/main.dart`](example/main.dart).
 
 ## Platform setup
 
-Attachments use the camera and photo library, so iOS needs the two usage
-strings. Add them to `ios/Runner/Info.plist`:
+Attachments use the camera and photo library, and voice messages use the
+microphone, so iOS needs three usage strings. Add them to `ios/Runner/Info.plist`:
 
 ```xml
 <key>NSPhotoLibraryUsageDescription</key>
 <string>Attach images to your support conversation.</string>
 <key>NSCameraUsageDescription</key>
 <string>Take a photo to send to support.</string>
+<key>NSMicrophoneUsageDescription</key>
+<string>Record a voice message for support.</string>
 ```
 
-Android needs nothing for the default setup. If you supply your own picker via
-`onPickAttachments`, neither is required.
+Without the microphone string, iOS terminates the app the moment a visitor
+starts recording. On macOS add the same string, and the
+`com.apple.security.device.audio-input` entitlement if the app is sandboxed.
+If you supply your own picker via `onPickAttachments`, the photo and camera
+strings are not required.
+
+Android needs nothing for the default setup. Voice messages bring the
+`RECORD_AUDIO` permission into your merged manifest (it is only requested when a
+visitor taps the microphone, and the microphone only appears when your workspace
+turns voice messages on). If you will never use them and don't want the
+permission declared, remove it in `android/app/src/main/AndroidManifest.xml`:
+
+```xml
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+    <uses-permission android:name="android.permission.RECORD_AUDIO"
+        tools:node="remove" />
+```
 
 Supported platforms: **Android, iOS, macOS, Windows, Linux**. Web is not
 supported — the web product is the embeddable script-tag widget, which you

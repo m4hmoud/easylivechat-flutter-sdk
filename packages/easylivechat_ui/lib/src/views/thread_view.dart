@@ -209,8 +209,15 @@ class _ThreadViewState extends State<ThreadView> {
                             agentLastReadAt: lastReadAt,
                           );
                         }
-                        // Trailing typing indicator.
-                        return _TypingRow(theme: t, label: _s.agentTyping);
+                        // Trailing typing indicator — named for the assistant
+                        // when it is the one composing, so the wait is not
+                        // mistaken for a person.
+                        return _TypingRow(
+                          theme: t,
+                          label: EasyLiveChat.instance.assistantTyping.value
+                              ? _s.assistantTyping
+                              : _s.agentTyping,
+                        );
                       },
                     );
                   },
@@ -412,7 +419,33 @@ class MessageBubble extends StatelessWidget {
     final column = Column(
       crossAxisAlignment: align,
       children: [
-        if (!_isCustomer && showAgentName && _agentName != null)
+        // Assistant messages always carry their name and an AI badge, even
+        // when the workspace hides agent names: hiding a colleague's name is
+        // the tenant's choice to make, hiding that nobody is there is not.
+        if (message.isFromAssistant)
+          Padding(
+            padding: const EdgeInsetsDirectional.only(start: 4, bottom: 2),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (_agentName != null)
+                  Flexible(
+                    child: Text(
+                      _agentName!,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: theme.text.withValues(alpha: 0.6),
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                if (_agentName != null) const SizedBox(width: 6),
+                AiBadge(label: strings.aiBadge, theme: theme),
+              ],
+            ),
+          )
+        else if (!_isCustomer && showAgentName && _agentName != null)
           Padding(
             padding: const EdgeInsets.only(left: 4, bottom: 2),
             child: Text(
@@ -1123,6 +1156,36 @@ class _PostChatCard extends StatelessWidget {
               ],
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+
+/// The small "AI" pill beside an assistant message's sender name.
+@visibleForTesting
+class AiBadge extends StatelessWidget {
+  final String label;
+  final EasyLiveChatTheme theme;
+
+  const AiBadge({super.key, required this.label, required this.theme});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+      decoration: BoxDecoration(
+        color: theme.primary.withValues(alpha: 0.14),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          color: theme.primary,
+          fontSize: 10,
+          fontWeight: FontWeight.w700,
+          height: 1.2,
         ),
       ),
     );

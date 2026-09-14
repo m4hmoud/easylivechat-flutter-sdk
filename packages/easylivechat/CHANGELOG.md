@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.1.51
+
+- The AI assistant, as the SDK sees it. The server has answered SDK visitors
+  with the workspace's assistant since it shipped, through the same `/widgets`
+  namespace as the web widget, but the SDK read none of what the widget reads
+  about it:
+  - `ChatMessage.isFromAssistant` — true for `BOT` messages, so a host can say
+    a reply is automated wherever it draws one.
+  - `EasyLiveChat.assistantCovers` — whether the assistant answers a message
+    sent right now, from `GET /config` and every `workspace:availability`
+    push. While it does, "we're offline, leave a message" is untrue.
+  - `EasyLiveChat.assistantTyping` — `agentTyping` is the assistant composing.
+    It sends an explicit stop when its reply is ready, and a reply can take ten
+    seconds, so it no longer falls to the 4-second clear meant for a person:
+    the typing row used to vanish halfway through the wait and leave the
+    visitor watching a silent thread. Its reply arriving also clears it.
+- `WidgetConfig.voiceNotesEnabled` — whether the workspace lets visitors send
+  voice messages. False when the server omits it, so an older server keeps a
+  host quiet rather than guessing.
+
 ## 0.1.50
 
 - `GET /config` now carries the host's `channel`, so an app receives ITS

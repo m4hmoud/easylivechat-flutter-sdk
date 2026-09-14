@@ -164,6 +164,14 @@ class ChatMessage {
   bool get isFromCustomer => senderType == SenderType.customer;
   bool get isFromAgent => senderType == SenderType.agent;
 
+  /// Written by the workspace's AI assistant, not a person.
+  ///
+  /// Say so wherever it is shown: a visitor decides whether to trust an answer,
+  /// wait for a person or repeat themselves based on who they think is talking,
+  /// and several jurisdictions now require the disclosure outright. Matches the
+  /// web widget, which badges every `BOT` message.
+  bool get isFromAssistant => senderType == SenderType.bot;
+
   /// What to show next to this message: nothing, or one of the four states of
   /// the visitor's own send.
   ///

@@ -1,5 +1,45 @@
 # Changelog
 
+## 0.1.66
+
+- **Voice messages.** When the workspace turns them on (dashboard → Widget), the
+  composer shows a microphone beside the paperclip; recording replaces the text
+  field with a running timer, and stopping sends. Records AAC in m4a. Off by
+  default, and invisible while the workspace has them off.
+- **Host app changes this release needs** — voice messages come from the new
+  `record` dependency:
+  - **Android:** `record` adds `RECORD_AUDIO` to your merged manifest, whether or
+    not your workspace uses voice messages, and your Play Data safety answers
+    follow it. If you will never use them, remove it in
+    `android/app/src/main/AndroidManifest.xml`:
+    `<uses-permission android:name="android.permission.RECORD_AUDIO" tools:node="remove" />`
+    (with `xmlns:tools="http://schemas.android.com/tools"` on `<manifest>`).
+  - **iOS:** add `NSMicrophoneUsageDescription` to `Info.plist`. Without it iOS
+    terminates the app the moment a visitor starts recording.
+  - **macOS:** the same `NSMicrophoneUsageDescription`, plus the
+    `com.apple.security.device.audio-input` entitlement for sandboxed apps.
+- Assistant replies say they are automated: the assistant's name and an "AI"
+  badge above every `BOT` message, shown even when the workspace hides agent
+  names — hiding a colleague's name is the tenant's choice, hiding that nobody
+  is there is not. They were drawn exactly like a colleague's, and with names
+  off like nobody's. Matches the web widget.
+- While the assistant covers a closed or busy workspace, the notice says it can
+  help in the meantime instead of "leave a message and we'll reply when we're
+  back", and the tenant's leave-a-message copy gives way to it. The reopening
+  time stays: it is when a person is back.
+- "Assistant is typing…" while the assistant composes a reply.
+- New strings in all thirteen locales: `aiBadge`, `assistantTyping`,
+  `closedAssistantNotice`, `noAgentsAssistantNotice` — overridable like the rest.
+- Requires `easylivechat` 0.1.51.
+- `file_picker` ^10.3.3 (was ^8.1.0). 8.x compiles against Android API 34 and
+  `flutter_plugin_android_lifecycle` 2.0.35 requires 36, so a fresh Android
+  build of a host app failed in `:file_picker:checkDebugAarMetadata`.
+- `record` ^6.2.1 (was ^5.1.0). record 5.x accepts `record_linux` 0.7.x, which
+  does not implement `record_platform_interface` 1.6.0, published 2026-05-22 —
+  so since then a fresh resolution of this package failed to compile on every
+  platform, not only Linux. Apps with an older lockfile were unaffected until
+  they ran `pub upgrade`.
+
 ## 0.1.65
 
 - An EMPTY composer keeps facing the way the visitor writes. 0.1.64 turned the
