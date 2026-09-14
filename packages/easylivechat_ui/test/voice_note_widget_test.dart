@@ -75,10 +75,13 @@ void main() {
     );
 
     expect(find.byType(ElcVoiceNoteTile), findsOneWidget);
-    expect(find.byIcon(Icons.play_arrow_rounded), findsOneWidget);
     // The download chip is what the bug looked like.
     expect(find.byIcon(Icons.download_rounded), findsNothing);
     expect(find.byIcon(Icons.insert_drive_file_outlined), findsNothing);
+    // It opens fetching the file — the play glyph replaces the spinner once
+    // the real duration is known. There is no network in a widget test, so
+    // this is as far as the first frame goes.
+    expect(find.byType(CircularProgressIndicator), findsOneWidget);
   });
 
   testWidgets('the rehosted attachment plays on its kind, not its extension',
@@ -147,11 +150,67 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('nothing is fetched until play is pressed', (tester) async {
-    // A thread of twenty notes must not pull twenty audio files just to print
-    // their lengths, so the tile names itself until it has been played once.
+  testWidgets('says what it is until it knows how long it is', (tester) async {
+    // The file is fetched up front — a duration cannot be known without it,
+    // and a note that will not say whether it is four seconds or four minutes
+    // is missing the one thing you need to decide whether to listen. Until it
+    // arrives there is no length to show, so the tile names itself.
     await pump(tester, message(urls: const ['/uploads/t1/2026-09/note.m4a']));
 
     expect(find.text('Voice message'), findsOneWidget);
+  });
+
+  testWidgets('a voice note is the whole card, with no bubble around it',
+      (tester) async {
+    // It already rounds its own corners; a bubble around it is a second card
+    // holding a first one, and on the visitor's own side that is the full
+    // accent colour — their recording arrived matted in a teal frame.
+    await pump(tester, message(urls: const ['/uploads/t1/2026-09/note.m4a']));
+
+    final tile = tester.widget<ElcVoiceNoteTile>(find.byType(ElcVoiceNoteTile));
+    expect(tile.background, isNotNull,
+        reason: 'standing alone, it paints the surface the bubble would have');
+  });
+
+  testWidgets('a note WITH a caption stays inlaid in its bubble', (tester) async {
+    // The caption needs the bubble, so the tile must not paint a second one.
+    await pump(
+      tester,
+      ChatMessage(
+        id: 'm2',
+        conversationId: 'c1',
+        body: 'have a listen',
+        senderType: SenderType.customer,
+        contentType: MessageContentType.audio,
+        attachmentUrls: const ['/uploads/t1/2026-09/note.m4a'],
+        createdAt: DateTime.utc(2026, 9, 14, 15, 50),
+      ),
+    );
+
+    final tile = tester.widget<ElcVoiceNoteTile>(find.byType(ElcVoiceNoteTile));
+    expect(tile.background, isNull);
+  });
+
+  group('the waveform', () {
+    test('is stable for one note and different between notes', () {
+      final a = List<int>.generate(9000, (i) => (i * 31) % 256);
+      final b = List<int>.generate(9000, (i) => (i * 97 + 11) % 256);
+      expect(waveformOf(a), waveformOf(a), reason: 'one note always looks the same');
+      expect(waveformOf(a), isNot(waveformOf(b)));
+    });
+
+    test('always draws bars that fit the column', () {
+      final bytes = List<int>.generate(9000, (i) => (i * 31) % 256);
+      final bars = waveformOf(bytes);
+      expect(bars, hasLength(32));
+      expect(bars.every((v) => v >= 0.12 && v <= 1.0), isTrue);
+      expect(bars.reduce((x, y) => x > y ? x : y), closeTo(1.0, 0.0001),
+          reason: 'every note should use the full height');
+    });
+
+    test('survives a file too short to bucket', () {
+      expect(waveformOf(const []), hasLength(32));
+      expect(waveformOf(const [1, 2, 3]), hasLength(32));
+    });
   });
 }

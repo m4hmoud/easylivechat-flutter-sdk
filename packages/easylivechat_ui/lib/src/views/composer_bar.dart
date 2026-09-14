@@ -1,9 +1,12 @@
 import 'dart:async';
 import 'dart:io' show Directory, File;
 
+import 'package:audioplayers/audioplayers.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:easylivechat/easylivechat.dart';
-import 'package:flutter/foundation.dart' show ValueListenable, Uint8List;
+import 'dart:typed_data' show Endian, Uint8List;
+
+import 'package:flutter/foundation.dart' show ValueListenable, visibleForTesting;
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
@@ -15,6 +18,7 @@ import '../l10n.dart';
 import '../picked_file.dart';
 import '../theme.dart';
 import 'image_viewer.dart';
+import 'voice_levels.dart';
 
 /// The message composer (native analog of the web `Composer.tsx`).
 ///
@@ -55,6 +59,42 @@ class _ComposerBarState extends State<ComposerBar> {
   int _recordSeconds = 0;
   Timer? _recordTicker;
   String? _recordPath;
+
+  /// Paused mid-take. The microphone is off but the audio is kept, and
+  /// `resume()` appends to the SAME file — so continuing really continues,
+  /// rather than starting a second recording that would have to be merged.
+  bool _paused = false;
+
+  /// Set once the take has been CLOSED so it can be listened to.
+  ///
+  /// `record` writes an m4a progressively and only finalises the container on
+  /// `stop()`, so a paused recording is not yet a playable file: previewing
+  /// has to end the take. Once it is set the microphone button goes, because
+  /// there is no longer anything to append to. Recording, pausing, deleting
+  /// and sending are unaffected — only "listen, then carry on talking" is out
+  /// of reach, and it needs an uncompressed format to be possible at all.
+  String? _reviewPath;
+
+  AudioPlayer? _preview;
+  bool _previewPlaying = false;
+  Duration _previewPos = Duration.zero;
+  Duration? _previewTotal;
+  final List<StreamSubscription<dynamic>> _previewSubs = [];
+
+  /// Input levels, one per sample interval, drawn as the waveform. Real
+  /// amplitudes off the microphone — unlike the ones the THREAD draws for a
+  /// received note, which cannot be measured without decoding it.
+  ///
+  /// A notifier rather than plain state: at sixteen samples a second,
+  /// `setState` on the composer rebuilt the text field, the buttons and the
+  /// pending-attachment strip sixteen times a second to move some bars.
+  final ValueNotifier<List<double>> _levels =
+      ValueNotifier<List<double>>(const <double>[]);
+  StreamSubscription<Amplitude>? _ampSub;
+
+  /// Kept for the whole take, so the review can draw all of it. Five minutes
+  /// at this rate is ~4800 doubles, which is nothing.
+  static const Duration _levelInterval = Duration(milliseconds: 60);
 
   /// Which way the visitor writes, remembered for when the box is EMPTY.
   ///
@@ -129,6 +169,9 @@ class _ComposerBarState extends State<ComposerBar> {
     _controller.dispose();
     _focus.dispose();
     _recordTicker?.cancel();
+    _ampSub?.cancel();
+    _disposePreview();
+    _levels.dispose();
     _recorder?.dispose();
     super.dispose();
   }
@@ -280,26 +323,40 @@ class _ComposerBarState extends State<ComposerBar> {
       // it already resolves inside the app's own sandbox.
       final dir = Directory.systemTemp;
       final stamp = DateTime.now().toIso8601String().replaceAll(RegExp(r'[:.]'), '-');
-      final path = '${dir.path}/voice-$stamp.m4a';
-      // AAC in m4a: the container every channel accepts, so a voice message
-      // sent from here needs none of the server-side rewrapping a browser
-      // recording does.
+      final path = '${dir.path}/voice-$stamp.wav';
+      // PCM in a WAV, NOT the AAC this used to record.
+      //
+      // AAC lives in an MP4 container whose index is only written when the
+      // recording stops, so a take could not be listened to without ending
+      // it — press play and the microphone button was gone for good. WAV is
+      // raw samples appended in order, so a playable copy can be cut from a
+      // take that is merely PAUSED, and talking can carry on afterwards.
+      //
+      // The upload is bigger for it: 16kHz mono is 32KB a second, against
+      // about 6 for AAC. It is well inside the 25MB cap even at the
+      // five-minute ceiling, and `services/audio-normalize.ts` re-encodes an
+      // uploaded wav to Ogg/Opus, so what is STORED and what goes out to
+      // WhatsApp is smaller than the AAC was. Only the upload pays.
       await recorder.start(
-        const RecordConfig(encoder: AudioEncoder.aacLc, numChannels: 1),
+        const RecordConfig(
+          encoder: AudioEncoder.wav,
+          numChannels: 1,
+          sampleRate: 16000,
+        ),
         path: path,
       );
       _recordPath = path;
       setState(() {
         _recording = true;
+        _paused = false;
+        _reviewPath = null;
         _recordSeconds = 0;
+        _levels.value = const <double>[];
         _attachError = null;
       });
+      _listenToLevels(recorder);
       _recordTicker?.cancel();
-      _recordTicker = Timer.periodic(const Duration(seconds: 1), (_) {
-        if (!mounted || !_recording) return;
-        setState(() => _recordSeconds++);
-        if (_recordSeconds >= maxRecordSeconds) _stopRecordingAndSend();
-      });
+      _startTicker();
     } catch (_) {
       setState(() => _attachError = _s.micFailed);
       await _teardownRecorder(deleteFile: true);
@@ -310,16 +367,10 @@ class _ComposerBarState extends State<ComposerBar> {
   /// visitor is unlikely to hunt for a second button to make it leave.
   Future<void> _stopRecordingAndSend() async {
     if (!_recording) return;
-    _recordTicker?.cancel();
-    _recordTicker = null;
-    String? path;
-    try {
-      path = await _recorder?.stop();
-    } catch (_) {
-      path = null;
-    }
+    // Already closed for a preview: send exactly what was listened to.
+    final path = await _finalizeTake();
     if (mounted) setState(() => _recording = false);
-    final file = File(path ?? _recordPath ?? '');
+    final file = File(path ?? '');
     if (!await file.exists()) {
       await _teardownRecorder(deleteFile: true);
       return;
@@ -337,7 +388,7 @@ class _ComposerBarState extends State<ComposerBar> {
       final uploaded = await EasyLiveChat.instance.uploadBytes(
         bytes: bytes,
         filename: name,
-        contentType: 'audio/mp4',
+        contentType: 'audio/wav',
       );
       _stopTyping();
       EasyLiveChat.instance
@@ -357,6 +408,187 @@ class _ComposerBarState extends State<ComposerBar> {
     }
   }
 
+  void _startTicker() {
+    _recordTicker?.cancel();
+    _recordTicker = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (!mounted || !_recording || _paused) return;
+      setState(() => _recordSeconds++);
+      if (_recordSeconds >= maxRecordSeconds) unawaited(_pauseRecording());
+    });
+  }
+
+  /// Real microphone levels, at the rate the bar can actually redraw.
+  void _listenToLevels(AudioRecorder recorder) {
+    _ampSub?.cancel();
+    _ampSub = recorder.onAmplitudeChanged(_levelInterval).listen((amp) {
+      if (!mounted || _paused) return;
+      // `current` is dBFS: 0 is clipping and anything under about -45 is a
+      // quiet room. Map that range onto the bar rather than the full -160,
+      // or ordinary speech draws as a flat line along the bottom.
+      final db = amp.current.isFinite ? amp.current : -45.0;
+      final raw = ((db + 45) / 45).clamp(0.0, 1.0);
+      final previous = _levels.value;
+      // Ease toward the new level instead of snapping to it. Raw amplitude
+      // jitters hard between consecutive samples and drew a comb; this is
+      // the same wave with the flicker taken out.
+      final smoothed = previous.isEmpty
+          ? raw
+          : (previous.last * 0.45 + raw * 0.55).clamp(0.0, 1.0);
+      _levels.value = <double>[...previous, smoothed.toDouble()];
+    }, onError: (_) {});
+  }
+
+  /// Stop listening, keep the audio. `resume()` appends to the same file.
+  Future<void> _pauseRecording() async {
+    if (!_recording || _paused) return;
+    try {
+      await _recorder?.pause();
+    } catch (_) {
+      // A recorder that would not pause is one we can still stop to send.
+    }
+    _ampSub?.cancel();
+    _ampSub = null;
+    if (mounted) setState(() => _paused = true);
+  }
+
+  Future<void> _resumeRecording() async {
+    final recorder = _recorder;
+    if (recorder == null || !_paused || _reviewPath != null) return;
+    try {
+      await recorder.resume();
+    } catch (_) {
+      if (mounted) setState(() => _attachError = _s.micFailed);
+      return;
+    }
+    // The take is about to grow, so the copy that was made of it is stale.
+    _disposePreview();
+    if (mounted) setState(() => _paused = false);
+    _listenToLevels(recorder);
+    _startTicker();
+  }
+
+  /// Close the take so it can be played. See [_reviewPath].
+  Future<String?> _finalizeTake() async {
+    if (_reviewPath != null) return _reviewPath;
+    _recordTicker?.cancel();
+    _recordTicker = null;
+    _ampSub?.cancel();
+    _ampSub = null;
+    String? path;
+    try {
+      path = await _recorder?.stop();
+    } catch (_) {
+      path = null;
+    }
+    path ??= _recordPath;
+    if (path == null || !await File(path).exists()) return null;
+    if (mounted) {
+      setState(() {
+        _paused = true;
+        _reviewPath = path;
+      });
+    } else {
+      _reviewPath = path;
+    }
+    return path;
+  }
+
+  /// A playable copy of the take so far, without disturbing the recorder.
+  ///
+  /// A WAV that is still being written carries a header whose two length
+  /// fields describe how much had been written when it was opened — which is
+  /// nothing. Players read those, conclude the file is empty and refuse it.
+  /// The bytes after the header are the real samples, so this copies what is
+  /// on disk and rewrites the two lengths to match what is actually there.
+  ///
+  /// Only ever called while PAUSED, so nothing is appending underneath.
+  Future<String?> _previewCopy() async {
+    final source = _recordPath;
+    if (source == null) return null;
+    try {
+      final bytes = await File(source).readAsBytes();
+      final fixed = withRealWavLengths(bytes);
+      if (fixed == null) return null;
+      final out = File('$source.preview.wav');
+      await out.writeAsBytes(fixed, flush: true);
+      return out.path;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> _togglePreview() async {
+    if (_previewPlaying) {
+      try {
+        await _preview?.pause();
+      } catch (_) {
+        // Nothing to pause is the state we wanted.
+      }
+      return;
+    }
+    // A COPY of what has been recorded so far, with a header that describes
+    // it. The recorder is left exactly as it was — paused, holding the take —
+    // so carrying on talking afterwards is still there to do.
+    final path = await _previewCopy();
+    if (path == null) return;
+    var player = _preview;
+    if (player == null) {
+      player = _preview = AudioPlayer()..setReleaseMode(ReleaseMode.stop);
+      // `record` leaves the session in playAndRecord, which routes playback
+      // to the earpiece — the same reset the thread's tile makes.
+      unawaited(player.setAudioContext(AudioContext(iOS: AudioContextIOS()))
+          .catchError((_) {}));
+      _previewSubs.add(player.onPositionChanged.listen((d) {
+        if (mounted) setState(() => _previewPos = d);
+      }));
+      _previewSubs.add(player.onDurationChanged.listen((d) {
+        if (mounted && d > Duration.zero) setState(() => _previewTotal = d);
+      }));
+      _previewSubs.add(player.onPlayerStateChanged.listen((st) {
+        if (mounted) setState(() => _previewPlaying = st == PlayerState.playing);
+      }));
+      _previewSubs.add(player.onPlayerComplete.listen((_) async {
+        try {
+          await player!.seek(Duration.zero);
+        } catch (_) {
+          // Disposed mid-completion.
+        }
+        if (mounted) {
+          setState(() {
+            _previewPos = Duration.zero;
+            _previewPlaying = false;
+          });
+        }
+      }));
+      try {
+        await player.setSourceDeviceFile(path);
+        _previewTotal = await player.getDuration();
+      } catch (_) {
+        if (mounted) setState(() => _attachError = _s.micFailed);
+        return;
+      }
+    }
+    try {
+      await player.resume();
+    } catch (_) {
+      if (mounted) setState(() => _attachError = _s.micFailed);
+    }
+  }
+
+  Future<void> _seekPreview(double fraction) async {
+    final total = _previewTotal;
+    final player = _preview;
+    if (player == null || total == null || total.inMilliseconds == 0) return;
+    final target = Duration(
+        milliseconds: (total.inMilliseconds * fraction.clamp(0.0, 1.0)).round());
+    if (mounted) setState(() => _previewPos = target);
+    try {
+      await player.seek(target);
+    } catch (_) {
+      // A seek the platform refused leaves the playhead where it was.
+    }
+  }
+
   Future<void> _cancelRecording() async {
     _recordTicker?.cancel();
     _recordTicker = null;
@@ -367,7 +599,44 @@ class _ComposerBarState extends State<ComposerBar> {
     await _teardownRecorder(deleteFile: true);
   }
 
+  /// Throw the take away. The microphone stops, the file goes, and the
+  /// composer comes back — the same thing the trash does in every messenger.
+  Future<void> _discardRecording() async {
+    await _cancelRecording();
+  }
+
+  void _disposePreview() {
+    final source = _recordPath;
+    if (source != null) {
+      // Best effort: the OS reclaims temp anyway.
+      unawaited(File('$source.preview.wav').delete().catchError((_) => File(source)));
+    }
+    for (final sub in _previewSubs) {
+      sub.cancel();
+    }
+    _previewSubs.clear();
+    _preview?.dispose();
+    _preview = null;
+    _previewPlaying = false;
+    _previewPos = Duration.zero;
+    _previewTotal = null;
+  }
+
   Future<void> _teardownRecorder({required bool deleteFile}) async {
+    _ampSub?.cancel();
+    _ampSub = null;
+    _disposePreview();
+    if (mounted) {
+      setState(() {
+        _paused = false;
+        _reviewPath = null;
+        _levels.value = const <double>[];
+      });
+    } else {
+      _paused = false;
+      _reviewPath = null;
+      _levels.value = const <double>[];
+    }
     final path = _recordPath;
     _recordPath = null;
     if (mounted) setState(() => _recordSeconds = 0);
@@ -512,6 +781,13 @@ class _ComposerBarState extends State<ComposerBar> {
                       _micButton(),
                       const SizedBox(width: 4),
                     ],
+                    // Recording puts the trash where the paperclip was: the
+                    // two destructive-ish controls never share a position, and
+                    // the take is the only thing on screen to act on.
+                    if (_recording) ...[
+                      _trashButton(),
+                      const SizedBox(width: 4),
+                    ],
                     // While the microphone is live there is nothing to type,
                     // so the bar stands in for the field and the only two
                     // things to press are discard and send.
@@ -522,9 +798,16 @@ class _ComposerBarState extends State<ComposerBar> {
                     // send button beside a disabled field promised something
                     // the composer would then refuse. While locked the row is
                     // just the field and its explanatory hint.
+                    // Paused with something to hear: the microphone comes
+                    // back to carry on talking, exactly where it was before
+                    // the take started.
+                    if (_recording && _paused) ...[
+                      const SizedBox(width: 4),
+                      _continueRecordingButton(),
+                    ],
                     if (!_locked) ...[
                       const SizedBox(width: 8),
-                      _recording ? _stopButton() : _sendButton(),
+                      _recording ? _sendRecordingButton() : _sendButton(),
                     ],
                   ],
                 ),
@@ -552,43 +835,107 @@ class _ComposerBarState extends State<ComposerBar> {
     );
   }
 
+  /// The take, while it is being made and once it is made.
+  ///
+  /// Recording: a live waveform off the microphone, running time, and a pause.
+  /// Paused: the same waveform with a playhead, a play button, and the elapsed
+  /// time as it plays back.
   Widget _recordingBar() {
     final t = _theme;
+    final reviewing = _paused;
+    final total = _previewTotal;
+    final fraction = (reviewing && total != null && total.inMilliseconds > 0)
+        ? (_previewPos.inMilliseconds / total.inMilliseconds).clamp(0.0, 1.0)
+        : (reviewing ? 0.0 : 1.0);
+    final elapsed = reviewing && _previewPos > Duration.zero
+        ? formatRecordDuration(_previewPos.inSeconds)
+        : formatRecordDuration(_recordSeconds);
+
     return Row(
       children: [
-        Container(
-          width: 9,
-          height: 9,
-          decoration: const BoxDecoration(
-              color: Color(0xFFE11D48), shape: BoxShape.circle),
-        ),
-        const SizedBox(width: 10),
-        Text(
-          formatRecordDuration(_recordSeconds),
-          style: TextStyle(
-              color: t.text, fontFeatures: const [FontFeature.tabularFigures()]),
-        ),
-        const SizedBox(width: 10),
+        if (reviewing)
+          IconButton(
+            onPressed: _togglePreview,
+            tooltip: _previewPlaying ? _s.pauseVoice : _s.playVoice,
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints.tightFor(width: 32, height: 32),
+            icon: Icon(
+              _previewPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
+              size: 22,
+              color: t.text,
+            ),
+          )
+        else
+          // The recording dot, which is the one thing on the bar that says
+          // the microphone is actually open.
+          Container(
+            width: 9,
+            height: 9,
+            decoration: const BoxDecoration(
+                color: Color(0xFFE11D48), shape: BoxShape.circle),
+          ),
+        const SizedBox(width: 8),
         Expanded(
-          child: Text(
-            _s.recordingVoice,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(color: t.text.withValues(alpha: 0.6), fontSize: 13),
+          child: VoiceLevels(
+            levels: _levels,
+            // Nothing is played back while the microphone is live, so every
+            // bar is "already recorded" and none of it is dimmed.
+            fraction: fraction,
+            color: t.text,
+            interval: _levelInterval,
+            onSeek: reviewing ? _seekPreview : null,
           ),
         ),
-        IconButton(
-          onPressed: _cancelRecording,
-          tooltip: _s.discardVoice,
-          padding: EdgeInsets.zero,
-          constraints: const BoxConstraints.tightFor(width: 36, height: 36),
-          icon: Icon(Icons.close, size: 18, color: t.text.withValues(alpha: 0.6)),
+        const SizedBox(width: 8),
+        Text(
+          elapsed,
+          style: TextStyle(
+              color: t.text.withValues(alpha: 0.7),
+              fontSize: 13,
+              fontFeatures: const [FontFeature.tabularFigures()]),
         ),
+        if (!reviewing)
+          IconButton(
+            onPressed: _pauseRecording,
+            tooltip: _s.pauseVoice,
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints.tightFor(width: 32, height: 32),
+            icon: Icon(Icons.pause_rounded, size: 22, color: t.text),
+          ),
       ],
     );
   }
 
-  Widget _stopButton() {
+  Widget _trashButton() {
     final t = _theme;
+    return IconButton(
+      onPressed: _discardRecording,
+      tooltip: _s.discardVoice,
+      padding: EdgeInsets.zero,
+      constraints: const BoxConstraints.tightFor(width: 44, height: 44),
+      icon: Icon(Icons.delete_outline,
+          size: 22, color: t.text.withValues(alpha: 0.75)),
+    );
+  }
+
+  /// Carry on talking. Genuinely appends — `record` pauses and resumes the
+  /// same file, so this is one recording and not two stitched together.
+  Widget _continueRecordingButton() {
+    return IconButton(
+      onPressed: _resumeRecording,
+      tooltip: _s.recordVoice,
+      padding: EdgeInsets.zero,
+      constraints: const BoxConstraints.tightFor(width: 44, height: 44),
+      icon: const Icon(Icons.mic_none_outlined,
+          size: 22, color: Color(0xFFE11D48)),
+    );
+  }
+
+  Widget _sendRecordingButton() {
+    final t = _theme;
+    final onPrimary = t.primary.computeLuminance() > 0.5
+        ? const Color(0xFF0F172A)
+        : Colors.white;
     return IconButton(
       onPressed: _stopRecordingAndSend,
       tooltip: _s.sendVoice,
@@ -598,7 +945,10 @@ class _ComposerBarState extends State<ComposerBar> {
         width: 34,
         height: 34,
         decoration: BoxDecoration(color: t.primary, shape: BoxShape.circle),
-        child: const Icon(Icons.stop, size: 16, color: Colors.white),
+        // `onPrimary`, not a hardcoded white: a workspace on a pale accent had
+        // a white glyph on a near-white disc, which is the same bug one layer
+        // down. The send button has always computed this.
+        child: Icon(Icons.send_rounded, size: 18, color: onPrimary),
       ),
     );
   }
@@ -936,4 +1286,44 @@ class _PendingAttachment {
         path.endsWith('.bmp') ||
         path.endsWith('.heic');
   }
+}
+
+/// Rewrite a WAV's RIFF and `data` lengths from the bytes actually present.
+///
+/// Returns null for anything that is not a RIFF/WAVE file, rather than
+/// guessing at offsets in a container this did not write.
+@visibleForTesting
+Uint8List? withRealWavLengths(Uint8List bytes) {
+  if (bytes.length < 44) return null;
+  bool tagAt(int offset, String tag) {
+    for (var i = 0; i < tag.length; i++) {
+      if (bytes[offset + i] != tag.codeUnitAt(i)) return false;
+    }
+    return true;
+  }
+
+  if (!tagAt(0, 'RIFF') || !tagAt(8, 'WAVE')) return null;
+
+  // Walk the chunks to find `data`; `fmt ` is not always the only one
+  // before it, and its size is not always 16.
+  var cursor = 12;
+  var dataAt = -1;
+  while (cursor + 8 <= bytes.length) {
+    final size = bytes.buffer.asByteData().getUint32(cursor + 4, Endian.little);
+    if (tagAt(cursor, 'data')) {
+      dataAt = cursor;
+      break;
+    }
+    // Chunks are word-aligned, and a stale size must never walk backwards.
+    final step = 8 + size + (size.isOdd ? 1 : 0);
+    if (step <= 8) return null;
+    cursor += step;
+  }
+  if (dataAt < 0 || dataAt + 8 > bytes.length) return null;
+
+  final out = Uint8List.fromList(bytes);
+  final view = out.buffer.asByteData();
+  view.setUint32(4, out.length - 8, Endian.little);
+  view.setUint32(dataAt + 4, out.length - (dataAt + 8), Endian.little);
+  return out;
 }

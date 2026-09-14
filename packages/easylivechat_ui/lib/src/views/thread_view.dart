@@ -395,7 +395,7 @@ class MessageBubble extends StatelessWidget {
       );
     }
 
-    final bubbleColor = _isCustomer ? theme.primary : theme.surface;
+    final bubbleColor = _bubbleColor;
     final textColor = _isCustomer ? _onColor(theme.primary) : theme.text;
     final align =
         _isCustomer ? CrossAxisAlignment.end : CrossAxisAlignment.start;
@@ -464,17 +464,17 @@ class MessageBubble extends StatelessWidget {
             maxWidth: maxBubble,
           ),
           child: Container(
-            // A message that is only pictures gets no bubble. The bubble exists
-            // to put a surface behind text; wrapped around a photo it becomes a
-            // thick coloured frame — on the visitor's own side that is the full
-            // accent colour, so their own images arrived matted in orange.
-            // Every other messenger renders a bare photo, and the tile already
-            // rounds its own corners.
-            padding: _isImageOnly
+            // A message that is only self-drawn media gets no bubble. The
+            // bubble exists to put a surface behind text; wrapped around a
+            // photo or a voice note it becomes a second card around a first
+            // one — on the visitor's own side the full accent colour, so
+            // their own images arrived matted in orange and their own
+            // recording in a teal frame.
+            padding: _isBareMedia
                 ? EdgeInsets.zero
                 : const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
             decoration: BoxDecoration(
-              color: _isImageOnly ? Colors.transparent : bubbleColor,
+              color: _isBareMedia ? Colors.transparent : bubbleColor,
               // Logical corners: the tail hugs the sender's own side in RTL
               // as well — bottomStart/bottomEnd flip with the layout,
               // physical left/right did not.
@@ -484,7 +484,7 @@ class MessageBubble extends StatelessWidget {
                 bottomStart: Radius.circular(_isCustomer ? 16 : 4),
                 bottomEnd: Radius.circular(_isCustomer ? 4 : 16),
               ),
-              border: _isCustomer || _isImageOnly
+              border: _isCustomer || _isBareMedia
                   ? null
                   : Border.all(color: theme.text.withValues(alpha: 0.08)),
             ),
@@ -607,22 +607,34 @@ class MessageBubble extends StatelessWidget {
   // ── attachment rendering ──
 
   /// Build attachment tiles, preferring the rich rehosted list when present.
-  /// True when this message is nothing but pictures that will actually render.
+  /// True when this message is nothing but media that draws its own surface.
+  ///
+  /// A picture, or a voice note: both already round their own corners, so the
+  /// bubble around them is a second card holding a first one. On the visitor's
+  /// own side that is the full accent colour, and their own recording arrived
+  /// matted in a teal frame.
   ///
   /// Deliberately strict. A caption needs the bubble behind it, and so does a
   /// file chip or an unavailable-media placeholder — those read as controls and
-  /// would float loose without a surface. Only when every tile is a real,
-  /// resolvable image and there is no text does the bubble stop earning its
-  /// place.
-  bool get _isImageOnly {
+  /// would float loose without a surface. Only when every tile draws its own
+  /// and there is no text does the bubble stop earning its place.
+  /// The visitor's own messages sit on the accent, everyone else's on the
+  /// neutral surface. A getter because a voice note standing outside the
+  /// bubble has to paint the same colour the bubble would have.
+  Color get _bubbleColor => _isCustomer ? theme.primary : theme.surface;
+
+  bool get _isBareMedia {
     if ((message.body ?? '').trim().isNotEmpty) return false;
     if (message.attachments.isNotEmpty) {
-      return message.attachments
-          .every((a) => a.isResolvable && a.kind == AttachmentKind.image);
+      return message.attachments.every((a) =>
+          a.isResolvable &&
+          (a.kind == AttachmentKind.image ||
+              a.kind == AttachmentKind.audio ||
+              _looksLikeAudio(a.url)));
     }
     if (message.attachmentUrls.isNotEmpty) {
-      return message.attachmentUrls
-          .every((u) => _isResolvableUrl(u) && _looksLikeImage(u));
+      return message.attachmentUrls.every((u) =>
+          _isResolvableUrl(u) && (_looksLikeImage(u) || _looksLikeAudio(u)));
     }
     return false;
   }
@@ -680,6 +692,9 @@ class MessageBubble extends StatelessWidget {
       key: ValueKey('voice:$url'),
       url: url,
       foreground: fg,
+      // Standing on its own it has to paint the surface the bubble used to,
+      // or white-on-white is all there is to see.
+      background: _isBareMedia ? _bubbleColor : null,
       strings: strings,
       fallback: _fileChip(label, fg),
     );

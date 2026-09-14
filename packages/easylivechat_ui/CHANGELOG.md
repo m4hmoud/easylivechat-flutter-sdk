@@ -1,6 +1,104 @@
 # Changelog
 
+## 0.1.69
+
+- **A voice note now actually plays, and shows its length and a seek bar.**
+  0.1.68 gave it a play button, but pressing it turned the note straight back
+  into a download chip. `routes/uploads.ts` serves every upload as a single
+  `200` with the whole body and **no `Accept-Ranges`** — it cannot answer a
+  byte-range request — and iOS plays remote media through `AVPlayer`, which
+  reads an MP4/M4A `moov` atom by issuing exactly those requests. The asset
+  never loaded, `play()` threw, and the tile fell back to its chip.
+- The file is now fetched before it is played, which a voice note wants in any
+  case. A plain GET needs no ranges, so it works against the server as it
+  stands; the **real duration is shown before anything is played** rather than
+  the words "voice message"; and **dragging the seek bar works**, which over a
+  server that cannot serve ranges it could not. Recordings are small, and are
+  cached under the system temp directory, so scrolling back through a thread
+  re-reads from disk instead of the network.
+- **A voice note is now the whole card.** It already rounds its own corners, so
+  the bubble around it was a second card holding a first one — on the visitor's
+  own side the full accent colour, so their own recording arrived matted in a
+  teal frame. It drops the bubble and paints that surface itself, exactly as an
+  image-only message already did. A note WITH a caption keeps its bubble and
+  stays an inlay, because the caption needs the surface.
+- **A recording can be reviewed before it is sent.** The composer used to
+  offer one move — stop, which sent immediately — so the only way to hear what
+  you had said was to send it to someone. It now records against a live
+  waveform of the microphone's own levels, pauses, plays back with a seek bar,
+  carries on recording where it left off, and sends or bins the take: trash,
+  play, waveform, mic, send, the way every messenger lays it out.
+- The recording waveform no longer overflows the composer. It is deliberately
+  wider than its window — it carries a spare bar to slide in from — and a
+  `Row` cannot be told that, so it reported a flex overflow and painted yellow
+  hazard stripes across the bar on a screen a visitor was looking at. The run
+  is laid out at its own width inside an `OverflowBox` now, anchored to the
+  trailing edge and clipped to the window. The widget moved to
+  `views/voice_levels.dart` so it can be tested at a width, which is how this
+  should have been caught.
+- The recording waveform moves at frame rate rather than in steps. It samples
+  at 60ms instead of 120, eases each level toward the last so raw amplitude
+  jitter stops drawing a comb, keeps a FIXED bar pitch — bars used to shrink
+  as the take grew, because they shared the width between them — and slides a
+  fraction of a bar every frame off a `Ticker` instead of jumping a whole one
+  each sample. Levels also moved to a `ValueNotifier`, so sixteen samples a
+  second redraw the waveform and not the whole composer.
+- Paused, the WHOLE take is fitted to the width — averaged down into as many
+  bars as fit — instead of showing only the tail. Nothing moves but the
+  playhead.
+- Continuing a paused take really continues it — `record` pauses and resumes
+  the same file, so it is one recording and not two stitched together.
+- **Listening to a take no longer ends it.** Play it, hear it, carry on
+  talking, as many times as you like. This is why the recording format changed
+  from AAC to WAV: AAC lives in an MP4 container whose index is only written
+  when the recording stops, so hearing a take meant ending it and the
+  microphone button disappeared for good. WAV is raw samples appended in
+  order, so a playable copy can be cut from a take that is merely paused. The
+  copy's two length fields are rewritten from the bytes actually on disk — a
+  half-written WAV says it holds nothing, and players believe it.
+- The upload is bigger for that: 16kHz mono is ~32KB a second against about 6
+  for AAC. It stays well inside the 25MB cap even at the five-minute ceiling,
+  and the server re-encodes an uploaded wav to Ogg/Opus, so what is stored and
+  what goes out to WhatsApp is *smaller* than the AAC was. Only the upload
+  pays.
+- **The button that sends a recording is drawn as a send arrow**, not a stop
+  square. It never stopped anything — it puts the note straight in the thread —
+  so the square was asking people to commit while showing them a pause. Its
+  tooltip has said "send voice message" the whole time; only the glyph
+  disagreed. It also takes its colour from the accent the way the composer's
+  send button does, instead of a hardcoded white that vanished on a pale one.
+- **A waveform seek bar**, in place of the single line. Playback fills the bars
+  from the leading edge, and dragging anywhere in the band seeks. The bars are
+  **decorative**: a true amplitude envelope means decoding the AAC to PCM,
+  which needs a platform decoder this package deliberately does not carry, so
+  they are a stable fingerprint of the file rather than a reading of its
+  loudness. One note always looks the same and two notes look different, but a
+  quiet passage is not drawn short.
+- **The download itself was racing, and that was the whole failure.** Every
+  fetch wrote through one shared `<name>.part`, held open for the length of the
+  download. A message re-keys from its optimistic `tmp-` id to the server's,
+  which re-mounts the tile while the first download is still running — so two
+  fetches of the same note overlap as a matter of course on the visitor's OWN
+  recording. Whichever finished first renamed the file out from under the
+  other, and the loser died with `PathNotFoundException: Cannot rename file …
+  No such file or directory`. A note is now fetched once however many tiles ask
+  for it, written through a scratch name unique to that attempt, and a lost
+  rename resolves to the file the winner left.
+- If the local copy cannot be made, it falls back to streaming the url before
+  giving up — half a voice note beats a download chip, even though streaming
+  can serve neither a duration nor a seek against this server.
+- A failure now says what it was: the reason is printed with an
+  `[easylivechat]` prefix, and in a **debug build** it is drawn in place of the
+  tile. A voice note that silently turns into a download chip is
+  indistinguishable from one the SDK never recognised as audio, and telling
+  those two apart by guesswork cost two releases.
+- The iOS audio session is put back to `playback` before a note starts. The
+  same app records voice notes, and `record` leaves the session in
+  `playAndRecord` — which routes playback to the **earpiece**, so a note plays
+  at a whisper against the side of your head.
+
 ## 0.1.68
+
 
 - **Voice messages play in the thread.** The SDK has recorded and sent them
   since 0.1.66, but what came back rendered through the generic attachment
