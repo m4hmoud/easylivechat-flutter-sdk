@@ -1,5 +1,32 @@
 # Changelog
 
+## 0.1.68
+
+- **Voice messages play in the thread.** The SDK has recorded and sent them
+  since 0.1.66, but what came back rendered through the generic attachment
+  path — `_richTile` special-cased images and every other kind fell through to
+  the download chip. A visitor's own recording came back as a uuid with a
+  download arrow beside it, and hearing it meant saving a file and leaving the
+  chat. A voice note now gets a play button, a progress bar you can scrub, and
+  its running time. Only one plays at a time, audio the device cannot decode
+  still falls back to the chip so the file is never unreachable, and the tile
+  is keyed by url so a message arriving mid-listen does not restart it.
+- Nothing is fetched until play is pressed. Reading a duration out of
+  `audioplayers` means loading the file, so a thread holding twenty notes would
+  otherwise pull twenty audio files over mobile data purely to print their
+  lengths. Until a note has been played once the tile says what it is instead
+  of how long it runs.
+- **`kmr` is Badini, not Kurmanji.** The six voice and microphone strings added
+  in 0.1.66 were written in Latin-script Kurmanji, while the other fifty-six in
+  that locale are Arabic-script Badini — which is what `kmr` means everywhere
+  else in the product (`Kurdish (Badini)` in every picker), and what the SDK's
+  own RTL list already assumed, so they were Latin text laid out right-to-left.
+  They now read as Badini, as do the three new playback strings.
+- `l10n/sdk_strings.json` had fallen ten keys behind the compiled table, so
+  running `l10n/apply.py` — the documented way to edit these strings — would
+  have silently deleted every voice and AI string from all thirteen locales.
+  The JSON is the source of truth again.
+
 ## 0.1.67
 
 - The "AI" badge and the assistant's name appear only on the AI assistant's

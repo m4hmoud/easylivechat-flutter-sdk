@@ -9,6 +9,7 @@ import '../l10n.dart';
 import '../theme.dart';
 import 'image_viewer.dart';
 import 'linkified_text.dart';
+import 'voice_note_tile.dart';
 
 /// The message thread (native analog of the web `Thread.tsx`).
 ///
@@ -18,9 +19,10 @@ import 'linkified_text.dart';
 /// (the server already nulls `senderName` when disabled — double-guarded here).
 ///
 /// Attachments: prefer the rich [RehostedAttachment] list when present
-/// (kind==image → inline via `cached_network_image`; otherwise a download
-/// chip). Otherwise fall back to flat [ChatMessage.attachmentUrls] (image-like
-/// extensions render inline, the rest as chips). Non-resolvable placeholders
+/// (kind==image → inline via `cached_network_image`; kind==audio → a playable
+/// [ElcVoiceNoteTile]; otherwise a download chip). Otherwise fall back to flat
+/// [ChatMessage.attachmentUrls] (image-like extensions render inline,
+/// audio-like ones play, the rest are chips). Non-resolvable placeholders
 /// (`wa:media:{id}`) render an inert "media unavailable" chip — never a broken
 /// image. Unknown `contentType` degrades to a plain text bubble; nothing here
 /// may crash on a future enum value.
@@ -647,7 +649,13 @@ class MessageBubble extends StatelessWidget {
     if (a.kind == AttachmentKind.image) {
       return _inlineImage(context, url, fg);
     }
-    return _fileChip(a.filename ?? _basename(a.url), fg);
+    final label = a.filename ?? _basename(a.url);
+    // The server's `kind` is authoritative — it comes from the mime type, so
+    // it catches an extension this end has never heard of.
+    if (a.kind == AttachmentKind.audio || _looksLikeAudio(a.url)) {
+      return _voiceTile(url, label, fg);
+    }
+    return _fileChip(label, fg);
   }
 
   Widget _urlTile(BuildContext context, String raw, Color fg) {
@@ -659,7 +667,22 @@ class MessageBubble extends StatelessWidget {
     if (_looksLikeImage(raw)) {
       return _inlineImage(context, url, fg);
     }
+    if (_looksLikeAudio(raw)) {
+      return _voiceTile(url, _basename(raw), fg);
+    }
     return _fileChip(_basename(raw), fg);
+  }
+
+  /// Keyed by URL so playback survives the thread rebuilding around it —
+  /// a message arriving mid-listen must not restart what is playing.
+  Widget _voiceTile(String url, String label, Color fg) {
+    return ElcVoiceNoteTile(
+      key: ValueKey('voice:$url'),
+      url: url,
+      foreground: fg,
+      strings: strings,
+      fallback: _fileChip(label, fg),
+    );
   }
 
   Widget _inlineImage(BuildContext context, String url, Color fg) {
@@ -778,6 +801,23 @@ class MessageBubble extends StatelessWidget {
         path.endsWith('.gif') ||
         path.endsWith('.webp') ||
         path.endsWith('.bmp');
+  }
+
+  /// `.webm` is deliberately absent: the outbound media classifier
+  /// (`adapters/media-out.ts`) reads it as video, and the API rewraps a
+  /// browser-recorded audio `.webm` to `.ogg` on upload, so one arriving here
+  /// really is a video. A `.webm` that is audio-only still plays — it reaches
+  /// [_richTile] carrying `kind: audio` from its mime type.
+  static bool _looksLikeAudio(String u) {
+    final path = u.toLowerCase().split('?').first;
+    return path.endsWith('.m4a') ||
+        path.endsWith('.mp3') ||
+        path.endsWith('.ogg') ||
+        path.endsWith('.oga') ||
+        path.endsWith('.opus') ||
+        path.endsWith('.aac') ||
+        path.endsWith('.amr') ||
+        path.endsWith('.wav');
   }
 
   static String _basename(String u) {
