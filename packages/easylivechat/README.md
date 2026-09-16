@@ -174,6 +174,33 @@ carrying a structured `metadata.i18n` key instead of baked-in English, so you
 can render them in the visitor's language. Render the key if you have a
 translation, and fall back to `body`.
 
+## Cards and quick replies
+
+An agent can send a card — an image, a title, a short text and link buttons —
+and a greeting or the AI assistant can offer one-tap answers. Both arrive on
+ordinary messages, and both have a plain-text fallback, so a UI that ignores
+them still shows something sensible.
+
+```dart
+final card = message.card; // null unless it's a valid card
+if (card != null) {
+  // Draw the card INSTEAD of message.body and message.attachmentUrls.
+  // card.imageUrl may be /uploads/…: EasyLiveChat.instance.resolveUrl(it).
+  for (final button in card.buttons) {
+    // button.uri is http(s) only, ready for url_launcher.
+  }
+}
+
+final offer = quickRepliesOnOffer(EasyLiveChat.instance.messages.value);
+if (offer != null) {
+  // Draw offer.replies under the message whose id is offer.messageId.
+  // A tap: EasyLiveChat.instance.sendMessage(reply);
+}
+```
+
+`quickRepliesOnOffer` is the web widget's rule: only the newest message offers
+them, and only until the visitor or the team says something else.
+
 ## Localization
 
 This package holds no user-facing strings — it is protocol and state only.

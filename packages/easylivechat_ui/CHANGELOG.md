@@ -1,5 +1,32 @@
 # Changelog
 
+## 0.1.70
+
+- **Cards draw as cards.** An agent's card — image, title, text and link
+  buttons — used to arrive as its plain-text version, every button spelled
+  out as `Label: https://…`. It is now drawn in the team's bubble: the same
+  surface, corners, tail and outline as the message beside it, with the image
+  across the top at 16:9, the title, the text, and each button as a full-width
+  row in the workspace accent. A button opens its link in the visitor's
+  browser, and only an `http:`/`https:` link ever reaches the platform. The
+  text version and the image attachment the card carries for other clients
+  are not drawn a second time. A card that doesn't validate reads as its text,
+  as it did before.
+- **Quick replies.** The answers a workspace offers under its greeting, and
+  the AI assistant's Yes / No when it offers to pass the visitor to the team,
+  are one-tap buttons under that message: pills outlined in the accent that
+  fill with it on press, wrapping from the team's side in either direction,
+  announced as "Suggested replies" in all 13 languages. A tap sends the reply
+  as the visitor's own message, through the same send the composer uses — so
+  it ticks, and fails to a retry, like anything typed. The buttons go the
+  moment the visitor answers or the team writes again, and are disabled while
+  a reply is on its way and while the workspace takes no messages, so a double
+  tap sends once.
+- The line with an agent's name above their bubble was inset from the physical
+  left, so in Arabic, Kurdish and Urdu it sat 4px off the wrong edge. It uses
+  a logical inset now.
+- Requires `easylivechat` 0.1.53.
+
 ## 0.1.69
 
 - **A voice note now actually plays, and shows its length and a seek bar.**

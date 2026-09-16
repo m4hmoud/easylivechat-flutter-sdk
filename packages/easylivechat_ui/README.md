@@ -139,6 +139,12 @@ any of it:
 Out-of-hours behaviour is a dashboard setting, not a client one — take a
 message, show a notice, or accept chats anyway.
 
+Cards your agents send are drawn as cards — image, title, text and link
+buttons — and the quick replies you set on the greeting, like the AI
+assistant's Yes / No when it offers to hand over, are one-tap buttons under
+the message, as in the web widget. Both follow your workspace's colours and
+the visitor's language and direction.
+
 ## Recipes
 
 ### Identify a signed-in user

@@ -338,7 +338,14 @@ class _EasyLiveChatScreenState extends State<EasyLiveChatScreen>
                 (EasyLiveChat.instance.workspaceClosed ||
                     EasyLiveChat.instance.composerLocked))
               ClosedNoticeBanner(config: config, theme: theme),
-            Expanded(child: ThreadView(theme: theme)),
+            Expanded(
+              child: ThreadView(
+                theme: theme,
+                // A tapped quick reply is the visitor's own message, sent the
+                // way the composer sends one.
+                onQuickReply: ThreadView.sendReplyAsMessage,
+              ),
+            ),
             ComposerBar(
               theme: theme,
               onPickAttachments: widget.onPickAttachments,

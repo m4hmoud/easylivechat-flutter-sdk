@@ -1,4 +1,6 @@
 import 'enums.dart';
+import 'js_text.dart';
+import 'message_card.dart';
 
 /// A rehosted attachment (rich shape the server fills in once the media
 /// re-host worker runs; arrives via `message:updated`). Prefer this over the
@@ -159,6 +161,32 @@ class ChatMessage {
     if (i18n is! Map) return '';
     final params = i18n['params'];
     return params is Map ? (params[name] ?? '').toString() : '';
+  }
+
+  /// The card this message draws as, or null.
+  ///
+  /// Only a [MessageContentType.card] message has one, and only when its
+  /// `metadata.card` validates ([MessageCard.tryParse]). Draw the card INSTEAD
+  /// of [body] and [attachmentUrls]: the body is the card's plain-text version
+  /// for clients that can't draw one, and the attachment is the card's own
+  /// image. When this is null, render the message like any other — an old or
+  /// malformed card still reads as its text.
+  MessageCard? get card => contentType == MessageContentType.card
+      ? MessageCard.tryParse(metadata?['card'])
+      : null;
+
+  /// The answers `metadata.quickReplies` offers under this message, blanks
+  /// dropped, each exactly as sent.
+  ///
+  /// Whether they are on offer is not this message's call alone — only the
+  /// newest message offers them, and only until the visitor or the team says
+  /// something else. Ask `quickRepliesOnOffer` which message that is.
+  List<String> get quickReplies {
+    final raw = metadata?['quickReplies'];
+    if (raw is! List) return const [];
+    return List<String>.unmodifiable(
+      raw.whereType<String>().where((r) => jsTrim(r).isNotEmpty),
+    );
   }
 
   bool get isFromCustomer => senderType == SenderType.customer;

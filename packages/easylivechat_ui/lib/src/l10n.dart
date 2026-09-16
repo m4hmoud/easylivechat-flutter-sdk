@@ -177,6 +177,10 @@ class ElcStrings {
   String get messageSent => _t('messageSent');
   String get messageRead => _t('messageRead');
 
+  /// Screen-reader name for the row of quick-reply buttons under a message —
+  /// the same words the web widget announces (`suggestedReplies`).
+  String get suggestedReplies => _t('suggestedReplies');
+
   // ── pre-chat ──
   String get startChat => _t('startChat');
   String get fieldRequired => _t('fieldRequired');
@@ -304,6 +308,7 @@ class ElcStrings {
       'sending': 'Sending…',
       'messageSent': 'Sent',
       'messageRead': 'Read',
+      'suggestedReplies': 'Suggested replies',
       'startChat': 'Start chat',
       'fieldRequired': 'This field is required',
       'invalidEmail': 'Enter a valid email address',
@@ -372,6 +377,7 @@ class ElcStrings {
       'sending': 'جارٍ الإرسال…',
       'messageSent': 'تم الإرسال',
       'messageRead': 'تمت القراءة',
+      'suggestedReplies': 'ردود مقترحة',
       'startChat': 'بدء المحادثة',
       'fieldRequired': 'هذا الحقل مطلوب',
       'invalidEmail': 'أدخل بريدًا إلكترونيًا صالحًا',
@@ -440,6 +446,7 @@ class ElcStrings {
       'sending': 'دەنێردرێت…',
       'messageSent': 'نێردرا',
       'messageRead': 'خوێندرایەوە',
+      'suggestedReplies': 'وەڵامە پێشنیارکراوەکان',
       'startChat': 'دەستپێکردنی گفتوگۆ',
       'fieldRequired': 'ئەم خانەیە پێویستە',
       'invalidEmail': 'ئیمەیڵێکی دروست بنووسە',
@@ -508,6 +515,7 @@ class ElcStrings {
       'sending': 'Senden…',
       'messageSent': 'Gesendet',
       'messageRead': 'Gelesen',
+      'suggestedReplies': 'Antwortvorschläge',
       'startChat': 'Chat starten',
       'fieldRequired': 'Dieses Feld ist erforderlich',
       'invalidEmail': 'Gültige E-Mail-Adresse eingeben',
@@ -576,6 +584,7 @@ class ElcStrings {
       'sending': 'Enviando…',
       'messageSent': 'Enviado',
       'messageRead': 'Leído',
+      'suggestedReplies': 'Respuestas sugeridas',
       'startChat': 'Iniciar chat',
       'fieldRequired': 'Este campo es obligatorio',
       'invalidEmail': 'Introduce un correo válido',
@@ -644,6 +653,7 @@ class ElcStrings {
       'sending': 'Envoi…',
       'messageSent': 'Envoyé',
       'messageRead': 'Lu',
+      'suggestedReplies': 'Réponses suggérées',
       'startChat': 'Démarrer le chat',
       'fieldRequired': 'Ce champ est obligatoire',
       'invalidEmail': 'Saisissez une adresse e-mail valide',
@@ -712,6 +722,7 @@ class ElcStrings {
       'sending': 'भेजा जा रहा है…',
       'messageSent': 'भेजा गया',
       'messageRead': 'पढ़ा गया',
+      'suggestedReplies': 'सुझाए गए जवाब',
       'startChat': 'चैट शुरू करें',
       'fieldRequired': 'यह फ़ील्ड आवश्यक है',
       'invalidEmail': 'मान्य ईमेल पता दर्ज करें',
@@ -780,6 +791,7 @@ class ElcStrings {
       'sending': 'Invio…',
       'messageSent': 'Inviato',
       'messageRead': 'Letto',
+      'suggestedReplies': 'Risposte suggerite',
       'startChat': 'Avvia chat',
       'fieldRequired': 'Questo campo è obbligatorio',
       'invalidEmail': 'Inserisci un’email valida',
@@ -848,6 +860,7 @@ class ElcStrings {
       'sending': 'د هنێریت…',
       'messageSent': 'هاتە فرێکرن',
       'messageRead': 'هاتە خواندن',
+      'suggestedReplies': 'بەرسڤێن پێشنیارکری',
       'startChat': 'دەستپێکرنا چاتی',
       'fieldRequired': 'ئەڤ خانە یا پێدڤی یە',
       'invalidEmail': 'ئیمێلەکێ دروست بنڤیسە',
@@ -916,6 +929,7 @@ class ElcStrings {
       'sending': 'Enviando…',
       'messageSent': 'Enviado',
       'messageRead': 'Lido',
+      'suggestedReplies': 'Respostas sugeridas',
       'startChat': 'Iniciar conversa',
       'fieldRequired': 'Este campo é obrigatório',
       'invalidEmail': 'Insira um e-mail válido',
@@ -984,6 +998,7 @@ class ElcStrings {
       'sending': 'Gönderiliyor…',
       'messageSent': 'Gönderildi',
       'messageRead': 'Okundu',
+      'suggestedReplies': 'Önerilen yanıtlar',
       'startChat': 'Sohbeti başlat',
       'fieldRequired': 'Bu alan zorunludur',
       'invalidEmail': 'Geçerli bir e-posta girin',
@@ -1052,6 +1067,7 @@ class ElcStrings {
       'sending': 'بھیجا جا رہا ہے…',
       'messageSent': 'بھیج دیا گیا',
       'messageRead': 'پڑھ لیا گیا',
+      'suggestedReplies': 'تجویز کردہ جوابات',
       'startChat': 'چیٹ شروع کریں',
       'fieldRequired': 'یہ خانہ ضروری ہے',
       'invalidEmail': 'درست ای میل درج کریں',
@@ -1120,6 +1136,7 @@ class ElcStrings {
       'sending': '发送中…',
       'messageSent': '已发送',
       'messageRead': '已读',
+      'suggestedReplies': '建议回复',
       'startChat': '开始聊天',
       'fieldRequired': '此字段为必填项',
       'invalidEmail': '请输入有效的电子邮箱',

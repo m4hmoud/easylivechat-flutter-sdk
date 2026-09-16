@@ -1,5 +1,39 @@
 # Changelog
 
+## 0.1.53
+
+- **Cards.** `ChatMessage.card` is the card an agent sent — an image, a title,
+  a short text and up to three link buttons — as a `MessageCard` with
+  `MessageCardButton`s. A card reached an SDK host only as its plain-text
+  `body` (`Label: https://…` for every button), while the web widget and the
+  dashboard drew the card. It is null for anything that is not a `CARD`
+  message or whose `metadata.card` does not validate; render the body then,
+  as before.
+- The card is validated here with the server's own rules
+  (`packages/shared/src/message-card.ts`), not trusted from the row: a title
+  is required, whitespace is collapsed, fields are capped (title 80, text 300,
+  label 30, three buttons, links 1000), and a button whose link is not
+  `http:`/`https:` — above all `javascript:` — is dropped. `MessageCard.tryParse`
+  and `MessageCard.isSafeUrl` are public for hosts that read cards themselves.
+- A link is judged the way a browser reads it, not the way Dart's
+  `Uri.parse` does: `Uri.parse` accepts `https://exa mple.com`, a port of
+  `99999` and `https://999.1.1.1`, all of which the web refuses, and refuses
+  `https:host`, which the web opens. Checked against the TypeScript validator
+  on 6,000 generated cards (identical) and 12,000 generated links (identical
+  but for host names in a non-Latin script, where the browser's full IDNA
+  tables are approximated in the accepting direction). Whitespace is trimmed
+  by JavaScript's rules as well — Dart's `String.trim()` also strips U+0085,
+  which the server keeps. `MessageCardButton.uri` is the link as a browser
+  would visit it, ready for `url_launcher`.
+- **Quick replies.** `ChatMessage.quickReplies` is the one-tap answers a
+  message offers — the workspace greeting's, or the AI assistant's Yes / No
+  to a handover — and `quickRepliesOnOffer(messages)` says which message's are
+  on offer right now, as a `QuickReplyOffer`. Only the newest message offers
+  them, and only until the visitor or the team says anything else; a system
+  notice doesn't count. It is the web widget's rule, ported with its tests, so
+  a host's own UI and the prebuilt one agree on when the buttons are there. A
+  tap is an ordinary `sendMessage` with the reply's exact text.
+
 ## 0.1.52
 
 - `ChatMessage.isFromAssistant` is true only for replies the AI assistant wrote,

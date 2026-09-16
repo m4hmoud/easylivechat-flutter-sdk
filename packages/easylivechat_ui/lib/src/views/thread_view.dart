@@ -7,8 +7,11 @@ import 'package:flutter/material.dart';
 
 import '../l10n.dart';
 import '../theme.dart';
+import 'bubble_shape.dart';
 import 'image_viewer.dart';
 import 'linkified_text.dart';
+import 'message_card_view.dart';
+import 'quick_replies_view.dart';
 import 'voice_note_tile.dart';
 
 /// The message thread (native analog of the web `Thread.tsx`).
@@ -29,10 +32,33 @@ import 'voice_note_tile.dart';
 ///
 /// Auto-scrolls to the newest message on append; a "load earlier" trigger at
 /// the top calls `loadOlderMessages()`.
+///
+/// A card (`ChatMessage.card`) draws as a card instead of a bubble, and the
+/// quick replies on offer (`quickRepliesOnOffer`) draw under the message that
+/// offers them — only when [onQuickReply] is given, as on the web.
 class ThreadView extends StatefulWidget {
   final EasyLiveChatTheme theme;
 
-  const ThreadView({super.key, required this.theme});
+  /// Sends a tapped quick reply as the visitor's own message, completing once
+  /// the server has it or has refused it. Every button is disabled until then,
+  /// so a double tap sends once. Null draws no quick replies at all.
+  ///
+  /// The chat screen passes [sendReplyAsMessage].
+  final Future<void> Function(String reply)? onQuickReply;
+
+  const ThreadView({super.key, required this.theme, this.onQuickReply});
+
+  /// A quick reply goes out exactly as typed text does — the same
+  /// `EasyLiveChat.sendMessage` the composer calls, so it shows at once as the
+  /// visitor's message, ticks the same way, and a failure leaves the same
+  /// tap-to-retry bubble behind. The reply is sent exactly as the server
+  /// offered it.
+  ///
+  /// Never throws: a failed send is already on screen as that bubble.
+  static Future<void> sendReplyAsMessage(String reply) => EasyLiveChat.instance
+      .sendMessage(reply)
+      .serverMessageId
+      .then<void>((_) {}, onError: (Object _) {});
 
   @override
   State<ThreadView> createState() => _ThreadViewState();
@@ -42,6 +68,10 @@ class _ThreadViewState extends State<ThreadView> {
   final ScrollController _scroll = ScrollController();
   int _lastCount = 0;
   bool _loadingOlder = false;
+
+  /// A tapped quick reply is on its way. Every button is disabled until the
+  /// server has it — or has refused it.
+  bool _sendingQuickReply = false;
 
   /// Read through to the controller rather than mirrored locally: the cursor
   /// is what actually knows whether earlier visits exist, and a copy of it here
@@ -63,6 +93,9 @@ class _ThreadViewState extends State<ThreadView> {
     super.initState();
     _lastCount = EasyLiveChat.instance.messages.value.length;
     EasyLiveChat.instance.messages.addListener(_onMessages);
+    // The quick replies are disabled while the workspace takes no messages,
+    // and that can change with the visitor already looking at them.
+    EasyLiveChat.instance.visitorMode.addListener(_onVisitorMode);
     // Older history loads as the visitor scrolls up, and only then.
     //
     // It used to also pull one page the moment the thread appeared. That made
@@ -80,9 +113,14 @@ class _ThreadViewState extends State<ThreadView> {
   @override
   void dispose() {
     EasyLiveChat.instance.messages.removeListener(_onMessages);
+    EasyLiveChat.instance.visitorMode.removeListener(_onVisitorMode);
     _scroll.removeListener(_onScroll);
     _scroll.dispose();
     super.dispose();
+  }
+
+  void _onVisitorMode() {
+    if (mounted) setState(() {});
   }
 
   void _onMessages() {
@@ -140,6 +178,34 @@ class _ThreadViewState extends State<ThreadView> {
     if (_scroll.position.pixels <= triggerPx) unawaited(_loadOlder());
   }
 
+  Future<void> _sendQuickReply(String messageId, String reply) async {
+    final send = widget.onQuickReply;
+    if (send == null || _sendingQuickReply) return;
+    // Asked again at the moment of the tap, not read off the button: a second
+    // tap can land in the same frame as the first, on a button the thread has
+    // not yet rebuilt away. A send that fails at once — no connection — has
+    // already cleared the in-flight flag by then, but it has also put the
+    // visitor's message in the thread, and that is the answer.
+    final offer = quickRepliesOnOffer(EasyLiveChat.instance.messages.value);
+    if (offer == null ||
+        offer.messageId != messageId ||
+        !offer.replies.contains(reply)) {
+      return;
+    }
+    setState(() => _sendingQuickReply = true);
+    try {
+      await send(reply);
+    } catch (_) {
+      // The send path owns failure: it leaves a failed bubble with retry.
+    } finally {
+      if (mounted) {
+        setState(() => _sendingQuickReply = false);
+      } else {
+        _sendingQuickReply = false;
+      }
+    }
+  }
+
   Future<void> _loadOlder() async {
     if (_loadingOlder || !_hasMoreOlder) return;
     setState(() => _loadingOlder = true);
@@ -188,6 +254,11 @@ class _ThreadViewState extends State<ThreadView> {
                   builder: (context, typing, _) {
                     // Header row (load-older) + messages + optional typing row.
                     final itemCount = messages.length + 1 + (typing ? 1 : 0);
+                    // Only ever under the newest message — decided once for
+                    // the whole thread, not per row.
+                    final offer = widget.onQuickReply == null
+                        ? null
+                        : quickRepliesOnOffer(messages);
                     return ListView.builder(
                       controller: _scroll,
                       // So the thread can be pulled even when it fits the
@@ -201,6 +272,10 @@ class _ThreadViewState extends State<ThreadView> {
                         final msgIndex = index - 1;
                         if (msgIndex < messages.length) {
                           final m = messages[msgIndex];
+                          final replies =
+                              offer != null && offer.messageId == m.id
+                                  ? offer.replies
+                                  : const <String>[];
                           return MessageBubble(
                             key: ValueKey(m.id),
                             message: m,
@@ -209,6 +284,15 @@ class _ThreadViewState extends State<ThreadView> {
                             showAgentAvatar: _showAgentAvatars,
                             strings: _s,
                             agentLastReadAt: lastReadAt,
+                            quickReplies: replies,
+                            // Disabled, not hidden, while one is on its way or
+                            // the workspace takes no messages — the same rule
+                            // as the composer beside them.
+                            onQuickReply: _sendingQuickReply ||
+                                    EasyLiveChat.instance.composerLocked
+                                ? null
+                                : (reply) =>
+                                    unawaited(_sendQuickReply(m.id, reply)),
                           );
                         }
                         // Trailing typing indicator — named for the assistant
@@ -285,6 +369,13 @@ class MessageBubble extends StatelessWidget {
   /// `EasyLiveChat.instance.agentLastReadAt` is the value to pass.
   final DateTime? agentLastReadAt;
 
+  /// Quick replies to draw under this message — empty unless it is the one
+  /// `quickRepliesOnOffer` picked for the thread.
+  final List<String> quickReplies;
+
+  /// Sends a tapped quick reply. Null draws [quickReplies] disabled.
+  final ValueChanged<String>? onQuickReply;
+
   const MessageBubble({
     super.key,
     required this.message,
@@ -293,6 +384,8 @@ class MessageBubble extends StatelessWidget {
     this.showAgentAvatar = true,
     required this.strings,
     this.agentLastReadAt,
+    this.quickReplies = const [],
+    this.onQuickReply,
   });
 
   bool get _isCustomer => message.isFromCustomer;
@@ -400,6 +493,7 @@ class MessageBubble extends StatelessWidget {
     final align =
         _isCustomer ? CrossAxisAlignment.end : CrossAxisAlignment.start;
 
+    final card = message.card;
     final body = (message.body ?? '').trim();
     final tiles = _attachmentTiles(context, textColor);
     // An avatar sits beside every inbound bubble when the workspace has the
@@ -449,7 +543,7 @@ class MessageBubble extends StatelessWidget {
           )
         else if (!_isCustomer && showAgentName && _agentName != null)
           Padding(
-            padding: const EdgeInsets.only(left: 4, bottom: 2),
+            padding: const EdgeInsetsDirectional.only(start: 4, bottom: 2),
             child: Text(
               _agentLine!,
               style: TextStyle(
@@ -459,68 +553,79 @@ class MessageBubble extends StatelessWidget {
               ),
             ),
           ),
-        ConstrainedBox(
-          constraints: BoxConstraints(
-            maxWidth: maxBubble,
-          ),
-          child: Container(
-            // A message that is only self-drawn media gets no bubble. The
-            // bubble exists to put a surface behind text; wrapped around a
-            // photo or a voice note it becomes a second card around a first
-            // one — on the visitor's own side the full accent colour, so
-            // their own images arrived matted in orange and their own
-            // recording in a teal frame.
-            padding: _isBareMedia
-                ? EdgeInsets.zero
-                : const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-            decoration: BoxDecoration(
-              color: _isBareMedia ? Colors.transparent : bubbleColor,
-              // Logical corners: the tail hugs the sender's own side in RTL
-              // as well — bottomStart/bottomEnd flip with the layout,
-              // physical left/right did not.
-              borderRadius: BorderRadiusDirectional.only(
-                topStart: const Radius.circular(16),
-                topEnd: const Radius.circular(16),
-                bottomStart: Radius.circular(_isCustomer ? 16 : 4),
-                bottomEnd: Radius.circular(_isCustomer ? 4 : 16),
+        // A card draws as a card, and only as a card: its body is the
+        // plain-text version for clients that can't draw one, and its
+        // attachment is the card's own image — drawing either as well would
+        // say it all twice.
+        // A CARD message whose card doesn't validate falls through to the
+        // bubble and reads as that text, like every other client.
+        if (card != null)
+          ElcMessageCardView(card: card, theme: theme, maxWidth: maxBubble)
+        else
+          ConstrainedBox(
+            constraints: BoxConstraints(
+              maxWidth: maxBubble,
+            ),
+            child: Container(
+              // A message that is only self-drawn media gets no bubble. The
+              // bubble exists to put a surface behind text; wrapped around a
+              // photo or a voice note it becomes a second card around a first
+              // one — on the visitor's own side the full accent colour, so
+              // their own images arrived matted in orange and their own
+              // recording in a teal frame.
+              padding: _isBareMedia
+                  ? EdgeInsets.zero
+                  : const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              decoration: BoxDecoration(
+                color: _isBareMedia ? Colors.transparent : bubbleColor,
+                borderRadius: ElcBubbleShape.radius(fromCustomer: _isCustomer),
+                border: _isCustomer || _isBareMedia
+                    ? null
+                    : ElcBubbleShape.teamBorder(theme),
               ),
-              border: _isCustomer || _isBareMedia
-                  ? null
-                  : Border.all(color: theme.text.withValues(alpha: 0.08)),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                if (tiles.isNotEmpty) ...[
-                  ...tiles,
-                  if (body.isNotEmpty) const SizedBox(height: 8),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (tiles.isNotEmpty) ...[
+                    ...tiles,
+                    if (body.isNotEmpty) const SizedBox(height: 8),
+                  ],
+                  if (body.isNotEmpty)
+                    LinkifiedText(
+                      text: body,
+                      style:
+                          TextStyle(color: textColor, fontSize: 15, height: 1.35),
+                      // On the accent-colored customer bubble the accent is the
+                      // background, so a link there keeps the bubble's own
+                      // foreground and relies on the underline; agent bubbles
+                      // sit on `surface`, where the accent reads correctly.
+                      linkColor: _isCustomer ? textColor : theme.primary,
+                    ),
+                  // Attachment-only message with no resolvable media still
+                  // needs *something* visible so it never renders empty.
+                  if (body.isEmpty && tiles.isEmpty)
+                    Text(
+                      strings.attachment,
+                      style: TextStyle(
+                          color: textColor.withValues(alpha: 0.7),
+                          fontSize: 14,
+                          fontStyle: FontStyle.italic),
+                    ),
                 ],
-                if (body.isNotEmpty)
-                  LinkifiedText(
-                    text: body,
-                    style:
-                        TextStyle(color: textColor, fontSize: 15, height: 1.35),
-                    // On the accent-colored customer bubble the accent is the
-                    // background, so a link there keeps the bubble's own
-                    // foreground and relies on the underline; agent bubbles
-                    // sit on `surface`, where the accent reads correctly.
-                    linkColor: _isCustomer ? textColor : theme.primary,
-                  ),
-                // Attachment-only message with no resolvable media still
-                // needs *something* visible so it never renders empty.
-                if (body.isEmpty && tiles.isEmpty)
-                  Text(
-                    strings.attachment,
-                    style: TextStyle(
-                        color: textColor.withValues(alpha: 0.7),
-                        fontSize: 14,
-                        fontStyle: FontStyle.italic),
-                  ),
-              ],
+              ),
             ),
           ),
-        ),
+        if (quickReplies.isNotEmpty)
+          ConstrainedBox(
+            constraints: BoxConstraints(maxWidth: maxBubble),
+            child: ElcQuickReplies(
+              replies: quickReplies,
+              theme: theme,
+              semanticLabel: strings.suggestedReplies,
+              onSelected: onQuickReply,
+            ),
+          ),
         const SizedBox(height: 2),
         _meta(textColorMuted: theme.text.withValues(alpha: 0.45)),
       ],
@@ -1001,15 +1106,10 @@ class _TypingRowState extends State<_TypingRow>
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
             decoration: BoxDecoration(
               color: t.surface,
-              // Logical corners so the bubble tail hugs the leading edge in
-              // RTL too, matching the message bubbles.
-              borderRadius: const BorderRadiusDirectional.only(
-                topStart: Radius.circular(16),
-                topEnd: Radius.circular(16),
-                bottomEnd: Radius.circular(16),
-                bottomStart: Radius.circular(4),
-              ),
-              border: Border.all(color: t.text.withValues(alpha: 0.08)),
+              // The team's shape, so the dots sit in the bubble the reply is
+              // about to arrive in.
+              borderRadius: ElcBubbleShape.radius(fromCustomer: false),
+              border: ElcBubbleShape.teamBorder(t),
             ),
             child: AnimatedBuilder(
               animation: _c,
