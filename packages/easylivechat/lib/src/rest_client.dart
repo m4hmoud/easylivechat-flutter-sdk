@@ -236,6 +236,50 @@ class RestClient {
     }
   }
 
+  /// `POST /:slug/push/register` — the device to notify when an agent replies
+  /// and this app is closed. Authed by the widget token: the server takes the
+  /// tenant and the contact from it, never from this body.
+  Future<void> registerPush({
+    required String token,
+    required String pushToken,
+    required String platform,
+    String? locale,
+    String? appVersion,
+  }) async {
+    try {
+      final res = await _dio.post<dynamic>(
+        '$_base/$_slug/push/register',
+        data: {
+          'token': pushToken,
+          'platform': platform,
+          if (locale != null && locale.isNotEmpty) 'locale': locale,
+          if (appVersion != null && appVersion.isNotEmpty) 'appVersion': appVersion,
+        },
+        options: Options(headers: _headers(token)),
+      );
+      if (!_ok(res.statusCode)) throwFor(res);
+    } on DioException catch (e) {
+      throw _networkError(e);
+    }
+  }
+
+  /// `POST /:slug/push/unregister` — stop notifying this device.
+  Future<void> unregisterPush({
+    required String token,
+    required String pushToken,
+  }) async {
+    try {
+      final res = await _dio.post<dynamic>(
+        '$_base/$_slug/push/unregister',
+        data: {'token': pushToken},
+        options: Options(headers: _headers(token)),
+      );
+      if (!_ok(res.statusCode)) throwFor(res);
+    } on DioException catch (e) {
+      throw _networkError(e);
+    }
+  }
+
   /// `POST /visitor/heartbeat` — public; tenant from body.tenantSlug (NOTE: no
   /// `:slug` path segment). Always tolerant/2xx. Keep cadence modest — first
   /// arrival / re-arrival after idle notifies agents.

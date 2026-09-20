@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.71
+
+- Requires `easylivechat` ^0.1.54, which adds `setPushToken()` — the device to
+  notify when an agent replies while the host app is closed. Nothing changes in
+  the widgets themselves; a host that wants visitor push calls that from its own
+  Firebase messaging setup. See the core package's README.
+
 ## 0.1.70
 
 - **Cards draw as cards.** An agent's card — image, title, text and link

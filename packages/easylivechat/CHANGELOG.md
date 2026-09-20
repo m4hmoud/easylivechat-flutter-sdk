@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.1.54
+
+- **Background push for visitors.** `EasyLiveChat.instance.setPushToken(token,
+  platform: 'ANDROID' | 'IOS')` registers the device that should be told when an
+  agent replies while your app is closed. The SDK brings no push dependency of
+  its own — you hand it the Firebase token your app already receives, so your
+  project keeps one Firebase setup and one permission prompt.
+- Call it as soon as you have a token, even before the visitor opens a chat: a
+  registration can only be authenticated with a session token, so it is held and
+  sent the moment there is one. Calling it again with a new token moves the
+  registration (the old one is dropped first); `null` stops the notifications.
+- The notification is always sent — nothing is suppressed server-side, because a
+  connected socket is not a person looking at the screen. Skip it in your own
+  notification handler when the chat is already on screen; your app is the only
+  thing that knows.
+- The payload carries `type: visitor.message`, `conversationId`, `messageId` and
+  `tenantId` in `data`, so a tap can open the right conversation. Its title is
+  the name the visitor already sees on the reply, and media without words
+  announces itself ("Sent a photo") in the device's language.
+
 ## 0.1.53
 
 - **Cards.** `ChatMessage.card` is the card an agent sent — an image, a title,

@@ -130,6 +130,15 @@ class SessionController {
   Map<String, String>? _identityFields;
 
   String? _token;
+
+  // ── visitor push ──
+  // The device token the host app handed us, and the one the server currently
+  // knows about. They differ while a registration is queued (no session token
+  // yet) or in flight, which is exactly the window the queue exists for.
+  String? _pushToken;
+  String? _pushPlatform;
+  String? _pushAppVersion;
+  String? _registeredPushToken;
   String? _conversationId;
 
   /// Which conversation the LIVE socket handshook with. The server binds that
@@ -595,6 +604,9 @@ class SessionController {
       await storage.write(StorageKeys.conversationId, res.conversationId!);
     }
 
+    // A push registration held for want of a session token can go now.
+    unawaited(_flushPushRegistration());
+
     // Cleared before the seed, not after: the watermark only ever moves
     // forward, so one carried over from a previous conversation would outrank
     // anything this thread's history has to say and show its first messages as
@@ -932,6 +944,71 @@ class SessionController {
         return;
       }
       rethrow;
+    }
+  }
+
+  /// The device to notify when an agent replies and this app is closed.
+  ///
+  /// Call it as soon as the push SDK hands over a token — before a chat exists
+  /// is fine, and is the common case. There is no session token to authenticate
+  /// with until the visitor opens a conversation, so the registration is held
+  /// and sent the moment there is one.
+  ///
+  /// Calling it again with a different token moves the registration: the old
+  /// one is dropped first, so a token rotation cannot leave a dead row behind
+  /// that keeps receiving this person's replies. `null` unregisters.
+  Future<void> setPushToken(
+    String? pushToken, {
+    required String platform,
+    String? appVersion,
+  }) async {
+    final next = pushToken?.trim();
+    if (next != null && next.isEmpty) return;
+    if (next == _pushToken && next == _registeredPushToken) return;
+
+    final previous = _registeredPushToken;
+    _pushToken = next;
+    _pushPlatform = platform;
+    _pushAppVersion = appVersion;
+
+    if (previous != null && previous != next) {
+      await _unregisterPush(previous);
+    }
+    if (next != null) await _flushPushRegistration();
+  }
+
+  /// Send the held registration, if there is one and we can authenticate it.
+  /// Called after every session adoption, so the queue drains by itself.
+  Future<void> _flushPushRegistration() async {
+    final pushToken = _pushToken;
+    final token = _token;
+    final platform = _pushPlatform;
+    if (pushToken == null || token == null || platform == null) return;
+    if (_registeredPushToken == pushToken) return;
+    try {
+      await rest.registerPush(
+        token: token,
+        pushToken: pushToken,
+        platform: platform,
+        locale: _effectiveLocale,
+        appVersion: _pushAppVersion,
+      );
+      _registeredPushToken = pushToken;
+    } catch (_) {
+      // Left queued: the next session adoption tries again. A visitor who
+      // never gets a notification is a smaller failure than one who cannot
+      // open a chat because registering threw.
+    }
+  }
+
+  Future<void> _unregisterPush(String pushToken) async {
+    final token = _token;
+    if (_registeredPushToken == pushToken) _registeredPushToken = null;
+    if (token == null) return;
+    try {
+      await rest.unregisterPush(token: token, pushToken: pushToken);
+    } catch (_) {
+      // Best effort. The server prunes a token FCM reports as dead anyway.
     }
   }
 
@@ -1305,6 +1382,7 @@ class SessionController {
           _token = res.token;
           _conversationId = res.conversationId ?? _conversationId;
           await storage.write(StorageKeys.token, res.token!);
+          unawaited(_flushPushRegistration());
           // Apply the fresh token. A LIVE socket won't re-read its handshake
           // auth on a no-op connect(), so force a fresh handshake — its
           // onConnect (with _hasConnectedOnce already true) then owns the gap

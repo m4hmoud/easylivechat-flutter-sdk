@@ -201,6 +201,39 @@ if (offer != null) {
 `quickRepliesOnOffer` is the web widget's rule: only the newest message offers
 them, and only until the visitor or the team says something else.
 
+## Push notifications
+
+A reply that lands while your app is closed can ring the visitor's phone. Hand
+the SDK the Firebase token your app already receives:
+
+```dart
+final token = await FirebaseMessaging.instance.getToken();
+await EasyLiveChat.instance.setPushToken(
+  token,
+  platform: Platform.isIOS ? 'IOS' : 'ANDROID',
+);
+```
+
+The SDK adds no push dependency of its own, so your project keeps one Firebase
+setup and one permission prompt. Call it as soon as you have a token — before
+the visitor has opened a chat is the normal case, and the registration is held
+until there is a session to authenticate it with. Call it again when the token
+rotates (the old registration is dropped first), and pass `null` on sign-out.
+
+The notification is always sent. Nothing is suppressed server-side, because a
+connected socket is not a person looking at the screen — skip it in your own
+`onMessage` handler when the chat is already on screen:
+
+```dart
+FirebaseMessaging.onMessage.listen((m) {
+  if (m.data['type'] == 'visitor.message' && chatIsVisible) return;
+  // …otherwise show it yourself, or let the OS do it in the background.
+});
+```
+
+`data` carries `type`, `conversationId`, `messageId` and `tenantId`, so a tap
+can open the right conversation.
+
 ## Localization
 
 This package holds no user-facing strings — it is protocol and state only.

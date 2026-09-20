@@ -220,6 +220,29 @@ class EasyLiveChat {
   void heartbeat({String? currentUrl, String? currentTitle}) =>
       _controller.heartbeat(currentUrl: currentUrl, currentTitle: currentTitle);
 
+  /// The device to notify when an agent replies and the app is closed.
+  ///
+  /// Hand over the FCM registration token your app already receives — the SDK
+  /// brings no push dependency of its own, so your project keeps one Firebase
+  /// setup and one notification permission prompt. Call it as soon as you have
+  /// a token, even before the visitor opens a chat: there is nothing to
+  /// authenticate a registration with until a session exists, so it is held and
+  /// sent the moment one does.
+  ///
+  /// Call it again when the token rotates — the old registration is dropped
+  /// first. Pass `null` on sign-out to stop the notifications.
+  ///
+  /// Nothing is suppressed server-side, on purpose: a socket that is connected
+  /// does not mean a person who is looking. Suppress in your notification
+  /// handler when the chat is already on screen — your app is the only thing
+  /// that knows.
+  Future<void> setPushToken(
+    String? pushToken, {
+    required String platform,
+    String? appVersion,
+  }) =>
+      _controller.setPushToken(pushToken, platform: platform, appVersion: appVersion);
+
   /// Tear everything down. After this you must [boot] again.
   void shutdown() {
     _c?.dispose();
