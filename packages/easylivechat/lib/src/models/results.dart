@@ -10,6 +10,10 @@ class SessionResult {
   final bool hasActiveConversation;
   final List<ChatMessage> messages;
 
+  /// Messages an agent unsent in this conversation lately — see
+  /// [MessagePage.unsentIds].
+  final List<String> unsentIds;
+
   const SessionResult({
     this.token,
     this.conversationId,
@@ -17,6 +21,7 @@ class SessionResult {
     required this.resumed,
     required this.hasActiveConversation,
     this.messages = const [],
+    this.unsentIds = const [],
   });
 
   factory SessionResult.fromJson(Map<String, dynamic> j) => SessionResult(
@@ -26,6 +31,7 @@ class SessionResult {
         resumed: j['resumed'] == true,
         hasActiveConversation: j['hasActiveConversation'] == true,
         messages: _msgs(j['messages']),
+        unsentIds: _ids(j['unsentIds']),
       );
 }
 
@@ -36,11 +42,22 @@ class MessagePage {
   final List<ChatMessage> messages;
   final String? nextCursor;
 
-  const MessagePage({required this.messages, this.nextCursor});
+  /// Messages an agent unsent in this conversation lately (the server keeps a
+  /// week of them). A client holding any of them takes them down — that is how
+  /// a visitor who was away when one went stops seeing it. Empty from a server
+  /// that predates the field.
+  final List<String> unsentIds;
+
+  const MessagePage({
+    required this.messages,
+    this.nextCursor,
+    this.unsentIds = const [],
+  });
 
   factory MessagePage.fromJson(Map<String, dynamic> j) => MessagePage(
         messages: _msgs(j['messages']),
         nextCursor: j['nextCursor'] as String?,
+        unsentIds: _ids(j['unsentIds']),
       );
 }
 
@@ -90,6 +107,32 @@ class FeedbackResult {
             ? DateTime.tryParse(j['ratedAt'] as String)?.toLocal()
             : null,
       );
+}
+
+/// A message an agent unsent — see `EasyLiveChat.onMessageDeleted`.
+///
+/// Arrives live (`message:deleted`) or, for one that went while this client
+/// was not listening, from the `unsentIds` a history response carries.
+class DeletedMessage {
+  /// The unsent message's id.
+  final String id;
+
+  /// The conversation it was in.
+  final String conversationId;
+
+  const DeletedMessage({required this.id, required this.conversationId});
+
+  @override
+  bool operator ==(Object other) =>
+      other is DeletedMessage &&
+      other.id == id &&
+      other.conversationId == conversationId;
+
+  @override
+  int get hashCode => Object.hash(id, conversationId);
+
+  @override
+  String toString() => 'DeletedMessage($id in $conversationId)';
 }
 
 /// A proactive outreach pushed by an agent (`widget:proactive-message`).
@@ -164,6 +207,14 @@ class SendResult {
   final ChatMessage optimistic;
   final Future<String> serverMessageId;
   const SendResult({required this.optimistic, required this.serverMessageId});
+}
+
+/// The ids in a response's `unsentIds`; anything that is not one is dropped,
+/// and a missing field reads as none.
+List<String> _ids(Object? raw) {
+  if (raw is! List) return const [];
+  return List<String>.unmodifiable(
+      raw.whereType<String>().where((id) => id.isNotEmpty));
 }
 
 List<ChatMessage> _msgs(Object? raw) {

@@ -667,6 +667,14 @@ class MessageBubble extends StatelessWidget {
   Widget _meta({required Color textColorMuted}) {
     final time = _formatTime(message.createdAt);
     final parts = <Widget>[
+      // An agent changed the words after sending them. Said quietly, in the
+      // time's own style, ahead of it — the Row lays it out on the leading
+      // side in either direction.
+      if (message.isEdited) ...[
+        Text(strings.edited,
+            style: TextStyle(color: textColorMuted, fontSize: 10)),
+        const SizedBox(width: 4),
+      ],
       Text(time, style: TextStyle(color: textColorMuted, fontSize: 10)),
     ];
     final receipt = message.receiptFor(agentLastReadAt);

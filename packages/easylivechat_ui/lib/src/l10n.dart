@@ -177,6 +177,9 @@ class ElcStrings {
   String get messageSent => _t('messageSent');
   String get messageRead => _t('messageRead');
 
+  /// Beside the time of a message an agent changed after sending it.
+  String get edited => _t('edited');
+
   /// Screen-reader name for the row of quick-reply buttons under a message —
   /// the same words the web widget announces (`suggestedReplies`).
   String get suggestedReplies => _t('suggestedReplies');
@@ -308,6 +311,7 @@ class ElcStrings {
       'sending': 'Sending…',
       'messageSent': 'Sent',
       'messageRead': 'Read',
+      'edited': 'edited',
       'suggestedReplies': 'Suggested replies',
       'startChat': 'Start chat',
       'fieldRequired': 'This field is required',
@@ -377,6 +381,7 @@ class ElcStrings {
       'sending': 'جارٍ الإرسال…',
       'messageSent': 'تم الإرسال',
       'messageRead': 'تمت القراءة',
+      'edited': 'معدّلة',
       'suggestedReplies': 'ردود مقترحة',
       'startChat': 'بدء المحادثة',
       'fieldRequired': 'هذا الحقل مطلوب',
@@ -446,6 +451,7 @@ class ElcStrings {
       'sending': 'دەنێردرێت…',
       'messageSent': 'نێردرا',
       'messageRead': 'خوێندرایەوە',
+      'edited': 'دەستکاریکراو',
       'suggestedReplies': 'وەڵامە پێشنیارکراوەکان',
       'startChat': 'دەستپێکردنی گفتوگۆ',
       'fieldRequired': 'ئەم خانەیە پێویستە',
@@ -515,6 +521,7 @@ class ElcStrings {
       'sending': 'Senden…',
       'messageSent': 'Gesendet',
       'messageRead': 'Gelesen',
+      'edited': 'bearbeitet',
       'suggestedReplies': 'Antwortvorschläge',
       'startChat': 'Chat starten',
       'fieldRequired': 'Dieses Feld ist erforderlich',
@@ -584,6 +591,7 @@ class ElcStrings {
       'sending': 'Enviando…',
       'messageSent': 'Enviado',
       'messageRead': 'Leído',
+      'edited': 'editado',
       'suggestedReplies': 'Respuestas sugeridas',
       'startChat': 'Iniciar chat',
       'fieldRequired': 'Este campo es obligatorio',
@@ -653,6 +661,7 @@ class ElcStrings {
       'sending': 'Envoi…',
       'messageSent': 'Envoyé',
       'messageRead': 'Lu',
+      'edited': 'modifié',
       'suggestedReplies': 'Réponses suggérées',
       'startChat': 'Démarrer le chat',
       'fieldRequired': 'Ce champ est obligatoire',
@@ -722,6 +731,7 @@ class ElcStrings {
       'sending': 'भेजा जा रहा है…',
       'messageSent': 'भेजा गया',
       'messageRead': 'पढ़ा गया',
+      'edited': 'संपादित',
       'suggestedReplies': 'सुझाए गए जवाब',
       'startChat': 'चैट शुरू करें',
       'fieldRequired': 'यह फ़ील्ड आवश्यक है',
@@ -791,6 +801,7 @@ class ElcStrings {
       'sending': 'Invio…',
       'messageSent': 'Inviato',
       'messageRead': 'Letto',
+      'edited': 'modificato',
       'suggestedReplies': 'Risposte suggerite',
       'startChat': 'Avvia chat',
       'fieldRequired': 'Questo campo è obbligatorio',
@@ -860,6 +871,7 @@ class ElcStrings {
       'sending': 'د هنێریت…',
       'messageSent': 'هاتە فرێکرن',
       'messageRead': 'هاتە خواندن',
+      'edited': 'هاتە گوهۆڕین',
       'suggestedReplies': 'بەرسڤێن پێشنیارکری',
       'startChat': 'دەستپێکرنا چاتی',
       'fieldRequired': 'ئەڤ خانە یا پێدڤی یە',
@@ -929,6 +941,7 @@ class ElcStrings {
       'sending': 'Enviando…',
       'messageSent': 'Enviado',
       'messageRead': 'Lido',
+      'edited': 'editada',
       'suggestedReplies': 'Respostas sugeridas',
       'startChat': 'Iniciar conversa',
       'fieldRequired': 'Este campo é obrigatório',
@@ -998,6 +1011,7 @@ class ElcStrings {
       'sending': 'Gönderiliyor…',
       'messageSent': 'Gönderildi',
       'messageRead': 'Okundu',
+      'edited': 'düzenlendi',
       'suggestedReplies': 'Önerilen yanıtlar',
       'startChat': 'Sohbeti başlat',
       'fieldRequired': 'Bu alan zorunludur',
@@ -1067,6 +1081,7 @@ class ElcStrings {
       'sending': 'بھیجا جا رہا ہے…',
       'messageSent': 'بھیج دیا گیا',
       'messageRead': 'پڑھ لیا گیا',
+      'edited': 'ترمیم شدہ',
       'suggestedReplies': 'تجویز کردہ جوابات',
       'startChat': 'چیٹ شروع کریں',
       'fieldRequired': 'یہ خانہ ضروری ہے',
@@ -1136,6 +1151,7 @@ class ElcStrings {
       'sending': '发送中…',
       'messageSent': '已发送',
       'messageRead': '已读',
+      'edited': '已编辑',
       'suggestedReplies': '建议回复',
       'startChat': '开始聊天',
       'fieldRequired': '此字段为必填项',

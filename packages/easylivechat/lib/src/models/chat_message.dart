@@ -105,6 +105,15 @@ class ChatMessage {
 
   final DateTime createdAt;
 
+  /// When an agent last changed the words of this message, or null when it
+  /// reads as first sent.
+  ///
+  /// An agent may edit (or unsend) a reply for a few minutes after sending it.
+  /// The edit arrives as `message:updated` carrying the new [body] and this
+  /// stamp, and history carries it too, so a reloaded thread still says
+  /// "edited". A malformed value is read as null rather than guessed at.
+  final DateTime? editedAt;
+
   /// True only for a locally-created optimistic message (id starts `tmp-`),
   /// before the server `message:send` ack / echo reconciles it.
   final bool isOptimistic;
@@ -134,6 +143,7 @@ class ChatMessage {
     this.deliveryStatus = MessageDeliveryStatus.sent,
     this.readByAgent = false,
     required this.createdAt,
+    this.editedAt,
     this.isOptimistic = false,
     this.failed = false,
     this.metadata,
@@ -188,6 +198,9 @@ class ChatMessage {
       raw.whereType<String>().where((r) => jsTrim(r).isNotEmpty),
     );
   }
+
+  /// An agent changed this message after sending it — see [editedAt].
+  bool get isEdited => editedAt != null;
 
   bool get isFromCustomer => senderType == SenderType.customer;
   bool get isFromAgent => senderType == SenderType.agent;
@@ -286,6 +299,7 @@ class ChatMessage {
       // from the socket, where a timestamp means read and null means not.
       readByAgent: j['read'] == true || j['readByAgentAt'] != null,
       createdAt: _parseDate(j['createdAt'] ?? j['created_at']),
+      editedAt: _parseOptionalDate(j['editedAt'] ?? j['edited_at']),
       isOptimistic: false,
       metadata: j['metadata'] is Map
           ? (j['metadata'] as Map).cast<String, dynamic>()
@@ -353,6 +367,7 @@ class ChatMessage {
       deliveryStatus: deliveryStatus,
       readByAgent: readByAgent,
       createdAt: createdAt,
+      editedAt: editedAt,
       isOptimistic: isOptimistic,
       failed: failed,
       metadata: metadata,
@@ -383,6 +398,7 @@ class ChatMessage {
       deliveryStatus: deliveryStatus ?? this.deliveryStatus,
       readByAgent: readByAgent ?? this.readByAgent,
       createdAt: createdAt,
+      editedAt: editedAt,
       isOptimistic: isOptimistic ?? this.isOptimistic,
       failed: failed ?? this.failed,
       metadata: metadata,
@@ -399,5 +415,13 @@ class ChatMessage {
     // to the top and stays put on re-parse). NEVER DateTime.now() — that is
     // non-deterministic and would re-order the row on every message:updated.
     return DateTime.fromMillisecondsSinceEpoch(0);
+  }
+
+  /// Like [_parseDate], but absent and malformed both mean null: an optional
+  /// stamp the server could not give us must not claim the epoch.
+  static DateTime? _parseOptionalDate(Object? v) {
+    if (v is String) return DateTime.tryParse(v)?.toLocal();
+    if (v is int) return DateTime.fromMillisecondsSinceEpoch(v).toLocal();
+    return null;
   }
 }

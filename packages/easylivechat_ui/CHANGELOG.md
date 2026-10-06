@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.1.72
+
+- Requires `easylivechat` ^0.1.55, which follows an agent editing or unsending
+  a reply.
+- **"edited" beside the time.** A message an agent changed after sending it
+  says so in its meta row, in the time's own muted style, on the leading side
+  of the time in either direction — translated into all 13 languages (`edited`
+  in `l10n/sdk_strings.json`, overridable like every other string). An unsent
+  message simply leaves the thread — one unsent while the app was away too.
+
 ## 0.1.71
 
 - Requires `easylivechat` ^0.1.54, which adds `setPushToken()` — the device to

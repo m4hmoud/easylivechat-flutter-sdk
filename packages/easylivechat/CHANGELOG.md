@@ -1,5 +1,29 @@
 # Changelog
 
+## 0.1.55
+
+- **An agent's edited or unsent reply follows on the visitor's screen.** An
+  agent may change or take back a reply for a few minutes after sending it.
+  An edit arrives as `message:updated` and replaces the message by id, in
+  place, with the new `body`; `ChatMessage.editedAt` (with `isEdited`) carries
+  when it was changed, parsed from the socket and from history alike, and is
+  null when absent or malformed rather than the epoch.
+- An unsend arrives as the new `message:deleted` (`{ id, conversationId }`) and
+  the message leaves `messages` with no placeholder, Telegram-style. It comes
+  off `unreadCount` if it was counted there, and nothing that lands late — the
+  read-receipt `message:updated` the server fans out seconds after a reply, a
+  `message:new`, a reconnect backfill page — brings it back.
+- **Unsent while away.** A message unsent while the visitor was not listening
+  (socket down, app suspended or closed) comes down too: the session open or
+  restore, every page of history and the reconnect backfill now carry
+  `unsentIds` (`SessionResult.unsentIds`, `MessagePage.unsentIds`; empty from an
+  older server), and any of those messages is removed and remembered.
+- **`EasyLiveChat.instance.onMessageDeleted`**, a `Stream<DeletedMessage>` (`id`,
+  `conversationId`) beside `onMessage`: fires once per id, for the live event
+  and for each id a history response lists the first time the session hears of
+  it. Use it to withdraw a notification or anything else you derived from the
+  message; `messages` already drops it.
+
 ## 0.1.54
 
 - **Background push for visitors.** `EasyLiveChat.instance.setPushToken(token,

@@ -29,6 +29,7 @@ class WidgetSocket {
   // ── inbound streams (broadcast) ──
   final _onMessageNew = StreamController<ChatMessage>.broadcast();
   final _onMessageUpdated = StreamController<ChatMessage>.broadcast();
+  final _onMessageDeleted = StreamController<DeletedMessage>.broadcast();
   final _onAgentTyping = StreamController<bool>.broadcast();
   final _onAssistantTyping = StreamController<bool>.broadcast();
   final _onAvailability = StreamController<bool>.broadcast();
@@ -43,9 +44,14 @@ class WidgetSocket {
   /// `message:new` — raw Prisma row (parse via [ChatMessage.fromAny]).
   Stream<ChatMessage> get onMessageNew => _onMessageNew.stream;
 
-  /// `message:updated` — media re-host swap (replace by id). The web client
-  /// does NOT register this; we DO.
+  /// `message:updated` — the whole message again, to replace by id: an agent
+  /// editing their reply (new `body`, `editedAt` set), a media re-host swap, a
+  /// read receipt.
   Stream<ChatMessage> get onMessageUpdated => _onMessageUpdated.stream;
+
+  /// `message:deleted` — `{ id, conversationId }`: an agent unsent a message.
+  /// The message leaves the thread with no placeholder.
+  Stream<DeletedMessage> get onMessageDeleted => _onMessageDeleted.stream;
 
   /// `agent:typing` — payload is `{ isTyping }` only; never an explicit false,
   /// so the controller arms a ~4s auto-clear.
@@ -160,6 +166,17 @@ class WidgetSocket {
       final m = _asMap(data);
       if (m != null && !_onMessageUpdated.isClosed) {
         _onMessageUpdated.add(ChatMessage.fromAny(m));
+      }
+    });
+
+    socket.on('message:deleted', (data) {
+      final m = _asMap(data);
+      final id = (m?['id'] ?? '').toString();
+      if (id.isNotEmpty && !_onMessageDeleted.isClosed) {
+        _onMessageDeleted.add(DeletedMessage(
+          id: id,
+          conversationId: (m?['conversationId'] ?? '').toString(),
+        ));
       }
     });
 
@@ -350,6 +367,7 @@ class WidgetSocket {
     }
     _onMessageNew.close();
     _onMessageUpdated.close();
+    _onMessageDeleted.close();
     _onAgentTyping.close();
     _onAssistantTyping.close();
     _onAvailability.close();

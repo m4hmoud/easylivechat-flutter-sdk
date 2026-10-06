@@ -113,6 +113,30 @@ if (EasyLiveChat.instance.hasOlderHistory) {
 `hasOlderHistory` is the only reliable signal: a scoped first page cannot be
 told from a complete one by looking at what arrived.
 
+## Message events
+
+`messages` is the thread as it stands; two streams tell you what happened to it,
+for anything you derive from messages yourself (a notification, a preview, a
+copy in your own store):
+
+```dart
+EasyLiveChat.instance.onMessage.listen((m) { /* a new message arrived */ });
+
+EasyLiveChat.instance.onMessageDeleted.listen((d) {
+  // d.id, d.conversationId — an agent unsent this message.
+  notifications.cancelFor(messageId: d.id);
+});
+```
+
+An agent may edit or unsend a reply for a few minutes after sending it. An
+edit replaces the message in `messages` by id, in place, with the new `body`
+and `editedAt` set (`isEdited`) — show "edited" beside the time. An unsent
+message leaves `messages` with no placeholder, and `onMessageDeleted` fires
+once per id: for the live event, and for every id a history response lists as
+unsent the first time the session hears of it — so a message unsent while the
+app was closed still comes down, and the stream can name one this device only
+ever saw as a push notification.
+
 ## Forms
 
 Both forms are authored in the dashboard and arrive in

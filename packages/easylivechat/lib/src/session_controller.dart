@@ -104,9 +104,14 @@ class SessionController {
   final ValueNotifier<DateTime?> agentLastReadAt = ValueNotifier(null);
 
   final _onMessage = StreamController<ChatMessage>.broadcast();
+  final _onMessageDeleted = StreamController<DeletedMessage>.broadcast();
   final _onProactive = StreamController<ProactiveMessage>.broadcast();
   final _onError = StreamController<EasyLiveChatError>.broadcast();
   Stream<ChatMessage> get onMessage => _onMessage.stream;
+
+  /// A message an agent unsent, once per id — see
+  /// `EasyLiveChat.onMessageDeleted`.
+  Stream<DeletedMessage> get onMessageDeleted => _onMessageDeleted.stream;
   Stream<ProactiveMessage> get onProactiveMessage => _onProactive.stream;
   Stream<EasyLiveChatError> get onError => _onError.stream;
 
@@ -163,6 +168,18 @@ class SessionController {
   /// to skip a redundant backfill on the FIRST connect (the session payload
   /// already seeded the newest page) and only backfill on real reconnects.
   bool _hasConnectedOnce = false;
+
+  /// Messages an agent unsent while this controller was listening.
+  ///
+  /// Remembered so nothing brings one back: a `message:updated` for it (the
+  /// visitor's own read receipt fans one out seconds after a reply lands, and
+  /// it travels a slower path than the delete), or a backfill page fetched
+  /// just before it went. Ids are never reused, so the set needs no expiry.
+  final Set<String> _unsentIds = {};
+
+  /// Agent replies counted in [unreadCount] since the visitor last looked, so
+  /// one unsent before they did can be taken back off the badge.
+  final Set<String> _unreadIds = {};
 
   EasyLiveChatLifecycle _lifecycle = EasyLiveChatLifecycle.resumed;
   Timer? _heartbeatTimer;
@@ -612,7 +629,9 @@ class SessionController {
     // anything this thread's history has to say and show its first messages as
     // already read.
     agentLastReadAt.value = null;
-    _setMessages(_dedupSort(res.messages));
+    _forgetUnsent(res.unsentIds, conversationId: res.conversationId);
+    _setMessages(_dedupSort(
+        res.messages.where((m) => !_unsentIds.contains(m.id)).toList()));
     _connectSocket();
     // Presence (`/widget-presence`) is the pre-chat proactive channel. Once the
     // full chat socket is up, the `/widgets` namespace delivers proactive too —
@@ -815,6 +834,7 @@ class SessionController {
           cursor: _oldestCursor,
           limit: 50,
         ));
+    _forgetUnsent(page.unsentIds);
     if (page.messages.isNotEmpty) {
       _mergeMessages(page.messages);
     }
@@ -829,6 +849,7 @@ class SessionController {
   /// check and no agent could tell read from ignored. Safe to call often; the
   /// server throttles and no-ops once the thread is fully read.
   void markRead() {
+    _unreadIds.clear();
     if (unreadCount.value != 0) unreadCount.value = 0;
     _socket?.reportSeen();
   }
@@ -1091,8 +1112,10 @@ class SessionController {
     _socket = socket;
     connection.value = ConnectionState.connecting;
 
-    _socketSubs.add(socket.onMessageNew.listen(_handleMessageNew));
-    _socketSubs.add(socket.onMessageUpdated.listen(_handleMessageUpdated));
+    _socketSubs.add(socket.onMessageNew.listen(handleMessageNew));
+    _socketSubs.add(socket.onMessageUpdated.listen(handleMessageUpdated));
+    _socketSubs.add(socket.onMessageDeleted.listen(
+        (d) => handleMessageDeleted(d.id, conversationId: d.conversationId)));
     _socketSubs.add(socket.onAgentTyping.listen(_handleAgentTyping));
     _socketSubs.add(socket.onAssistantTyping.listen(handleAssistantTyping));
     _socketSubs.add(socket.onAvailability.listen((open) {
@@ -1153,7 +1176,11 @@ class SessionController {
 
   // ── inbound handlers ──
 
-  void _handleMessageNew(ChatMessage msg) {
+  /// `message:new`. Exposed for tests only — the socket is the one caller.
+  @visibleForTesting
+  void handleMessageNew(ChatMessage msg) {
+    if (_unsentIds.contains(msg.id)) return;
+
     // The assistant's reply is its own "done typing": clear the indicator now
     // rather than waiting on a stop event that may have been lost.
     if (msg.isFromAssistant && assistantTyping.value) {
@@ -1202,12 +1229,18 @@ class SessionController {
     if (msg.isFromAgent &&
         phase.value != ChatPhase.chat &&
         phase.value != ChatPhase.feedback) {
+      _unreadIds.add(msg.id);
       unreadCount.value = unreadCount.value + 1;
     }
     if (!_onMessage.isClosed) _onMessage.add(msg);
   }
 
-  void _handleMessageUpdated(ChatMessage msg) {
+  /// `message:updated`: the whole message again — an agent editing their reply
+  /// (new [ChatMessage.body], [ChatMessage.editedAt] set), a media re-host, a
+  /// read receipt. Replaced by id, in place.
+  @visibleForTesting
+  void handleMessageUpdated(ChatMessage msg) {
+    if (_unsentIds.contains(msg.id)) return;
     final list = messages.value;
     final idx = list.indexWhere((m) => m.id == msg.id);
     if (idx == -1) {
@@ -1221,6 +1254,44 @@ class SessionController {
     // see [ChatMessage.withIdentityFrom].
     final next = List<ChatMessage>.of(list)..[idx] = msg.withIdentityFrom(list[idx]);
     _setMessages(_dedupSort(next));
+  }
+
+  /// `message:deleted`: an agent unsent a message.
+  @visibleForTesting
+  void handleMessageDeleted(String id, {String? conversationId}) {
+    _forgetUnsent([id], conversationId: conversationId);
+  }
+
+  /// Take down messages an agent unsent, and remember them.
+  ///
+  /// One path for the live `message:deleted` and for the `unsentIds` every
+  /// history response carries (session open or restore, paging, the reconnect
+  /// backfill) — the second is how a visitor who was away when an agent took a
+  /// reply back stops seeing it. Each id leaves the thread with no placeholder,
+  /// comes off the unread badge if it was counted there, and is announced on
+  /// [onMessageDeleted] once — the first time this controller hears of it.
+  void _forgetUnsent(Iterable<String> ids, {String? conversationId}) {
+    final fresh = <String>[];
+    for (final id in ids) {
+      if (id.isNotEmpty && _unsentIds.add(id)) fresh.add(id);
+    }
+    if (fresh.isEmpty) return;
+    final gone = fresh.toSet();
+    final list = messages.value;
+    if (list.any((m) => gone.contains(m.id))) {
+      _setMessages(list.where((m) => !gone.contains(m.id)).toList());
+    }
+    final convId = (conversationId != null && conversationId.isNotEmpty)
+        ? conversationId
+        : (_conversationId ?? '');
+    for (final id in fresh) {
+      if (_unreadIds.remove(id) && unreadCount.value > 0) {
+        unreadCount.value = unreadCount.value - 1;
+      }
+      if (!_onMessageDeleted.isClosed) {
+        _onMessageDeleted.add(DeletedMessage(id: id, conversationId: convId));
+      }
+    }
   }
 
   void _handleAgentTyping(bool isTyping) {
@@ -1243,7 +1314,7 @@ class SessionController {
   /// ten seconds or more, so the 4-second clear used for a person would drop
   /// the indicator halfway and leave the visitor watching a silent thread. The
   /// backstop is long instead — only for a stop lost to a dropped connection.
-  /// Its reply arriving also clears it (see [_handleMessageNew]).
+  /// Its reply arriving also clears it (see [handleMessageNew]).
   @visibleForTesting
   void handleAssistantTyping(bool isTyping) {
     _typingTimer?.cancel();
@@ -1432,6 +1503,7 @@ class SessionController {
         messages.value.where((m) => !m.isOptimistic).map((m) => m.id).toSet();
 
     final fetched = <ChatMessage>[];
+    final unsent = <String>[];
     String? cursor;
     // Bound the walk so a pathological gap can't loop forever.
     for (var pages = 0; pages < 20; pages++) {
@@ -1445,6 +1517,7 @@ class SessionController {
         // next _guardAuth call re-mints and re-backfills cleanly.
         break;
       }
+      unsent.addAll(page.unsentIds);
       if (page.messages.isEmpty) break;
       fetched.addAll(page.messages);
 
@@ -1455,6 +1528,9 @@ class SessionController {
       if (overlaps || cursor == null) break;
     }
 
+    // Anything an agent unsent while we were away goes, whether or not a page
+    // brought anything new.
+    _forgetUnsent(unsent);
     if (fetched.isNotEmpty) {
       _mergeMessages(fetched);
     }
@@ -1551,7 +1627,10 @@ class SessionController {
   }
 
   void _mergeMessages(Iterable<ChatMessage> incoming) {
-    _setMessages(_dedupSort([...messages.value, ...incoming]));
+    _setMessages(_dedupSort([
+      ...messages.value,
+      ...incoming.where((m) => !_unsentIds.contains(m.id)),
+    ]));
   }
 
   /// Dedup by id (last write wins, so server rows replace optimistic temps that
@@ -1685,6 +1764,7 @@ class SessionController {
     _socket?.dispose();
     _presence?.dispose();
     _onMessage.close();
+    _onMessageDeleted.close();
     _onProactive.close();
     _onError.close();
     phase.dispose();

@@ -126,6 +126,16 @@ class EasyLiveChat {
   /// The bundled [EasyLiveChatScreen] already does this.
   ValueListenable<DateTime?> get agentLastReadAt => _controller.agentLastReadAt;
   Stream<ChatMessage> get onMessage => _controller.onMessage;
+
+  /// A message an agent unsent, once per id.
+  ///
+  /// Fires for the live `message:deleted`, and for every id a history response
+  /// lists in `unsentIds` the first time this session hears of it — so it can
+  /// include a message this client never displayed, such as one that only
+  /// reached the device as a push notification. Use it to withdraw anything you
+  /// derived from the message yourself (a notification, a cached preview); the
+  /// [messages] listenable already drops it.
+  Stream<DeletedMessage> get onMessageDeleted => _controller.onMessageDeleted;
   Stream<ProactiveMessage> get onProactiveMessage =>
       _controller.onProactiveMessage;
   Stream<EasyLiveChatError> get onError => _controller.onError;
