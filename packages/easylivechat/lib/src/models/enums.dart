@@ -117,13 +117,25 @@ enum LocaleDirection {
 }
 
 /// Pre-chat form field input type (`packages/shared` PreChatField.type).
+///
+/// A type this SDK does not know reads as [text], as it always has.
 enum PreChatFieldType {
   text,
   email,
   phone,
   number,
   textarea,
-  select;
+  select,
+
+  /// A checkbox the visitor ticks to agree to something — usually the
+  /// workspace's privacy notice. The field's `label` is the sentence they
+  /// agree to and `policyUrl` an optional link beside it.
+  ///
+  /// Not a value: it never goes into `fields`. Send the ids of the ticked ones
+  /// as `consents` (see `EasyLiveChat.startSession`). The server only sends
+  /// these fields to a client that asked for them — see
+  /// `EasyLiveChat.supportsConsent`.
+  consent;
 
   static PreChatFieldType fromWire(Object? w) => _parse(values, w, text);
 }

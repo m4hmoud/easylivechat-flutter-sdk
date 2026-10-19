@@ -66,6 +66,9 @@ class _EasyLiveChatLauncherState extends State<EasyLiveChatLauncher> {
   @override
   void initState() {
     super.initState();
+    // The pre-chat form here draws consent checkboxes, so ask the server for
+    // them — before the open() a tap starts. See the chat screen.
+    EasyLiveChat.instance.supportsConsent = true;
     // The bubble is the surface that's up when the visitor ISN'T reading the
     // thread — exactly when a reply most needs to make a sound.
     ElcChime.instance.attach();

@@ -20,6 +20,13 @@ abstract final class StorageKeys {
   static const token = 'easylivechat:widgetToken';
   static const conversationId = 'easylivechat:conversationId';
 
+  /// The host `userId` this device's visitor was last identified as (see
+  /// `EasyLiveChat.identify(userId: …)`). Compared with the next declared
+  /// identity to tell "the same person signed in" from "someone else": a
+  /// different id, or none after one was set, forgets the visitor. Same name as
+  /// the web widget's key.
+  static const identifiedUserId = 'livechattools:identifiedUserId';
+
   /// Everything that says WHO this visitor is, in the order it should be
   /// dropped — the `visitorId` last, because it is the one the server keys the
   /// contact on and the others are meaningless without it.
@@ -27,7 +34,13 @@ abstract final class StorageKeys {
   /// Used by `EasyLiveChat.reset()`. Kept here so the list cannot drift from
   /// the keys above: a new durable key added and not listed would survive a
   /// logout and quietly re-identify the next person on the device.
-  static const identity = <String>[token, conversationId, profile, visitorId];
+  static const identity = <String>[
+    token,
+    conversationId,
+    profile,
+    identifiedUserId,
+    visitorId,
+  ];
 }
 
 /// Ephemeral, process-lifetime storage. Do NOT use in production — the

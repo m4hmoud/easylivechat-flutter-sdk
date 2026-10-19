@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:easylivechat/easylivechat.dart';
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../l10n.dart';
 import '../theme.dart';
@@ -9,10 +10,15 @@ import '../theme.dart';
 /// Dynamic pre-chat form (the native analog of the web `PreChat.tsx`).
 ///
 /// Renders `config.preChatForm.fields` in order, choosing an input per
-/// [PreChatFieldType] (text / email / phone / number / textarea / select).
-/// Enforces `required` + per-type validation locally via [PreChatField.validate]
-/// (the server stays the authority), then submits a `Map<fieldId, value>` via
-/// `EasyLiveChat.instance.startSession(fields: …)`.
+/// [PreChatFieldType] (text / email / phone / number / textarea / select /
+/// consent). Enforces `required` + per-type validation locally via
+/// [PreChatField.validate] and [PreChatField.validateConsent] (the server stays
+/// the authority), then submits a `Map<fieldId, value>` and the ticked consent
+/// ids via `EasyLiveChat.instance.startSession(fields: …, consents: …)`.
+///
+/// A consent field is a checkbox beside the tenant's sentence, with a
+/// "Privacy policy" link under it when the field has a `policyUrl`; the link
+/// opens in the visitor's browser, never inside the host app.
 ///
 /// Tenant-authored copy — [WidgetConfigModel.welcomeTitle] /
 /// [WidgetConfigModel.welcomeSubtitle] and every field `label`/`placeholder` —
@@ -40,6 +46,10 @@ class _PreChatFormViewState extends State<PreChatFormView> {
   final Map<String, TextEditingController> _controllers = {};
   final Map<String, String> _selectValues = {};
 
+  /// Consent checkboxes by field id. Absent means unticked, so a consent field
+  /// that arrives with a refreshed config starts unticked too.
+  final Map<String, bool> _consents = {};
+
   /// Server-supplied per-field error codes (keyed by fieldId), shown inline.
   final Map<String, String> _serverFieldErrors = {};
 
@@ -58,7 +68,7 @@ class _PreChatFormViewState extends State<PreChatFormView> {
     for (final f in _fields) {
       if (f.type == PreChatFieldType.select) {
         _selectValues[f.id] = '';
-      } else {
+      } else if (!f.isConsent) {
         _controllers[f.id] = TextEditingController();
       }
     }
@@ -79,8 +89,14 @@ class _PreChatFormViewState extends State<PreChatFormView> {
     setState(() {
       _submitting = false;
       final fieldId = err.fieldId;
-      if (fieldId != null && fieldId.isNotEmpty) {
+      if (fieldId != null && _fields.any((f) => f.id == fieldId)) {
         _serverFieldErrors[fieldId] = err.code;
+      } else if (fieldId != null && fieldId.isNotEmpty) {
+        // A field this form does not show — the tenant changed the form while
+        // the visitor was filling it in. Nothing inline can be highlighted, so
+        // say so at the form level and fetch the form as it is now.
+        _formError = _s.somethingWentWrong;
+        unawaited(EasyLiveChat.instance.refreshAvailability());
       } else {
         _formError = err.message ?? _s.somethingWentWrong;
       }
@@ -105,7 +121,13 @@ class _PreChatFormViewState extends State<PreChatFormView> {
     if (!(_formKey.currentState?.validate() ?? false)) return;
 
     final fields = <String, String>{};
+    final consents = <String>[];
     for (final f in _fields) {
+      if (f.isConsent) {
+        // Consent is not a value: it travels as the list of ticked ids.
+        if (_consents[f.id] ?? false) consents.add(f.id);
+        continue;
+      }
       final v = (f.type == PreChatFieldType.select)
           ? (_selectValues[f.id] ?? '')
           : (_controllers[f.id]?.text ?? '');
@@ -115,7 +137,8 @@ class _PreChatFormViewState extends State<PreChatFormView> {
 
     setState(() => _submitting = true);
     try {
-      await EasyLiveChat.instance.startSession(fields: fields);
+      await EasyLiveChat.instance
+          .startSession(fields: fields, consents: consents);
       // On success the controller advances `phase`; the shell swaps this view.
     } on EasyLiveChatError catch (e) {
       _onError(e);
@@ -195,6 +218,7 @@ class _PreChatFormViewState extends State<PreChatFormView> {
   }
 
   Widget _buildField(PreChatField f) {
+    if (f.isConsent) return _buildConsent(f);
     final t = _theme;
     final label = Text(
       f.label + (f.required ? ' *' : ''),
@@ -293,6 +317,112 @@ class _PreChatFormViewState extends State<PreChatFormView> {
     );
   }
 
+  /// A checkbox, the tenant's sentence beside it (verbatim, wrapping — it can
+  /// run to 500 characters) and, under the sentence, the privacy-policy link.
+  ///
+  /// Tapping the sentence ticks the box, as a label does. The link is its own
+  /// target and its own node for a screen reader, so opening the policy never
+  /// ticks anything — reading what you agree to is not agreeing to it.
+  Widget _buildConsent(PreChatField f) {
+    final t = _theme;
+    final policyUrl = f.policyUrl;
+    final sentence = f.label + (f.required ? ' *' : '');
+    return FormField<bool>(
+      key: ValueKey('elc-consent-${f.id}'),
+      initialValue: _consents[f.id] ?? false,
+      validator: (_) {
+        final serverCode = _serverFieldErrors[f.id];
+        if (serverCode != null) return _s.forErrorCode(serverCode);
+        final code = f.validateConsent(_consents[f.id] ?? false);
+        return code == null ? null : _s.forErrorCode(code);
+      },
+      builder: (state) {
+        final checked = _consents[f.id] ?? false;
+        void toggle(bool value) {
+          setState(() {
+            _consents[f.id] = value;
+            _serverFieldErrors.remove(f.id);
+          });
+          state.didChange(value);
+          // Clear the error the moment the box is ticked, rather than leave
+          // "please tick this box" under a ticked box until the next submit.
+          if (state.hasError) state.validate();
+        }
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Semantics(
+                  label: f.label,
+                  child: Checkbox(
+                    value: checked,
+                    activeColor: t.primary,
+                    side: BorderSide(
+                      color: state.hasError
+                          ? _FormErrorColor.color
+                          : t.text.withValues(alpha: 0.45),
+                      width: 1.5,
+                    ),
+                    onChanged: _submitting ? null : (v) => toggle(v ?? false),
+                  ),
+                ),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      ExcludeSemantics(
+                        child: GestureDetector(
+                          behavior: HitTestBehavior.opaque,
+                          onTap: _submitting ? null : () => toggle(!checked),
+                          child: Padding(
+                            padding: const EdgeInsetsDirectional.only(
+                                top: 13, end: 4),
+                            child: Text(
+                              sentence,
+                              textAlign: TextAlign.start,
+                              style: TextStyle(
+                                color: t.text,
+                                fontSize: 14,
+                                height: 1.45,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                      if (policyUrl != null)
+                        _PolicyLink(
+                          label: _s.privacyPolicy,
+                          color: t.primary,
+                          onTap: () => _openPolicy(policyUrl),
+                        ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            if (state.hasError) _errorText(state.errorText!),
+          ],
+        );
+      },
+    );
+  }
+
+  /// Out to the visitor's browser. The URL was checked when the config was
+  /// parsed — only `http:`/`https:` ever reaches here — and a platform that
+  /// cannot open it is a no-op, not a crash in the middle of a form.
+  Future<void> _openPolicy(String url) async {
+    final uri = Uri.tryParse(url);
+    if (uri == null) return;
+    try {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } catch (_) {
+      // No browser, or the platform refused — nothing useful to show.
+    }
+  }
+
   Widget _buildSubmit() {
     final t = _theme;
     return SizedBox(
@@ -330,7 +460,7 @@ class _PreChatFormViewState extends State<PreChatFormView> {
   }
 
   Widget _errorText(String msg) => Padding(
-        padding: const EdgeInsets.only(top: 6, left: 4),
+        padding: const EdgeInsetsDirectional.only(top: 6, start: 4),
         child: Text(
           msg,
           style: const TextStyle(color: _FormErrorColor.color, fontSize: 12),
@@ -370,6 +500,43 @@ class _PreChatFormViewState extends State<PreChatFormView> {
 
   static Color _onColor(Color bg) =>
       bg.computeLuminance() > 0.5 ? const Color(0xFF0F172A) : Colors.white;
+}
+
+/// The "Privacy policy" link under a consent sentence.
+class _PolicyLink extends StatelessWidget {
+  final String label;
+  final Color color;
+  final VoidCallback onTap;
+
+  const _PolicyLink({
+    required this.label,
+    required this.color,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      link: true,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(6),
+        child: Padding(
+          padding: const EdgeInsetsDirectional.only(top: 6, bottom: 6, end: 8),
+          child: Text(
+            label,
+            style: TextStyle(
+              color: color,
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              decoration: TextDecoration.underline,
+              decorationColor: color,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 /// Shared destructive color for validation/errors (no `error` slot on the

@@ -1,10 +1,13 @@
 /// Rich cards: a message an agent builds from an image, a title, a short text
-/// and up to three link buttons — an order's status, a help article, a product.
+/// and up to three buttons — an order's status, a help article, a product. A
+/// button opens a link, or is a reply the visitor taps to answer; a message
+/// can carry one card or a carousel of up to ten.
 ///
-/// Carried on a `MessageContentType.card` message as `metadata.card`, with a
-/// plain-text version of the same card in `body`. Read it through
-/// `ChatMessage.card`, which is null for anything that isn't a usable card —
-/// render the message's body then, exactly as for a text message.
+/// Carried on a `MessageContentType.card` message as `metadata.card` (one) or
+/// `metadata.cards` (a carousel), with a plain-text version in `body`. Read it
+/// through `ChatMessage.cards` (or `ChatMessage.card` for the single card),
+/// which is empty for anything that isn't usable — render the message's body
+/// then, exactly as for a text message.
 ///
 /// A port of `packages/shared/src/message-card.ts`, the validator the server
 /// stores cards with and the web widget draws them with. It runs again here
@@ -15,21 +18,35 @@ library;
 
 import 'package:meta/meta.dart';
 
+import 'bot_buttons.dart';
 import 'js_text.dart';
 import 'web_url.dart';
 
-/// One link button on a [MessageCard].
+/// One button on a [MessageCard]: a link, or a reply ([isReply]).
 @immutable
 class MessageCardButton {
   /// What the button says. Whitespace collapsed, at most
   /// [MessageCard.maxButtonLabelLength] UTF-16 code units, never empty.
   final String label;
 
-  /// Where it goes: always an `http:` or `https:` link (see
-  /// [MessageCard.isSafeUrl]), as the server stored it.
+  /// Where a link goes: always an `http:` or `https:` link (see
+  /// [MessageCard.isSafeUrl]), as the server stored it. Empty on a reply.
   final String url;
 
-  const MessageCardButton({required this.label, required this.url});
+  /// A reply button's id — tap it to answer, with `EasyLiveChat.answerButton`
+  /// — or null on a link.
+  final String? replyId;
+
+  const MessageCardButton({required this.label, required this.url})
+      : replyId = null;
+
+  /// A button the visitor taps to answer instead of opening a link.
+  const MessageCardButton.reply({required this.label, required String id})
+      : url = '',
+        replyId = id;
+
+  /// Answers in the chat rather than opening a link.
+  bool get isReply => replyId != null;
 
   /// [url] as the platform should be asked to open it, or null when it is not
   /// a link the web would open.
@@ -48,13 +65,18 @@ class MessageCardButton {
 
   @override
   bool operator ==(Object other) =>
-      other is MessageCardButton && other.label == label && other.url == url;
+      other is MessageCardButton &&
+      other.label == label &&
+      other.url == url &&
+      other.replyId == replyId;
 
   @override
-  int get hashCode => Object.hash(label, url);
+  int get hashCode => Object.hash(label, url, replyId);
 
   @override
-  String toString() => 'MessageCardButton($label, $url)';
+  String toString() => replyId == null
+      ? 'MessageCardButton($label, $url)'
+      : 'MessageCardButton.reply($label, $replyId)';
 }
 
 /// An agent's card: an optional image, a title, optional text and up to
@@ -65,6 +87,9 @@ class MessageCard {
   static const int maxTitleLength = 80;
   static const int maxTextLength = 300;
   static const int maxButtonLabelLength = 30;
+
+  /// A carousel holds at most this many cards.
+  static const int maxCarouselCards = 10;
 
   /// Links are held to 1000 characters so the text version of the largest card
   /// still fits in one Telegram message.
@@ -110,14 +135,23 @@ class MessageCard {
     final imageUrl = _isCardImage(rawImage) ? jsTrim(rawImage as String) : null;
 
     final buttons = <MessageCardButton>[];
+    final replies = <String>{};
     final rawButtons = raw['buttons'];
     if (rawButtons is List) {
       for (final b in rawButtons) {
         if (b is! Map) continue;
         final label = _clean(b['label'], maxButtonLabelLength);
+        if (label == null) continue;
         final url = b['url'];
-        if (label == null || !isSafeUrl(url)) continue;
-        buttons.add(MessageCardButton(label: label, url: jsTrim(url as String)));
+        final reply = b['reply'];
+        // A safe link is a link; otherwise a reply id of ours is an answer.
+        if (isSafeUrl(url)) {
+          buttons.add(MessageCardButton(label: label, url: jsTrim(url as String)));
+        } else if (isBotButtonId(reply) && replies.add(reply as String)) {
+          buttons.add(MessageCardButton.reply(label: label, id: reply));
+        } else {
+          continue;
+        }
         if (buttons.length == maxButtons) break;
       }
     }
@@ -128,6 +162,29 @@ class MessageCard {
       text: text.isEmpty ? null : text,
       buttons: List<MessageCardButton>.unmodifiable(buttons),
     );
+  }
+
+  /// A carousel (`metadata.cards`), cleaned: the usable cards, at most
+  /// [maxCarouselCards], no reply id twice across them. Not a list: none.
+  static List<MessageCard> tryParseCarousel(Object? raw) {
+    if (raw is! List) return const [];
+    final out = <MessageCard>[];
+    final replies = <String>{};
+    for (final item in raw) {
+      final card = tryParse(item);
+      if (card == null) continue;
+      final kept = card.buttons
+          .where((b) => b.replyId == null || replies.add(b.replyId!))
+          .toList();
+      out.add(MessageCard(
+        imageUrl: card.imageUrl,
+        title: card.title,
+        text: card.text,
+        buttons: List<MessageCardButton>.unmodifiable(kept),
+      ));
+      if (out.length == maxCarouselCards) break;
+    }
+    return List<MessageCard>.unmodifiable(out);
   }
 
   /// A link a visitor may be sent to: `http:` or `https:` only, as the web's URL

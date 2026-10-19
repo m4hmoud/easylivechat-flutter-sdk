@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 
 import 'chime.dart';
 import 'end_chat_button.dart';
+import 'help_screen.dart';
 import 'l10n.dart';
 import 'picked_file.dart';
 import 'theme.dart';
@@ -25,6 +26,11 @@ import 'views/thread_view.dart';
 ///  • `chat` → a [Column] of [ThreadView] + [ComposerBar];
 ///  • `feedback` → [PostChatFormView] when the tenant configured a survey,
 ///    otherwise [FeedbackPromptView].
+///
+/// When the workspace shows help articles (`helpArticlesEnabled`), `prechat`
+/// and `chat` also carry a "Browse help articles" row until the visitor has
+/// written, leading to an [EasyLiveChatHelpScreen] whose "Start a chat" comes
+/// back here. Opt out with [showHelpArticles].
 ///
 /// The subtree is wrapped in a [Directionality] driven by `theme.direction` so
 /// `ar`/`ku` tenants flip bubbles + composer. A [WidgetsBindingObserver] relays
@@ -92,6 +98,12 @@ class EasyLiveChatScreen extends StatefulWidget {
   /// Title for [showAppBar]. Defaults to the workspace's own chat title.
   final String? appBarTitle;
 
+  /// Offer the workspace's help articles ("Browse help articles", leading to
+  /// an [EasyLiveChatHelpScreen]) above the thread until the visitor has
+  /// written. Only ever shown when the workspace turned help articles on
+  /// (`WidgetConfigModel.helpArticlesEnabled`); set false to never show it.
+  final bool showHelpArticles;
+
   const EasyLiveChatScreen({
     super.key,
     this.themeOverride,
@@ -103,6 +115,7 @@ class EasyLiveChatScreen extends StatefulWidget {
     this.confirmExit = false,
     this.showAppBar = false,
     this.appBarTitle,
+    this.showHelpArticles = true,
   });
 
   @override
@@ -131,6 +144,11 @@ class _EasyLiveChatScreenState extends State<EasyLiveChatScreen>
     if (widget.stringsByLocale != null) {
       ElcStrings.overrideByLocale(widget.stringsByLocale!);
     }
+    // This UI's pre-chat form draws consent checkboxes (a box, the tenant's
+    // sentence, the privacy-policy link), so the config is asked for them.
+    // Set before the open()/refreshAvailability() below, both of which fetch
+    // the config; the core leaves consent out for hosts with their own form.
+    EasyLiveChat.instance.supportsConsent = true;
     WidgetsBinding.instance.addObserver(this);
     // Chime here too, for hosts that push the screen directly without ever
     // mounting the launcher bubble. Ref-counted, so having both up is fine.
@@ -325,7 +343,16 @@ class _EasyLiveChatScreenState extends State<EasyLiveChatScreen>
         if (config == null) {
           return _error != null ? _buildError(config, theme) : _spinner(theme);
         }
-        return PreChatFormView(config: config, theme: theme);
+        final form = PreChatFormView(config: config, theme: theme);
+        if (!widget.showHelpArticles || !config.helpArticlesEnabled) {
+          return form;
+        }
+        return Column(
+          children: [
+            _HelpEntry(theme: theme, config: config, screen: widget),
+            Expanded(child: form),
+          ],
+        );
 
       case ChatPhase.chat:
         return Column(
@@ -338,6 +365,17 @@ class _EasyLiveChatScreenState extends State<EasyLiveChatScreen>
                 (EasyLiveChat.instance.workspaceClosed ||
                     EasyLiveChat.instance.composerLocked))
               ClosedNoticeBanner(config: config, theme: theme),
+            // Help first, while there is nothing written yet: an answer found
+            // there is a chat nobody had to wait on.
+            if (widget.showHelpArticles && config != null)
+              ValueListenableBuilder<List<ChatMessage>>(
+                valueListenable: EasyLiveChat.instance.messages,
+                builder: (context, messages, _) =>
+                    offerHelpEntry(config, messages)
+                        ? _HelpEntry(
+                            theme: theme, config: config, screen: widget)
+                        : const SizedBox.shrink(),
+              ),
             Expanded(
               child: ThreadView(
                 theme: theme,
@@ -437,6 +475,73 @@ class _ErrorRetry extends StatelessWidget {
               child: Text(retryLabel),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+/// "Browse help articles" — a quiet row above the thread (or the pre-chat
+/// form) that opens the help screen. "Start a chat" there comes straight back
+/// here, so the visitor never loses the conversation they were about to have.
+class _HelpEntry extends StatelessWidget {
+  final EasyLiveChatTheme theme;
+  final WidgetConfigModel config;
+  final EasyLiveChatScreen screen;
+
+  const _HelpEntry({
+    required this.theme,
+    required this.config,
+    required this.screen,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final s = ElcStrings.of(screen.locale ?? config.locale);
+    final t = theme;
+    return Semantics(
+      button: true,
+      child: InkWell(
+        onTap: () {
+          final navigator = Navigator.of(context);
+          navigator.push(MaterialPageRoute<void>(
+            builder: (_) => EasyLiveChatHelpScreen(
+              themeOverride: screen.themeOverride,
+              directionOverride: screen.directionOverride,
+              locale: screen.locale,
+              onStartChat: navigator.pop,
+            ),
+          ));
+        },
+        child: Container(
+          padding: const EdgeInsetsDirectional.fromSTEB(16, 12, 12, 12),
+          decoration: BoxDecoration(
+            border: Border(
+              bottom: BorderSide(color: t.text.withValues(alpha: 0.08)),
+            ),
+          ),
+          child: Row(
+            children: [
+              ExcludeSemantics(
+                child: Icon(Icons.help_outline, size: 20, color: t.primary),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  s.helpBrowse,
+                  style: TextStyle(
+                    color: t.text,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+              ExcludeSemantics(
+                child: Icon(Icons.chevron_right,
+                    color: t.text.withValues(alpha: 0.35)),
+              ),
+            ],
+          ),
         ),
       ),
     );

@@ -1,5 +1,73 @@
 # Changelog
 
+## 0.1.73
+
+- **Reply buttons no longer show twice.** A message with buttons (a bot
+  flow's, or an agent's) draws its own words with the buttons under it, from
+  `metadata.bot` — the numbered menu its body carries for older clients is
+  not drawn as well, which is what used to put every option on screen twice.
+  A tap answers with the button's id (`EasyLiveChat.answerButton`); the
+  buttons are live while the question is open and the chosen one stays
+  filled. `MessageBubble` takes `showButtons`, `chosenButtonId` and
+  `onButton`; `ThreadView` wires them whenever it offers quick replies.
+- **Cards with reply buttons, and carousels.** A card's reply button answers
+  the same way (link buttons still open in the browser), and two or more
+  cards draw as a row the visitor swipes through (`ElcCardCarousel`,
+  announced as "Cards" — a new string in all 13 languages).
+  `ElcMessageCardView` takes `chosenReplyId`, `onReply` and `width`;
+  `ElcQuickReplies` takes `chosen`.
+
+- Requires `easylivechat` ^0.1.56: identity verification
+  (`identify(userId:, userHash:)`, `clearIdentity()`, the typed
+  `isIdentityNotVerified` refusal, and a new visitor whenever a different
+  person signs in) and help articles. Both are re-exported here.
+- **Help articles.** `EasyLiveChatHelpScreen`: a search field over the
+  workspace's top articles (debounced; one character is still the top list),
+  an article reader, "Was this helpful? Yes / No", and "Still need help? Start
+  a chat" — which opens the chat screen, or runs your `onStartChat`. Article
+  bodies render natively through the new `ElcHelpMarkdown` (headings,
+  paragraphs with line breaks, lists, quotes, code, **bold**, *italic*,
+  `code`, links and images) — a Dart port of the shared help dialect, no HTML
+  and no WebView; only http(s)/mailto:/tel: links and http(s) images ever
+  become tappable or load, raw HTML shows as text. Links open with
+  `url_launcher`, or your `onOpenLink`. Each article reads in its own
+  language's direction; the chrome follows the workspace's (or
+  `directionOverride`).
+- **On the chat screen**, when the workspace shows help articles, a "Browse
+  help articles" row sits above the pre-chat form and the thread until the
+  visitor has written; "Start a chat" there comes straight back. Nothing
+  changes when the switch is off; `EasyLiveChatScreen(showHelpArticles:
+  false)` hides it regardless.
+- 17 new strings (`help*` in `l10n/sdk_strings.json`) in all 13 languages,
+  worded as in the web widget; screen-reader labels for the search clear
+  button, rows, headings, the loading state and the result count.
+- `SecurePrefsStorage` keeps the identified user id in secure storage, beside
+  the profile — it is often an email or an account number.
+- Requires `easylivechat` ^0.1.56, which reads consent fields in the pre-chat
+  form.
+- **Consent checkboxes.** A workspace's consent field draws as a checkbox with
+  the tenant's sentence beside it — verbatim, start-aligned, wrapping however
+  long it is (up to 500 characters) — and, when the field has one, a "Privacy
+  policy" link under the sentence that opens in the visitor's browser, never
+  inside the host app. Tapping the sentence ticks the box, as a label does;
+  the link is its own target and its own screen-reader node, so opening the
+  policy never ticks anything. A required box left unticked keeps the chat
+  from starting and says "Please tick this box to continue" under it, cleared
+  the moment it is ticked; the server's own `CONSENT_REQUIRED` lands on the
+  same box. A consent is never sent as a field value: the ticked ids go as
+  `consents`.
+- The launcher and the chat screen now set `EasyLiveChat.supportsConsent`, so
+  their config asks for consent fields (`?caps=consent`). A server that has
+  none, or predates them, sends none, and the form is what it was.
+- Two new strings in all 13 languages, overridable like every other:
+  `privacyPolicy` and `consentRequired` (in `l10n/sdk_strings.json`).
+- A field error naming a field the form does not show — the tenant changed
+  the form while the visitor was filling it in — now says something went wrong
+  and re-reads the config, instead of highlighting nothing.
+- The inline error under a pre-chat field was inset from the physical left; it
+  uses a logical start inset now, so in Arabic, Kurdish and Urdu it sits under
+  the field's own edge.
+
 ## 0.1.72
 
 - Requires `easylivechat` ^0.1.55, which follows an agent editing or unsending

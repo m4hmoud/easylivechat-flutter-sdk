@@ -284,7 +284,10 @@ class _HistoryRest extends RestClient {
     String? contentLocale,
     bool resumeOnly = false,
     Map<String, String>? fields,
+    List<String>? consents,
     Map<String, String>? attributes,
+    String? userId,
+    String? userHash,
   }) async =>
       SessionResult.fromJson({
         'token': 'widget-jwt',

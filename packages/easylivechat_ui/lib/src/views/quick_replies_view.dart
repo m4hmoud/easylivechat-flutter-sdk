@@ -26,12 +26,17 @@ class ElcQuickReplies extends StatelessWidget {
   /// locked — so a double tap cannot send twice.
   final ValueChanged<String>? onSelected;
 
+  /// The one the visitor already chose (a reply button they answered): drawn
+  /// filled and not dimmed with the rest, which are then disabled.
+  final String? chosen;
+
   const ElcQuickReplies({
     super.key,
     required this.replies,
     required this.theme,
     required this.semanticLabel,
     required this.onSelected,
+    this.chosen,
   });
 
   @override
@@ -64,6 +69,7 @@ class ElcQuickReplies extends StatelessWidget {
                 _QuickReplyButton(
                   reply: reply,
                   theme: theme,
+                  chosen: chosen == reply,
                   onPressed: onSelected == null ? null : () => onSelected!(reply),
                 ),
             ],
@@ -78,11 +84,13 @@ class _QuickReplyButton extends StatelessWidget {
   final String reply;
   final EasyLiveChatTheme theme;
   final VoidCallback? onPressed;
+  final bool chosen;
 
   const _QuickReplyButton({
     required this.reply,
     required this.theme,
     required this.onPressed,
+    this.chosen = false,
   });
 
   @override
@@ -91,7 +99,7 @@ class _QuickReplyButton extends StatelessWidget {
     final onAccent = accent.computeLuminance() > 0.5
         ? const Color(0xFF0F172A)
         : Colors.white;
-    return OutlinedButton(
+    final button = OutlinedButton(
       onPressed: onPressed,
       style: ButtonStyle(
         // 40 tall rather than the pill's natural ~34: still reads as a pill,
@@ -109,19 +117,21 @@ class _QuickReplyButton extends StatelessWidget {
         ),
         side: WidgetStateProperty.resolveWith(
           (states) => BorderSide(
-            color: states.contains(WidgetState.disabled)
+            color: states.contains(WidgetState.disabled) && !chosen
                 ? accent.withValues(alpha: 0.5)
                 : accent,
             width: 1.5,
           ),
         ),
         backgroundColor: WidgetStateProperty.resolveWith(
-          (states) => states.contains(WidgetState.pressed) &&
-                  !states.contains(WidgetState.disabled)
+          (states) => chosen ||
+                  (states.contains(WidgetState.pressed) &&
+                      !states.contains(WidgetState.disabled))
               ? accent
               : theme.background,
         ),
         foregroundColor: WidgetStateProperty.resolveWith((states) {
+          if (chosen) return onAccent;
           if (states.contains(WidgetState.disabled)) {
             return accent.withValues(alpha: 0.5);
           }
@@ -146,5 +156,6 @@ class _QuickReplyButton extends StatelessWidget {
         textDirection: textDirectionOf(reply),
       ),
     );
+    return chosen ? Semantics(selected: true, child: button) : button;
   }
 }

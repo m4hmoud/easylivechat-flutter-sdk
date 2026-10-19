@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'config.dart';
 import 'errors.dart';
 import 'models/chat_message.dart';
+import 'models/help_article.dart';
 import 'models/results.dart';
 import 'models/widget_config.dart';
 import 'session_controller.dart';
@@ -33,6 +34,33 @@ class EasyLiveChat {
 
   bool get isBooted => _c != null;
 
+  bool _supportsConsent = false;
+
+  /// Whether this app draws the workspace's consent checkboxes — a pre-chat
+  /// field of type [PreChatFieldType.consent]: a checkbox, the tenant's
+  /// sentence beside it, and its privacy-policy link.
+  ///
+  /// Off by default, and the prebuilt `easylivechat_ui` screens turn it on
+  /// themselves. A host that builds its OWN pre-chat form turns it on once it
+  /// renders consent fields — it may be set before [boot]:
+  ///
+  /// ```dart
+  /// EasyLiveChat.instance.supportsConsent = true;
+  /// // … then pass the ticked ids:
+  /// await EasyLiveChat.instance.startSession(fields: values, consents: ticked);
+  /// ```
+  ///
+  /// While it is off the config is requested without consent fields — the
+  /// server leaves them out for a client that does not ask, rather than have
+  /// it draw a text box labelled "I agree to…" — and no consent is asked of
+  /// the visitor, exactly as before consent existed. Takes effect at the next
+  /// config fetch ([open], [loadConfig], [refreshAvailability]).
+  bool get supportsConsent => _supportsConsent;
+  set supportsConsent(bool value) {
+    _supportsConsent = value;
+    _c?.supportsConsent = value;
+  }
+
   /// Initialize with [config]. Inject a durable [storage] (an
   /// `EasyLiveChatStorage`); defaults to ephemeral [InMemoryStorage] which is
   /// NOT durable — production apps must provide a persistent implementation
@@ -51,23 +79,89 @@ class EasyLiveChat {
     // Fail fast on a misconfigured apiBase/tenantSlug rather than deep in the
     // transport with an opaque error.
     config.validate();
-    _c = SessionController(
-        config: config, storage: storage ?? InMemoryStorage());
-    await _c!.boot();
+    final c = SessionController(
+        config: config, storage: storage ?? InMemoryStorage())
+      ..supportsConsent = _supportsConsent;
+    _c = c;
+    await c.boot();
+    // An identify()/clearIdentity() made before boot, now that there is a
+    // visitor to line it up against.
+    final pending = _pendingIdentity;
+    _pendingIdentity = null;
+    pending?.call(c);
   }
+
+  /// identify()/clearIdentity() called before [boot], applied by it.
+  void Function(SessionController c)? _pendingIdentity;
 
   /// Pre-identify a known (logged-in) visitor BEFORE [open]. [open] then skips
   /// the pre-chat form and starts the session directly as this person; [phone]
-  /// (optional) and [fields] (your own keys, e.g. userId / app) are sent with
+  /// (optional) and [fields] (your own keys, e.g. plan / app) are sent with
   /// the session so agents see who they're talking to. Safe to call before or
-  /// after [boot] (re-applied at boot); a no-op identity (`null`s) is ignored.
+  /// after [boot] (applied at boot); a no-op identity (`null`s) is ignored.
+  ///
+  /// **Identity verification.** [userId] is YOUR app's own id for the signed-in
+  /// user; [userHash] proves it: your BACKEND computes
+  /// `hex(HMAC_SHA256(workspaceIdentitySecret, userId))` and hands it to the
+  /// app with the id. Never compute it in the app — the secret must not ship
+  /// in a binary. Both are sent on every session call (the silent resume and
+  /// the start). With the workspace's verification off they are ignored; when
+  /// it is optional a correct hash marks the contact verified and a wrong one
+  /// is simply not trusted; when it is ENFORCED a `userId` with a missing or
+  /// wrong hash is refused and [open] throws an [EasyLiveChatError] whose
+  /// `isIdentityNotVerified` is true (also emitted on [onError]) — its
+  /// `reason` says what to fix. Anonymous visitors are never refused.
+  ///
+  /// Declare the identity on EVERY launch, before the chat opens — the SDK
+  /// remembers which `userId` this device's visitor belongs to and lines the
+  /// two up the way the web widget does:
+  ///  • anonymous → signed in keeps the visitor: the conversation they already
+  ///    started continues, with the identity attached;
+  ///  • a DIFFERENT `userId`, or opening the chat with none after one was set,
+  ///    forgets the stored visitor — a fresh visitorId, nothing to resume — so
+  ///    the next person on the device never sees the last one's conversation.
+  /// Signing out mid-session: call [clearIdentity] (or [reset]).
   void identify(
-          {String? name,
-          String? email,
-          String? phone,
-          Map<String, String>? fields}) =>
-      _controller.identify(
-          name: name, email: email, phone: phone, fields: fields);
+      {String? name,
+      String? email,
+      String? phone,
+      Map<String, String>? fields,
+      String? userId,
+      String? userHash}) {
+    void apply(SessionController c) => c.identify(
+        name: name,
+        email: email,
+        phone: phone,
+        fields: fields,
+        userId: userId,
+        userHash: userHash);
+    final c = _c;
+    if (c == null) {
+      _pendingIdentity = apply;
+      return;
+    }
+    apply(c);
+  }
+
+  /// The signed-in user signed out: drop the identity passed to [identify]
+  /// without tearing the SDK down.
+  ///
+  /// When this device's visitor had been identified with a `userId`, the
+  /// visitor is forgotten as well — a fresh visitorId, no conversation to
+  /// resume — and a chat on screen restarts as an anonymous visitor. For a
+  /// visitor that never carried a `userId` only the declared identity and the
+  /// cached profile go; [reset] is the full logout that also abandons the
+  /// visitorId in every case.
+  void clearIdentity() {
+    final c = _c;
+    if (c == null) {
+      // Nothing booted yet: the next open() lines up "nobody signed in" by
+      // itself, so all there is to do is drop an identify() still waiting.
+      _pendingIdentity = null;
+      return;
+    }
+    c.clearIdentity();
+  }
 
   // ── reactive state (read-only) ──
   ValueListenable<ChatPhase> get phase => _controller.phase;
@@ -151,19 +245,46 @@ class EasyLiveChat {
   /// visible again — reopening the screen, or the app returning to foreground.
   Future<void> refreshAvailability() => _controller.refreshAvailability();
   Future<bool> silentResume() => _controller.silentResume();
+
+  /// Start a new chat from the pre-chat form: [fields] keyed by field id, and
+  /// [consents] — the ids of the consent fields the visitor ticked.
+  ///
+  /// Consent is not a value, so it never goes in [fields]. [consents] only
+  /// matters with [supportsConsent] on; a required consent field left out of
+  /// it fails with `CONSENT_REQUIRED` (its `fieldId` set), locally first and
+  /// then from the server, as other field errors do.
   Future<void> startSession(
           {String? name,
           String? email,
           String? phone,
-          Map<String, String>? fields}) =>
+          Map<String, String>? fields,
+          List<String>? consents}) =>
       _controller.startSession(
-          name: name, email: email, phone: phone, fields: fields);
+          name: name,
+          email: email,
+          phone: phone,
+          fields: fields,
+          consents: consents);
   void closeSession() => _controller.closeSession();
 
   // ── messaging ──
   SendResult sendMessage(String body,
           {List<String> attachmentUrls = const []}) =>
       _controller.sendMessage(body, attachmentUrls: attachmentUrls);
+
+  /// Answer a reply button under [message] — one of its
+  /// [ChatMessage.botButtons], or a reply button on one of its cards. Sends
+  /// [label] as the visitor's own message (it shows and ticks like anything
+  /// typed) with the button's id beside it, so the server records which
+  /// button was meant; the agents read "Chose: …".
+  ///
+  /// Offer it only while [buttonsOpen] says the question is still open. For a
+  /// card's reply button pass the label [ChatMessage.botButtons] gives that
+  /// id — on a carousel it names the card ("Blue shirt · Buy").
+  SendResult answerButton(ChatMessage message,
+          {required String buttonId, required String label}) =>
+      _controller.sendMessage(label,
+          reply: {'messageId': message.id, 'buttonId': buttonId});
 
   /// Submit the tenant's post-chat survey (see
   /// [WidgetConfigModel.postChatForm]). Keyed by field id. A conversation that
@@ -216,10 +337,50 @@ class EasyLiveChat {
   String resolveUrl(String relativeOrAbsolute) =>
       _controller.resolveUrl(relativeOrAbsolute);
 
+  // ── help articles ──
+  //
+  // Public: they need [boot] (for the visitorId) but no session — a visitor
+  // can read them before ever opening a chat. Gate any help UI on
+  // `widgetConfig.value?.helpArticlesEnabled`; with the workspace's switch off
+  // the list answers `enabled: false` and an article is NOT_FOUND.
+
+  /// Search the workspace's help articles, best match first (server default 5,
+  /// at most 20). A [q] shorter than two characters returns the top articles
+  /// instead, exactly like [helpArticles]. [category] narrows to one of
+  /// [HelpArticleList.categories]. Articles come in `config.contentLocale` when
+  /// the workspace wrote any in it.
+  Future<HelpArticleList> searchHelp(String q,
+          {String? category, int? limit}) =>
+      _controller.searchHelp(q, category: category, limit: limit);
+
+  /// The top articles in the workspace's own order (default 20, at most 50) —
+  /// what to show before the visitor has typed anything.
+  Future<HelpArticleList> helpArticles({String? category, int? limit}) =>
+      _controller.helpArticles(category: category, limit: limit);
+
+  /// One article in full; its [HelpArticle.body] is markdown to render as
+  /// text, never as HTML. Records the reading for the workspace's help
+  /// analytics (fire-and-forget; a failed count is swallowed). Throws an
+  /// [EasyLiveChatError] with code `NOT_FOUND` when the article is gone.
+  Future<HelpArticle> getHelpArticle(String id) =>
+      _controller.getHelpArticle(id);
+
+  /// Answer "Was this helpful?" for an article. One answer per reading;
+  /// answering again replaces it.
+  Future<void> rateHelpArticle(String id, bool helpful) =>
+      _controller.rateHelpArticle(id, helpful);
+
   // ── offline + CSAT ──
+  /// Leave a message for the team. [consents] are the consent fields the
+  /// visitor ticked on your form, as for [startSession]; omit them and nothing
+  /// about consent is sent.
   Future<String> submitOfflineForm(
-          {String? name, String? email, required String message}) =>
-      _controller.submitOfflineForm(name: name, email: email, message: message);
+          {String? name,
+          String? email,
+          required String message,
+          List<String>? consents}) =>
+      _controller.submitOfflineForm(
+          name: name, email: email, message: message, consents: consents);
   Future<FeedbackResult> submitFeedback(
           {required int rating, String? comment}) =>
       _controller.submitFeedback(rating: rating, comment: comment);
@@ -284,6 +445,7 @@ class EasyLiveChat {
   /// [storage] you pass to [boot] so the keys can still be cleared. When it IS
   /// booted the controller's own storage is used and the argument is ignored.
   Future<void> reset({EasyLiveChatStorage? storage}) async {
+    _pendingIdentity = null;
     final c = _c;
     if (c != null) {
       await c.resetVisitor();

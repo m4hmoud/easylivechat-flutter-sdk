@@ -45,6 +45,12 @@ class WidgetConfigModel {
   /// should never ask. Defaults to false when the server omits it, so an older
   /// server keeps the SDK quiet rather than guessing.
   final bool voiceNotesEnabled;
+
+  /// Whether the workspace shows its help articles to visitors (the
+  /// dashboard's "Show help articles" switch). Gate any help UI on it — with
+  /// the switch off the help endpoints answer an empty list / 404. False when
+  /// an older server omits it.
+  final bool helpArticlesEnabled;
   final bool showAgentAvatars;
   final bool showAgentNames;
   final bool collectEmailPreChat; // legacy fallback flag
@@ -75,6 +81,7 @@ class WidgetConfigModel {
     required this.direction,
     required this.soundEnabled,
     this.voiceNotesEnabled = false,
+    this.helpArticlesEnabled = false,
     required this.showAgentAvatars,
     required this.showAgentNames,
     required this.collectEmailPreChat,
@@ -105,6 +112,7 @@ class WidgetConfigModel {
       direction: LocaleDirection.fromWire(j['direction']),
       soundEnabled: j['soundEnabled'] != false,
       voiceNotesEnabled: j['voiceNotesEnabled'] == true,
+      helpArticlesEnabled: j['helpArticlesEnabled'] == true,
       showAgentAvatars: j['showAgentAvatars'] != false,
       showAgentNames: j['showAgentNames'] != false,
       collectEmailPreChat: j['collectEmailPreChat'] == true,

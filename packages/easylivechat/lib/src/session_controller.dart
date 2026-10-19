@@ -9,6 +9,7 @@ import 'config.dart';
 import 'errors.dart';
 import 'models/chat_message.dart';
 import 'models/enums.dart';
+import 'models/help_article.dart';
 import 'models/pre_chat_form.dart';
 import 'models/results.dart';
 import 'models/widget_config.dart';
@@ -134,7 +135,43 @@ class SessionController {
   String? _phone;
   Map<String, String>? _identityFields;
 
+  // ── host-declared identity (identity verification) ──
+  //
+  // What the host last DECLARED via identify()/clearIdentity(), and the claim
+  // session calls actually SEND. They differ only while a change is being lined
+  // up against storage (see [_lineUpIdentity]): until the visitor has been
+  // switched, a token re-mint for the previous person must keep presenting the
+  // previous person's claim, or the new user id would be verified onto the old
+  // person's contact.
+  String? _userId;
+  String? _userHash;
+  String? _claimUserId;
+  String? _claimUserHash;
+
+  /// A declared identity not yet compared with the stored one. True at start:
+  /// a launch that opens the chat without declaring anybody is itself a
+  /// statement (nobody is signed in), exactly as a web page load is.
+  bool _identityPending = true;
+
+  /// Serializes the line-ups so two quick identify() calls cannot interleave.
+  Future<void>? _identityLineUp;
+
+  /// Help-article reading session — one per controller (i.e. per app launch,
+  /// and per person after a switch). The server dedupes views on it and counts
+  /// "deflection": a session that read an article and then wrote no message.
+  String _helpSessionId = _uuid.v4();
+
   String? _token;
+
+  /// Whether this client draws the workspace's consent checkboxes — see
+  /// `EasyLiveChat.supportsConsent`. Read at each config fetch.
+  bool supportsConsent = false;
+
+  /// Whether the config in [widgetConfig] was asked for WITH consent fields.
+  /// Only then can the visitor have been shown them, so only then does a new
+  /// chat declare the capability — declaring it over a form fetched without
+  /// would make the server demand boxes nobody drew.
+  bool _configHasConsent = false;
 
   // ── visitor push ──
   // The device token the host app handed us, and the one the server currently
@@ -276,21 +313,33 @@ class SessionController {
   /// skips the pre-chat form and starts directly as this person. A fully-null
   /// identity is ignored (stays anonymous). Also seeds the cached profile so
   /// [silentResume] carries the name/email.
+  ///
+  /// [userId] + [userHash] are the identity-verification claim (see
+  /// `EasyLiveChat.identify`); they are sent on every `POST /session` and
+  /// decide whether this device's stored visitor still belongs to the person
+  /// now signed in ([visitorChangeFor]).
   void identify(
       {String? name,
       String? email,
       String? phone,
-      Map<String, String>? fields}) {
+      Map<String, String>? fields,
+      String? userId,
+      String? userHash}) {
+    final claimedId = _trimmedOrNull(userId);
     final hasAny = (name != null && name.trim().isNotEmpty) ||
         (email != null && email.trim().isNotEmpty) ||
         (phone != null && phone.trim().isNotEmpty) ||
-        (fields != null && fields.isNotEmpty);
+        (fields != null && fields.isNotEmpty) ||
+        claimedId != null;
     if (!hasAny) return;
     _hasIdentity = true;
     _identityName = name;
     _identityEmail = email;
     _phone = phone;
     _identityFields = fields;
+    // A hash means nothing without the id it signs.
+    _userId = claimedId;
+    _userHash = claimedId == null ? null : _trimmedOrNull(userHash);
     // identify() is AUTHORITATIVE: the host is declaring the full visitor
     // identity for this session, so replace the persisted profile rather than
     // merging stale fields. A value the host no longer supplies (e.g. email)
@@ -302,13 +351,180 @@ class SessionController {
       phone: phone,
       preChat: fields,
     );
+    _identityPending = true;
+    // Line up now rather than at the next open(): a person switched while the
+    // chat is on screen must not keep typing into the previous person's thread.
+    unawaited(_lineUpIdentity(reopen: true));
+  }
+
+  /// Declare that nobody is signed in any more, without tearing the SDK down.
+  ///
+  /// Drops the identity passed to [identify] (name, email, phone, fields and
+  /// the verification claim) and the cached profile. When this device's
+  /// visitor had been identified with a `userId`, the visitor itself is
+  /// forgotten too — a fresh visitorId, no conversation to resume — because the
+  /// next person to open the chat may be someone else ([visitorChangeFor]).
+  /// A visitor never identified with a `userId` keeps their visitorId; use
+  /// `EasyLiveChat.reset()` for a full logout.
+  void clearIdentity() {
+    _hasIdentity = false;
+    _identityName = null;
+    _identityEmail = null;
+    _phone = null;
+    _identityFields = null;
+    _userId = null;
+    _userHash = null;
+    _profile = null;
+    _identityPending = true;
+    unawaited(storage.delete(StorageKeys.profile).catchError((Object _) {}));
+    unawaited(_lineUpIdentity(reopen: true));
+  }
+
+  /// Compare the declared identity with the one this device's visitor was
+  /// last identified as, and act on the difference ([visitorChangeFor]).
+  ///
+  /// Awaited by every path that is about to send a NEW session claim (open,
+  /// silent resume, start) — "before the visitor id is read", as the web
+  /// widget puts it — and kicked off eagerly by [identify]/[clearIdentity].
+  /// A no-op when nothing was declared since the last line-up. [reopen]
+  /// re-runs [open] after a switch when a chat surface is showing, so the
+  /// screen follows the new person instead of stranding on a spinner.
+  Future<void> _lineUpIdentity({bool reopen = false}) {
+    final previous = _identityLineUp ?? Future<void>.value();
+    final run = previous.then((_) async {
+      if (!_identityPending || _disposed) return;
+      _identityPending = false;
+      await _reconcileIdentity(reopen: reopen);
+    });
+    // Never let one failed line-up poison every later session call.
+    _identityLineUp = run.catchError((Object _) {});
+    return _identityLineUp!;
+  }
+
+  Future<void> _reconcileIdentity({required bool reopen}) async {
+    final next = _userId;
+    String? stored;
+    try {
+      stored = _trimmedOrNull(await storage.read(StorageKeys.identifiedUserId));
+    } catch (_) {
+      // Storage unreadable: the visitorId cannot be trusted to persist either,
+      // so there is no stored person to leak. Same rule as the web widget.
+      _adoptClaim();
+      return;
+    }
+    final change = visitorChangeFor(stored: stored, next: next);
+    var surfaceWasShowing = false;
+    try {
+      switch (change) {
+        case VisitorChange.same:
+          break;
+        case VisitorChange.upgraded:
+          await storage.write(StorageKeys.identifiedUserId, next!);
+        case VisitorChange.switched:
+          surfaceWasShowing = await _forgetVisitorForSwitch();
+          if (next != null) {
+            await storage.write(StorageKeys.identifiedUserId, next);
+          } else {
+            await storage.delete(StorageKeys.identifiedUserId);
+          }
+      }
+    } finally {
+      _adoptClaim();
+    }
+    if (_disposed) return;
+    if (change == VisitorChange.upgraded && _token != null) {
+      // The visitor signed in mid-conversation: re-mint so the server attaches
+      // (and, when it checks out, verifies) the identity on this contact now,
+      // not at the next app launch. A refusal surfaces on onError and leaves
+      // the running chat alone.
+      unawaited(_remintToken());
+    } else if (change == VisitorChange.switched && reopen && surfaceWasShowing) {
+      unawaited(open().catchError((Object e) => _emitError(e)));
+    }
+  }
+
+  void _adoptClaim() {
+    _claimUserId = _userId;
+    _claimUserHash = _userHash;
+  }
+
+  /// A different person (or nobody) is signed in now: drop everything that
+  /// belongs to the previous one, locally and in storage, and mint a fresh
+  /// visitorId. Their transcript stays on the server; this device simply stops
+  /// being able to resume it.
+  ///
+  /// Returns whether a chat surface (thread, form, notice, survey) was showing,
+  /// i.e. whether the caller should re-run [open] for the new person.
+  Future<bool> _forgetVisitorForSwitch() async {
+    final p = phase.value;
+    final surfaceWasShowing = p == ChatPhase.chat ||
+        p == ChatPhase.prechat ||
+        p == ChatPhase.offline ||
+        p == ChatPhase.feedback;
+
+    // Best effort: stop the previous person's replies notifying this device.
+    // The next registration would move the device anyway (the server upserts
+    // by device token), but only once the new person opens a chat.
+    final pushToken = _registeredPushToken ?? _pushToken;
+    String? staleToken = _token;
+    if (staleToken == null) {
+      try {
+        staleToken = await storage.read(StorageKeys.token);
+      } catch (_) {}
+    }
+    if (pushToken != null && staleToken != null && staleToken.isNotEmpty) {
+      try {
+        await rest.unregisterPush(token: staleToken, pushToken: pushToken);
+      } catch (_) {}
+    }
+    _registeredPushToken = null;
+
+    _stopHeartbeat();
+    _teardownSocket();
+    _teardownPresence();
+    _socketConversationId = null;
+    _token = null;
+    _conversationId = null;
+    _oldestCursor = null;
+    _historyLoadedOnce = false;
+    _unreadIds.clear();
+    if (!_disposed) {
+      connection.value = ConnectionState.disconnected;
+      agentLastReadAt.value = null;
+      unreadCount.value = 0;
+      agentTyping.value = false;
+      assistantTyping.value = false;
+      _setMessages(const []);
+    }
+    // Whatever identify() just declared is the NEW person's and stays; a
+    // profile that only came from storage was the previous person's.
+    if (!_hasIdentity) {
+      _profile = null;
+      _phone = null;
+    }
+    for (final key in StorageKeys.identity) {
+      if (key == StorageKeys.identifiedUserId) continue; // the caller sets it
+      try {
+        await storage.delete(key);
+      } catch (_) {}
+    }
+    final vid = _uuid.v4();
+    _visitorId = vid;
+    try {
+      await storage.write(StorageKeys.visitorId, vid);
+    } catch (_) {}
+    _helpSessionId = _uuid.v4();
+    _setPhase(ChatPhase.idle);
+    return surfaceWasShowing;
   }
 
   /// `GET /config`. Sets [widgetConfig] + [isOpen]. If the workspace is outside
   /// working hours, drops to [ChatPhase.offline].
   Future<WidgetConfigModel> loadConfig() async {
     _setPhase(ChatPhase.loading);
-    final res = await _guardAuth(() => rest.getConfig());
+    final askConsent = supportsConsent;
+    final res = await _guardAuth(() => rest.getConfig(consent: askConsent));
+    _configHasConsent = askConsent;
     widgetConfig.value = res.config;
     isOpen.value = res.isOpen;
     agentsAccepting.value = res.agentsAccepting;
@@ -333,7 +549,28 @@ class SessionController {
 
   /// Full orchestration: config → silentResume → (prechat | anonymous start)
   /// → connect /widgets.
-  Future<void> open() async {
+  ///
+  /// Single-flight: a call while one is running joins it. Two overlapping runs
+  /// (the host opening the chat while an identity switch re-opens it) would
+  /// each find nothing to resume and start two sessions.
+  Future<void> open() {
+    final inflight = _openInFlight;
+    if (inflight != null) return inflight;
+    final run = _openImpl();
+    _openInFlight = run;
+    run.then((_) {}, onError: (Object _) {}).whenComplete(() {
+      if (identical(_openInFlight, run)) _openInFlight = null;
+    });
+    return run;
+  }
+
+  Future<void>? _openInFlight;
+
+  Future<void> _openImpl() async {
+    // Before anything reads the visitorId: a different person signed in (or
+    // nobody, after someone was) must not resume the previous one's thread.
+    await _lineUpIdentity();
+
     // ALWAYS re-fetch. This used to be `widgetConfig.value ?? await
     // loadConfig()`, so reopening the chat within one app session reused the
     // config captured at startup — `isOpen` was frozen at whatever it was then,
@@ -401,6 +638,7 @@ class SessionController {
   }
 
   Future<bool> _silentResumeImpl() async {
+    await _lineUpIdentity();
     _setPhase(ChatPhase.resuming);
     final SessionResult res;
     try {
@@ -417,6 +655,8 @@ class SessionController {
             phone: _phone ?? _profile?.phone,
             locale: _effectiveLocale,
             resumeOnly: true,
+            userId: _claimUserId,
+            userHash: _claimUserHash,
           ));
     } catch (e) {
       _emitError(e);
@@ -448,8 +688,10 @@ class SessionController {
   Future<void> refreshAvailability() async {
     if (_disposed) return;
     try {
-      final res = await rest.getConfig();
+      final askConsent = supportsConsent;
+      final res = await rest.getConfig(consent: askConsent);
       if (_disposed) return;
+      _configHasConsent = askConsent;
       widgetConfig.value = res.config;
       isOpen.value = res.isOpen;
       agentsAccepting.value = res.agentsAccepting;
@@ -555,13 +797,24 @@ class SessionController {
   /// `POST /session` with optional pre-chat [fields]. Validates client-side for
   /// UX; treats server 400 `{fieldId}` as authority. Persists profile + token,
   /// then connects.
+  ///
+  /// [consents] are the ids of the consent fields the visitor ticked. They
+  /// are sent — with the `consent` capability — whenever the form the visitor
+  /// filled in could have shown consent fields: it is enabled and was fetched
+  /// with [supportsConsent] on. Null then means none ticked, so a required one
+  /// fails here with `CONSENT_REQUIRED` before the server says the same.
+  /// Otherwise nothing about consent is sent and the server asks for none:
+  /// a host-identified visitor ([skipValidation]) never saw a form, and an
+  /// anonymous start has no form to see.
   Future<void> startSession({
     String? name,
     String? email,
     String? phone,
     Map<String, String>? fields,
+    List<String>? consents,
     bool skipValidation = false,
   }) async {
+    await _lineUpIdentity();
     // Client-side validation mirroring the server (server stays the authority).
     // Skipped for a host-identified visitor (see [identify]).
     final cfg = widgetConfig.value;
@@ -576,6 +829,22 @@ class SessionController {
         }
       }
     }
+    // After the values, as the server checks them.
+    final List<String>? sentConsents = !skipValidation &&
+            _configHasConsent &&
+            cfg != null &&
+            cfg.preChatForm.enabled
+        ? List<String>.unmodifiable(consents ?? const <String>[])
+        : null;
+    if (sentConsents != null) {
+      final missing = cfg!.preChatForm.missingConsent(sentConsents);
+      if (missing != null) {
+        throw _surface(EasyLiveChatError(
+          EasyLiveChatErrorCode.consentRequired,
+          fieldId: missing.id,
+        ));
+      }
+    }
 
     _setPhase(ChatPhase.loading);
     final SessionResult res;
@@ -587,6 +856,9 @@ class SessionController {
             phone: phone ?? _phone ?? _profile?.phone,
             locale: _effectiveLocale,
             fields: fields,
+            userId: _claimUserId,
+            userHash: _claimUserHash,
+            consents: sentConsents,
           ));
     } catch (e) {
       _setPhase(cfg?.preChatForm.enabled == true
@@ -655,7 +927,7 @@ class SessionController {
   /// returned [SendResult.serverMessageId] resolves to the server id on ack
   /// (or throws [EasyLiveChatError] on `ok:false`).
   SendResult sendMessage(String body,
-      {List<String> attachmentUrls = const []}) {
+      {List<String> attachmentUrls = const [], Map<String, String>? reply}) {
     final tempId = 'tmp-${_uuid.v4()}';
     final convId = _conversationId ?? '';
     final optimistic = ChatMessage.optimistic(
@@ -679,7 +951,9 @@ class SessionController {
           optimistic: optimistic, serverMessageId: completer.future);
     }
 
-    socket.sendMessage(body: body, attachmentUrls: attachmentUrls).then((ack) {
+    socket
+        .sendMessage(body: body, attachmentUrls: attachmentUrls, reply: reply)
+        .then((ack) {
       if (ack.ok) {
         final serverId = ack.messageId;
         if (serverId != null) {
@@ -887,18 +1161,82 @@ class SessionController {
     return s;
   }
 
+  // ── help articles ──
+  //
+  // Public endpoints: no session, no token, no socket. They work before the
+  // visitor has opened a chat, which is the point — an answer found here is a
+  // chat nobody had to start.
+
+  /// Search the workspace's help articles. A [q] shorter than two characters
+  /// lists the top articles instead (see [helpArticles]).
+  Future<HelpArticleList> searchHelp(String q, {String? category, int? limit}) =>
+      rest.getHelpArticles(q: q, category: category, limit: limit);
+
+  /// The top articles in the workspace's order — what to show before the
+  /// visitor has typed anything.
+  Future<HelpArticleList> helpArticles({String? category, int? limit}) =>
+      rest.getHelpArticles(category: category, limit: limit);
+
+  /// One article in full. Also records the reading (fire-and-forget: a count
+  /// that fails must never cost the visitor the article).
+  Future<HelpArticle> getHelpArticle(String id) async {
+    final article = await rest.getHelpArticle(id);
+    final vid = _visitorId;
+    if (vid != null) {
+      unawaited(rest
+          .postHelpArticleView(
+            article.id.isNotEmpty ? article.id : id,
+            visitorId: vid,
+            sessionId: _helpSessionId,
+          )
+          .then((_) {}, onError: (Object _) {}));
+    }
+    return article;
+  }
+
+  /// "Was this helpful?" — one answer per reading; answering again replaces it.
+  Future<void> rateHelpArticle(String id, bool helpful) =>
+      rest.postHelpArticleFeedback(
+        id,
+        visitorId: visitorId,
+        sessionId: _helpSessionId,
+        helpful: helpful,
+      );
+
   // ── offline + CSAT ──
 
   /// `POST /offline-form` — terminal "we'll get back to you" (no socket).
+  ///
+  /// [consents] are the consent fields the visitor ticked on the form shown
+  /// beside it. Passing them (even an empty list) declares the `consent`
+  /// capability, so the server holds the submission to the required ones —
+  /// checked here first, `CONSENT_REQUIRED` + `fieldId`. They are sent only
+  /// when the config was fetched with [supportsConsent], since otherwise no
+  /// consent field can have been on screen. Null sends nothing about consent.
   Future<String> submitOfflineForm({
     String? name,
     String? email,
     required String message,
+    List<String>? consents,
   }) async {
+    final cfg = widgetConfig.value;
+    final List<String>? sentConsents = consents != null && _configHasConsent
+        ? List<String>.unmodifiable(consents)
+        : null;
+    if (sentConsents != null && cfg != null) {
+      final missing = cfg.preChatForm.missingConsent(sentConsents);
+      if (missing != null) {
+        throw EasyLiveChatError(
+          EasyLiveChatErrorCode.consentRequired,
+          fieldId: missing.id,
+        );
+      }
+    }
     final id = await rest.postOfflineForm(
       name: name ?? _profile?.name,
       email: email ?? _profile?.email,
       message: message,
+      consents: sentConsents,
     );
     return id;
   }
@@ -1448,6 +1786,10 @@ class SessionController {
           phone: _phone ?? _profile?.phone,
           locale: _effectiveLocale,
           resumeOnly: true,
+          // The claim this visitor was lined up with — deliberately not a
+          // newer declaration still being lined up (see [_claimUserId]).
+          userId: _claimUserId,
+          userHash: _claimUserHash,
         );
         if (res.hasActiveConversation && res.token != null) {
           _token = res.token;
@@ -1801,4 +2143,35 @@ ChatMessage? newestSessionStartMarker(Iterable<ChatMessage> messages) {
     if (newest == null || m.createdAt.isAfter(newest.createdAt)) newest = m;
   }
   return newest;
+}
+
+/// How the visitor on this device relates to the person the host now declares
+/// — the web widget's `reconcileVisitor` rule (apps/widget/src/lib/identity.ts).
+enum VisitorChange {
+  /// The same person, or still nobody. Nothing to do.
+  same,
+
+  /// An anonymous visitor signed in: keep their visitor — the conversation
+  /// they already started continues, with the identity attached.
+  upgraded,
+
+  /// A different person, or nobody after someone was: the stored visitor must
+  /// not be reused, or the next person would resume the last one's thread.
+  switched,
+}
+
+/// Decide [VisitorChange] from the user id this device's visitor was last
+/// identified as ([stored]) and the one now declared ([next]; null = nobody
+/// signed in).
+VisitorChange visitorChangeFor(
+    {required String? stored, required String? next}) {
+  if (next == stored) return VisitorChange.same;
+  if (stored == null) return VisitorChange.upgraded;
+  return VisitorChange.switched;
+}
+
+String? _trimmedOrNull(String? v) {
+  if (v == null) return null;
+  final t = v.trim();
+  return t.isEmpty ? null : t;
 }

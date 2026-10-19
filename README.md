@@ -69,6 +69,13 @@ management you like.
   `canLaunchUrl`, so **no host `Info.plist` / manifest entries are needed**.
   Scheme-less domains only link for the TLDs in `_bareLinkTlds` — `main.py` and
   `photo.png` stay plain text. Extend that set if a tenant needs more.
+- ✅ **Identity verification** — `identify(userId:, userHash:)` (the hash made
+  by the host's backend), sent on every session call; a refusal is a typed
+  `isIdentityNotVerified` error, and a different signed-in user gets a fresh
+  visitor rather than the last one's conversation.
+- ✅ **Help articles** — headless `searchHelp()` / `getHelpArticle()` /
+  `rateHelpArticle()` in the core, `EasyLiveChatHelpScreen` + the native
+  `ElcHelpMarkdown` renderer (no HTML/WebView) in the UI kit.
 - ⛔ **Background push** ("agent replied while the app was closed") needs a
   server-side visitor push registry + fan-out (the backend currently pushes to
   agents only). The `EasyLiveChatPush` hook is stubbed until then.

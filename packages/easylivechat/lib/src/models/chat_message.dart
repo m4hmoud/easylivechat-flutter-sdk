@@ -1,5 +1,6 @@
 import 'enums.dart';
 import 'js_text.dart';
+import 'bot_buttons.dart';
 import 'message_card.dart';
 
 /// A rehosted attachment (rich shape the server fills in once the media
@@ -184,6 +185,36 @@ class ChatMessage {
   MessageCard? get card => contentType == MessageContentType.card
       ? MessageCard.tryParse(metadata?['card'])
       : null;
+
+  /// The cards this message draws as: a carousel (`metadata.cards`, two or
+  /// more, swiped sideways), else its one [card], else none — it then reads as
+  /// its text. A carousel leaves `metadata.card` unset on purpose, so a client
+  /// that only knows [card] shows every card's words in [body] rather than
+  /// silently only the first card.
+  List<MessageCard> get cards {
+    if (contentType != MessageContentType.card) return const [];
+    final carousel = MessageCard.tryParseCarousel(metadata?['cards']);
+    if (carousel.length >= 2) return carousel;
+    final one = card ?? (carousel.isEmpty ? null : carousel.first);
+    return one == null ? const [] : List<MessageCard>.unmodifiable([one]);
+  }
+
+  /// The reply buttons under this message (a bot's, or an agent's), or null.
+  ///
+  /// Draw [BotButtons.text] in the bubble instead of [body] — the body holds
+  /// the same words with a numbered menu for older clients — and the buttons
+  /// under it. On a card message the reply buttons are the cards' own: draw
+  /// them on the cards ([cards]) and use this only to answer.
+  BotButtons? get botButtons {
+    if (senderType == SenderType.customer || senderType == SenderType.system) {
+      return null;
+    }
+    return BotButtons.tryParse(metadata?['bot']);
+  }
+
+  /// On the visitor's own message: the button it answered, once the server has
+  /// matched it (`metadata.botReply`).
+  BotReply? get botReply => BotReply.tryParse(metadata?['botReply']);
 
   /// The answers `metadata.quickReplies` offers under this message, blanks
   /// dropped, each exactly as sent.

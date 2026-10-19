@@ -2,10 +2,12 @@ import 'package:dio/dio.dart';
 
 import 'config.dart';
 import 'errors.dart';
+import 'models/help_article.dart';
 import 'models/results.dart';
 import 'models/widget_config.dart';
 
-/// 1:1 wrapper over the six widget HTTP endpoints + `/api/uploads`.
+/// 1:1 wrapper over the widget HTTP endpoints (session, history, forms, push,
+/// help articles) + `/api/uploads`.
 ///
 /// Base: `<apiBase>/api/widget`. Tenant resolved by `:slug`. JWT-gated calls
 /// (`GET /messages`, `POST /feedback`, `POST /uploads`) take a Bearer token
@@ -39,6 +41,18 @@ class RestClient {
         if (token != null && token.isNotEmpty) 'authorization': 'Bearer $token',
       };
 
+  /// The `capabilities` + `consents` pair, or nothing when [consents] is null.
+  /// Always sent together: the ids mean nothing to the server without the
+  /// declaration, and the declaration alone would make it demand consent the
+  /// caller never said it collected. Duplicates are dropped.
+  Map<String, dynamic> _consentBody(List<String>? consents) {
+    if (consents == null) return const {};
+    return {
+      'capabilities': const [consentCapability],
+      'consents': consents.toSet().toList(),
+    };
+  }
+
   /// True when [status] is a 2xx success code.
   bool _ok(int? status) => status != null && status >= 200 && status < 300;
 
@@ -48,13 +62,24 @@ class RestClient {
     return const <String, dynamic>{};
   }
 
+  /// What a client declares when it can show a consent checkbox: `?caps=` on
+  /// `GET /config`, `capabilities` on `POST /session` and `/offline-form`
+  /// (`CONSENT_CAPABILITY` in `packages/shared/src/pre-chat-form.ts`).
+  static const String consentCapability = 'consent';
+
   /// `GET /:slug/config?channel=&origin=` — public. Soft `allowedOrigins` gate
   /// only when an origin is supplied (native should usually omit it).
-  Future<ConfigResponse> getConfig() async {
+  ///
+  /// [consent] adds `caps=consent`. Without it the server leaves consent
+  /// fields out of the pre-chat form, because a client that cannot draw a
+  /// checkbox would draw a text box labelled "I agree to…" instead. A server
+  /// that predates consent ignores the parameter.
+  Future<ConfigResponse> getConfig({bool consent = false}) async {
     try {
       final res = await _dio.get<dynamic>(
         '$_base/$_slug/config',
         queryParameters: {
+          if (consent) 'caps': consentCapability,
           // The INBOX this host routes to. Sessions have always carried it, so
           // the conversation landed in the right inbox — but the config did
           // not, and the server resolves per-channel overrides from exactly
@@ -80,10 +105,19 @@ class RestClient {
 
   /// `POST /:slug/session` — public; MINTS the widget JWT.
   /// Body keys: visitorId (required), name?, email?, phone?, page?, locale?,
-  /// resumeOnly?, fields? (keyed by PreChatField.id). On pre-chat failure the
-  /// server returns 400 `{ error, fieldId }` => throw [EasyLiveChatError].
+  /// resumeOnly?, fields? (keyed by PreChatField.id), userId?, userHash?. On
+  /// pre-chat failure the server returns 400 `{ error, fieldId }` => throw
+  /// [EasyLiveChatError]. A workspace that ENFORCES identity verification
+  /// refuses a [userId] with a missing/wrong [userHash] with 403
+  /// `{ error: 'IDENTITY_NOT_VERIFIED', reason }`.
   /// On `resumeOnly:true` with no active conversation the response has no
   /// `token` (and `hasActiveConversation:false`) — return it as-is.
+  ///
+  /// A non-null [consents] (the ids of the consent fields the visitor ticked,
+  /// possibly none) also declares `capabilities: ['consent']`, which is what
+  /// lets the server refuse a required one left unticked with 400
+  /// `CONSENT_REQUIRED` + `fieldId`. Null sends neither, and the server asks
+  /// nothing about consent — the request an SDK made before consent existed.
   Future<SessionResult> postSession({
     required String visitorId,
     String? name,
@@ -93,7 +127,12 @@ class RestClient {
     String? locale,
     bool resumeOnly = false,
     Map<String, String>? fields,
+    String? userId,
+    String? userHash,
+    List<String>? consents,
   }) async {
+    final claimedId = userId?.trim() ?? '';
+    final claimedHash = userHash?.trim() ?? '';
     try {
       final res = await _dio.post<dynamic>(
         '$_base/$_slug/session',
@@ -125,6 +164,14 @@ class RestClient {
           // back for. Earlier visits stay one scroll up, behind the cursor.
           'historyScope': 'session',
           if (fields != null && fields.isNotEmpty) 'fields': fields,
+          // Host-declared identity (HMAC identity verification). The hash is
+          // made by the host's BACKEND; a hash without an id proves nothing,
+          // so it only travels with one. Omitted entirely for anonymous
+          // visitors, whom the server never refuses.
+          if (claimedId.isNotEmpty) 'userId': claimedId,
+          if (claimedId.isNotEmpty && claimedHash.isNotEmpty)
+            'userHash': claimedHash,
+          ..._consentBody(consents),
         },
         options: Options(headers: _headers()),
       );
@@ -163,10 +210,13 @@ class RestClient {
   /// `POST /:slug/offline-form` — public. Returns the created conversationId.
   /// NOTE: this creates an UNRESUMABLE conversation (random externalId, no
   /// token) — terminal "we'll get back to you" UX, never connect a socket.
+  ///
+  /// [consents] works as it does on [postSession].
   Future<String> postOfflineForm({
     String? name,
     String? email,
     required String message,
+    List<String>? consents,
   }) async {
     try {
       final res = await _dio.post<dynamic>(
@@ -175,6 +225,7 @@ class RestClient {
           if (name != null) 'name': name,
           if (email != null) 'email': email,
           'message': message,
+          ..._consentBody(consents),
         },
         options: Options(headers: _headers()),
       );
@@ -280,6 +331,116 @@ class RestClient {
     }
   }
 
+  // ── help articles (public, no token) ──
+
+  /// `GET /:slug/help/articles?q=&locale=&category=&limit=`.
+  ///
+  /// A [q] shorter than two characters lists the top articles in the
+  /// workspace's order (server default 20, max 50); a longer one is a ranked
+  /// search (default 5, max 20). A workspace with help switched off answers
+  /// `enabled: false` and no articles — not an error.
+  Future<HelpArticleList> getHelpArticles({
+    String? q,
+    String? category,
+    int? limit,
+  }) async {
+    final query = q?.trim() ?? '';
+    final cat = category?.trim() ?? '';
+    try {
+      final res = await _dio.get<dynamic>(
+        '$_base/$_slug/help/articles',
+        queryParameters: {
+          if (query.isNotEmpty) 'q': query,
+          if (cat.isNotEmpty) 'category': cat,
+          if (limit != null && limit > 0) 'limit': limit,
+          if (_contentLocale != null) 'locale': _contentLocale,
+        },
+        options: Options(headers: _headers()),
+      );
+      if (!_ok(res.statusCode)) throwFor(res);
+      return HelpArticleList.fromJson(_asMap(res.data));
+    } on DioException catch (e) {
+      throw _networkError(e);
+    }
+  }
+
+  /// `GET /:slug/help/articles/:id?locale=` — 404 `NOT_FOUND` when it is
+  /// unpublished, gone, or the workspace switched help off.
+  Future<HelpArticle> getHelpArticle(String id) async {
+    try {
+      final res = await _dio.get<dynamic>(
+        '$_base/$_slug/help/articles/${Uri.encodeComponent(id)}',
+        queryParameters: {
+          if (_contentLocale != null) 'locale': _contentLocale,
+        },
+        options: Options(headers: _headers()),
+      );
+      if (!_ok(res.statusCode)) throwFor(res);
+      final raw = _asMap(res.data)['article'];
+      if (raw is! Map) {
+        throw EasyLiveChatError(
+          EasyLiveChatErrorCode.notFound,
+          httpStatus: res.statusCode,
+          message: 'help article response missing an `article` object',
+        );
+      }
+      return HelpArticle.fromJson(raw.cast<String, dynamic>());
+    } on DioException catch (e) {
+      throw _networkError(e);
+    }
+  }
+
+  /// `POST /:slug/help/articles/:id/view` — counts a reading. Returns whether
+  /// it was counted (false for a repeat within the same [sessionId]).
+  Future<bool> postHelpArticleView(
+    String id, {
+    required String visitorId,
+    required String sessionId,
+  }) async {
+    try {
+      final res = await _dio.post<dynamic>(
+        '$_base/$_slug/help/articles/${Uri.encodeComponent(id)}/view',
+        data: {'visitorId': visitorId, 'sessionId': sessionId},
+        options: Options(headers: _headers()),
+      );
+      if (!_ok(res.statusCode)) throwFor(res);
+      return _asMap(res.data)['counted'] == true;
+    } on DioException catch (e) {
+      throw _networkError(e);
+    }
+  }
+
+  /// `POST /:slug/help/articles/:id/feedback` — "Was this helpful?". One
+  /// answer per reading; answering again replaces it.
+  Future<void> postHelpArticleFeedback(
+    String id, {
+    required String visitorId,
+    required String sessionId,
+    required bool helpful,
+  }) async {
+    try {
+      final res = await _dio.post<dynamic>(
+        '$_base/$_slug/help/articles/${Uri.encodeComponent(id)}/feedback',
+        data: {
+          'visitorId': visitorId,
+          'sessionId': sessionId,
+          'helpful': helpful,
+        },
+        options: Options(headers: _headers()),
+      );
+      if (!_ok(res.statusCode)) throwFor(res);
+    } on DioException catch (e) {
+      throw _networkError(e);
+    }
+  }
+
+  /// The content-locale code help articles are asked for in, when the host set
+  /// one. Unknown codes fall back to the workspace default server-side.
+  String? get _contentLocale {
+    final c = config.contentLocale?.trim();
+    return (c == null || c.isEmpty) ? null : c;
+  }
+
   /// `POST /visitor/heartbeat` — public; tenant from body.tenantSlug (NOTE: no
   /// `:slug` path segment). Always tolerant/2xx. Keep cadence modest — first
   /// arrival / re-arrival after idle notifies agents.
@@ -380,6 +541,7 @@ class RestClient {
     final serverCode = (body['error'] as Object?)?.toString();
     final fieldId = (body['fieldId'] as Object?)?.toString();
     final message = (body['message'] as Object?)?.toString();
+    final reason = (body['reason'] as Object?)?.toString();
 
     // Prefer the server-supplied `{ error }` code when present — it carries the
     // specific protocol codes (ORIGIN_NOT_ALLOWED, CONTENT_TYPE_MISMATCH,
@@ -402,6 +564,9 @@ class RestClient {
         case 415:
           code = EasyLiveChatErrorCode.unsupportedType;
           break;
+        case 429:
+          code = EasyLiveChatErrorCode.rateLimited;
+          break;
         default:
           code = EasyLiveChatErrorCode.unknown;
       }
@@ -412,6 +577,7 @@ class RestClient {
       fieldId: fieldId,
       httpStatus: status,
       message: message,
+      reason: (reason != null && reason.isNotEmpty) ? reason : null,
     );
   }
 

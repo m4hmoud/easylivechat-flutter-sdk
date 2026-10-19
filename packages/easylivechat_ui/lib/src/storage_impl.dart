@@ -5,10 +5,12 @@ import 'package:shared_preferences/shared_preferences.dart';
 /// Durable [EasyLiveChatStorage] for production apps.
 ///
 /// Splits persistence by sensitivity:
-///  • the widget **JWT** ([StorageKeys.token]) and the cached **profile**
+///  • the widget **JWT** ([StorageKeys.token]), the cached **profile**
 ///    ([StorageKeys.profile], which holds the visitor's name / email / pre-chat
-///    answers — PII) → `flutter_secure_storage` (Keychain /
-///    EncryptedSharedPreferences), kept out of plain prefs;
+///    answers — PII) and the host **user id** the visitor was identified as
+///    ([StorageKeys.identifiedUserId] — often an email or account number) →
+///    `flutter_secure_storage` (Keychain / EncryptedSharedPreferences), kept
+///    out of plain prefs;
 ///  • the durable **visitorId** and **conversationId**
 ///    ([StorageKeys.visitorId], [StorageKeys.conversationId] — opaque,
 ///    non-sensitive) → `shared_preferences`.
@@ -32,10 +34,12 @@ class SecurePrefsStorage implements EasyLiveChatStorage {
               aOptions: AndroidOptions(encryptedSharedPreferences: true),
             );
 
-  /// True for keys that must live in secure storage: the bearer JWT and the
-  /// PII-bearing profile blob.
+  /// True for keys that must live in secure storage: the bearer JWT, the
+  /// PII-bearing profile blob and the host's own user id.
   bool _isSecure(String key) =>
-      key == StorageKeys.token || key == StorageKeys.profile;
+      key == StorageKeys.token ||
+      key == StorageKeys.profile ||
+      key == StorageKeys.identifiedUserId;
 
   Future<SharedPreferences> _ensurePrefs() =>
       _prefsFuture ??= SharedPreferences.getInstance();

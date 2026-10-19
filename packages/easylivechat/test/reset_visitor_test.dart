@@ -23,6 +23,9 @@ void main() {
           StorageKeys.profile,
           StorageKeys.token,
           StorageKeys.conversationId,
+          // Which signed-in user the visitor belongs to. Surviving a logout,
+          // it would make the next sign-in look like the same person.
+          StorageKeys.identifiedUserId,
         ]),
       );
     });
@@ -41,6 +44,7 @@ void main() {
       await storage.write(StorageKeys.token, 'jwt');
       await storage.write(StorageKeys.conversationId, 'c1');
       await storage.write(StorageKeys.profile, '{"name":"Mahmoud"}');
+      await storage.write(StorageKeys.identifiedUserId, 'user-42');
 
       await EasyLiveChat.instance.reset(storage: storage);
 

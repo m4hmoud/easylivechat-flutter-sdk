@@ -1,5 +1,104 @@
 # Changelog
 
+## 0.1.56
+
+- **Reply buttons.** `ChatMessage.botButtons` reads the buttons under a
+  message from the team — a bot flow's, or ones an agent added
+  (`metadata.bot`: `BotButtons.text` and `BotButton`s with ids) — and
+  `EasyLiveChat.answerButton(message, buttonId:, label:)` answers one: the
+  label goes as the visitor's own message with `reply: {messageId, buttonId}`
+  beside it, so the server records the choice (the agents read "Chose: …").
+  `buttonsOpen(messages, id)` says whether the question is still open (the
+  newest thing anyone but the system said, and unanswered);
+  `chosenButtonId(messages, id)` and `ChatMessage.botReply` say which button
+  was chosen. Draw `BotButtons.text`, not `body`: the body repeats the words
+  with a numbered menu for clients that predate buttons.
+- **Richer cards.** A `MessageCardButton` can be a reply
+  (`MessageCardButton.reply`, `isReply`, `replyId`; its `url` is empty and its
+  `uri` null) — answer it with `answerButton`, using the label
+  `ChatMessage.botButtons` gives that id. `ChatMessage.cards` reads one card
+  or a carousel of up to ten (`metadata.cards`, `MessageCard.tryParseCarousel`);
+  a carousel has no `card`, so a client that only reads `card` shows the body,
+  which carries every card's words and links.
+
+- **Identity verification.** `identify()` takes `userId` (your app's own id for
+  the signed-in user) and `userHash` — `hex(HMAC_SHA256(identitySecret,
+  userId))`, computed by YOUR backend; the secret never belongs in the app.
+  Both travel as top-level `userId` / `userHash` on every `POST /session`, the
+  silent resume as well as the start (and the token re-mint), and are omitted
+  for anonymous visitors. With the workspace's verification off they are
+  ignored; optional verifies a correct hash and never refuses; ENFORCED refuses
+  a `userId` with a missing or wrong hash.
+- **The refusal is typed.** A 403 `{ error: 'IDENTITY_NOT_VERIFIED', reason }`
+  is an `EasyLiveChatError` with `isIdentityNotVerified`, the new
+  `EasyLiveChatErrorCode.identityNotVerified`, and the server's `reason` kept on
+  the new `EasyLiveChatError.reason` (`IdentityNotVerifiedReason.noSecret` /
+  `noHash` / `badHash`; the dartdoc says what to fix for each). `open()` throws
+  it for an identified visitor and it is emitted on `onError`. It is not an
+  auth error, so no token re-mint loops on it.
+- **A different person never resumes the last one's chat.** The SDK now
+  remembers which `userId` this device's visitor was identified as
+  (`StorageKeys.identifiedUserId`, cleared by `reset()`) and lines it up
+  before every new session, the web widget's rule: anonymous → signed in keeps
+  the visitor and their conversation, with the identity attached (re-minted at
+  once when a chat is live); a different `userId`, or opening the chat with
+  none after one was set, forgets the stored visitor, token, conversation and
+  profile and starts a fresh visitorId — re-opening the chat as the new person
+  if one was on screen, and unregistering the previous person's push token.
+  Declare the identity on every launch before the chat opens.
+- **`clearIdentity()`** — the signed-in user signed out, without tearing the
+  SDK down (forgets the visitor when it carried a `userId`; `reset()` remains
+  the full logout).
+- `identify()` before `boot()` now works as its docs always said: it is held
+  and applied by `boot()` (it used to throw a `StateError`).
+- `open()` is single-flight: a call while one runs joins it, so two overlapping
+  opens cannot start two sessions.
+- **Help articles.** `searchHelp(q, {category, limit})`, `helpArticles()`
+  (the top list), `getHelpArticle(id)` and `rateHelpArticle(id, helpful)` on
+  `EasyLiveChat.instance`, over the public `GET /help/articles`, `GET
+  /help/articles/:id`, `POST …/view` and `POST …/feedback` endpoints. No
+  session or token needed. Typed, null-tolerant models: `HelpArticleList`
+  (`enabled`, `articles`, `categories`), `HelpArticleSummary`, `HelpArticle`
+  (markdown `body`, `locale`, `url`). Articles are asked for in
+  `config.contentLocale`. `getHelpArticle` records the reading
+  (fire-and-forget; a failed count is swallowed), and views and answers share
+  one per-launch reading session id, which the server uses to dedupe views and
+  count chats the articles saved.
+- `WidgetConfigModel.helpArticlesEnabled` (false when an older server omits
+  it) — gate any help UI on it.
+- New error codes `RATE_LIMITED` (also the default for a bare 429) and
+  `INVALID_PAYLOAD`.
+- **Consent checkboxes in the pre-chat form.** A workspace can ask the visitor
+  to agree to something — its privacy notice, usually — before a chat starts.
+  It arrives as a pre-chat field of the new type `PreChatFieldType.consent`:
+  `label` is the sentence the visitor agrees to (the tenant's own words, up to
+  500 characters — render it verbatim and let it wrap) and the new
+  `PreChatField.policyUrl` an optional privacy-policy link. The link is checked
+  with the server's own rule (`cleanPolicyUrl`, public): only an `http:` /
+  `https:` URL survives parsing, so a `javascript:` link never reaches a
+  launcher. A type this SDK does not know still reads as `text`.
+- **Opt-in: `EasyLiveChat.instance.supportsConsent`** (default false, may be set
+  before `boot`). The server leaves consent fields out of the config for a
+  client that does not ask (`GET /config?caps=consent`), so a host's own
+  pre-chat form keeps working on this release exactly as before, and never
+  draws a text box labelled "I agree to…". The prebuilt `easylivechat_ui`
+  turns it on itself; a host with its own form turns it on once it renders
+  consent fields.
+- **`startSession(…, consents:)` and `submitOfflineForm(…, consents:)`**, the
+  ids of the consent fields the visitor ticked — consent is never a `fields`
+  value. With consent on and a pre-chat form shown, a new chat sends them with
+  `capabilities: ['consent']`; a required one left unticked fails with the new
+  `EasyLiveChatErrorCode.consentRequired` (`CONSENT_REQUIRED`) and its
+  `fieldId` — checked locally first, and decoded from the server's 400 like
+  any other field error. Nothing about consent is declared over a form fetched
+  without consent fields, for a host-identified visitor (who never saw the
+  form), or for an anonymous start, so the server cannot demand a box nobody
+  drew. An older server ignores both the query parameter and the body fields.
+- `PreChatField.isConsent`, `PreChatField.validateConsent(bool)`,
+  `PreChatForm.consentFields` and `PreChatForm.missingConsent(ids)` mirror the
+  server's `validateConsents` for a host's own form. `PreChatField.validate`
+  returns null for a consent field — it has no value to check.
+
 ## 0.1.55
 
 - **An agent's edited or unsent reply follows on the visitor's screen.** An

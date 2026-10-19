@@ -33,9 +33,14 @@ import 'voice_note_tile.dart';
 /// Auto-scrolls to the newest message on append; a "load earlier" trigger at
 /// the top calls `loadOlderMessages()`.
 ///
-/// A card (`ChatMessage.card`) draws as a card instead of a bubble, and the
-/// quick replies on offer (`quickRepliesOnOffer`) draw under the message that
-/// offers them — only when [onQuickReply] is given, as on the web.
+/// A card (`ChatMessage.cards` — one, or a carousel) draws as cards instead of
+/// a bubble, and the quick replies on offer (`quickRepliesOnOffer`) draw under
+/// the message that offers them — only when [onQuickReply] is given, as on the
+/// web. A message with reply buttons (`ChatMessage.botButtons`: a bot's, or an
+/// agent's) draws its own words with the buttons under it — never the numbered
+/// menu its body carries for older clients — and a tap answers through
+/// `EasyLiveChat.answerButton`, while the question is still open; the chosen
+/// button stays marked.
 class ThreadView extends StatefulWidget {
   final EasyLiveChatTheme theme;
 
@@ -206,6 +211,28 @@ class _ThreadViewState extends State<ThreadView> {
     }
   }
 
+  /// A tap on a reply button (under a message, or on its card): sent with the
+  /// button's id, so the server records which one was meant.
+  Future<void> _sendButton(ChatMessage message, String buttonId, String label) async {
+    if (widget.onQuickReply == null || _sendingQuickReply) return;
+    // Asked again at the moment of the tap, as for quick replies.
+    if (!buttonsOpen(EasyLiveChat.instance.messages.value, message.id)) return;
+    setState(() => _sendingQuickReply = true);
+    try {
+      await EasyLiveChat.instance
+          .answerButton(message, buttonId: buttonId, label: label)
+          .serverMessageId;
+    } catch (_) {
+      // The send path owns failure: it leaves a failed bubble with retry.
+    } finally {
+      if (mounted) {
+        setState(() => _sendingQuickReply = false);
+      } else {
+        _sendingQuickReply = false;
+      }
+    }
+  }
+
   Future<void> _loadOlder() async {
     if (_loadingOlder || !_hasMoreOlder) return;
     setState(() => _loadingOlder = true);
@@ -272,10 +299,19 @@ class _ThreadViewState extends State<ThreadView> {
                         final msgIndex = index - 1;
                         if (msgIndex < messages.length) {
                           final m = messages[msgIndex];
-                          final replies =
-                              offer != null && offer.messageId == m.id
-                                  ? offer.replies
-                                  : const <String>[];
+                          // Reply buttons draw from their own layer, never
+                          // also as the quick replies they carry for older
+                          // clients.
+                          final hasButtons = m.botButtons != null;
+                          final replies = !hasButtons &&
+                                  offer != null &&
+                                  offer.messageId == m.id
+                              ? offer.replies
+                              : const <String>[];
+                          final open =
+                              hasButtons && buttonsOpen(messages, m.id);
+                          final chosen =
+                              hasButtons ? chosenButtonId(messages, m.id) : null;
                           return MessageBubble(
                             key: ValueKey(m.id),
                             message: m,
@@ -293,6 +329,14 @@ class _ThreadViewState extends State<ThreadView> {
                                 ? null
                                 : (reply) =>
                                     unawaited(_sendQuickReply(m.id, reply)),
+                            showButtons: widget.onQuickReply != null,
+                            chosenButtonId: chosen,
+                            onButton: !open ||
+                                    _sendingQuickReply ||
+                                    EasyLiveChat.instance.composerLocked
+                                ? null
+                                : (id, label) =>
+                                    unawaited(_sendButton(m, id, label)),
                           );
                         }
                         // Trailing typing indicator — named for the assistant
@@ -376,6 +420,19 @@ class MessageBubble extends StatelessWidget {
   /// Sends a tapped quick reply. Null draws [quickReplies] disabled.
   final ValueChanged<String>? onQuickReply;
 
+  /// Draw this message's reply buttons (`ChatMessage.botButtons`), if it has
+  /// any. Off, a message with buttons reads as its body — words and a
+  /// numbered menu — as on clients that predate buttons.
+  final bool showButtons;
+
+  /// The reply button the visitor already chose under this message.
+  final String? chosenButtonId;
+
+  /// Answers with one of this message's reply buttons: its id and the label
+  /// to send. Null draws them disabled (the question has moved on, or a send
+  /// is under way).
+  final void Function(String id, String label)? onButton;
+
   const MessageBubble({
     super.key,
     required this.message,
@@ -386,6 +443,9 @@ class MessageBubble extends StatelessWidget {
     this.agentLastReadAt,
     this.quickReplies = const [],
     this.onQuickReply,
+    this.showButtons = false,
+    this.chosenButtonId,
+    this.onButton,
   });
 
   bool get _isCustomer => message.isFromCustomer;
@@ -493,9 +553,28 @@ class MessageBubble extends StatelessWidget {
     final align =
         _isCustomer ? CrossAxisAlignment.end : CrossAxisAlignment.start;
 
-    final card = message.card;
-    final body = (message.body ?? '').trim();
+    final cards = message.cards;
+    // A bot's or an agent's reply buttons: the message's own words in the
+    // bubble (its body repeats them with a numbered menu), the buttons under
+    // it. A card's reply buttons are on the card.
+    final buttons = showButtons ? message.botButtons : null;
+    final chips = cards.isEmpty ? buttons : null;
+    final body = (chips != null ? chips.text : (message.body ?? '')).trim();
     final tiles = _attachmentTiles(context, textColor);
+    String labelFor(String id, String fallback) {
+      for (final b in buttons?.buttons ?? const <BotButton>[]) {
+        if (b.id == id) return b.label;
+      }
+      return fallback;
+    }
+
+    final answer = onButton == null
+        ? null
+        : (String id, String label) => onButton!(id, labelFor(id, label));
+    String? chosenLabel;
+    for (final b in chips?.buttons ?? const <BotButton>[]) {
+      if (b.id == chosenButtonId) chosenLabel = b.label;
+    }
     // An avatar sits beside every inbound bubble when the workspace has the
     // switch on. System notices never reach here — they return above — so what
     // is left is the team talking, and the team gets a face.
@@ -559,9 +638,24 @@ class MessageBubble extends StatelessWidget {
         // say it all twice.
         // A CARD message whose card doesn't validate falls through to the
         // bubble and reads as that text, like every other client.
-        if (card != null)
-          ElcMessageCardView(card: card, theme: theme, maxWidth: maxBubble)
-        else
+        if (cards.length > 1)
+          ElcCardCarousel(
+            cards: cards,
+            theme: theme,
+            semanticLabel: strings.cards,
+            chosenReplyId: buttons == null ? null : chosenButtonId,
+            onReply: buttons == null ? null : answer,
+          )
+        else if (cards.length == 1)
+          ElcMessageCardView(
+            card: cards.first,
+            theme: theme,
+            maxWidth: maxBubble,
+            chosenReplyId: buttons == null ? null : chosenButtonId,
+            onReply: buttons == null ? null : answer,
+          )
+        // Buttons with no words of their own: just the buttons, no empty bubble.
+        else if (chips == null || body.isNotEmpty || tiles.isNotEmpty)
           ConstrainedBox(
             constraints: BoxConstraints(
               maxWidth: maxBubble,
@@ -616,7 +710,23 @@ class MessageBubble extends StatelessWidget {
               ),
             ),
           ),
-        if (quickReplies.isNotEmpty)
+        if (chips != null)
+          ConstrainedBox(
+            constraints: BoxConstraints(maxWidth: maxBubble),
+            child: ElcQuickReplies(
+              replies: [for (final b in chips.buttons) b.label],
+              theme: theme,
+              semanticLabel: strings.suggestedReplies,
+              chosen: chosenLabel,
+              onSelected: answer == null
+                  ? null
+                  : (label) {
+                      final b = chips.buttons.firstWhere((b) => b.label == label);
+                      answer(b.id, b.label);
+                    },
+            ),
+          )
+        else if (quickReplies.isNotEmpty)
           ConstrainedBox(
             constraints: BoxConstraints(maxWidth: maxBubble),
             child: ElcQuickReplies(

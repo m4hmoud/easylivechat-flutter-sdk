@@ -287,6 +287,7 @@ class WidgetSocket {
     required String body,
     List<String> attachmentUrls = const [],
     String? contentType,
+    Map<String, String>? reply,
   }) async {
     final socket = _socket;
     if (socket == null) {
@@ -296,6 +297,9 @@ class WidgetSocket {
       'body': body,
       if (attachmentUrls.isNotEmpty) 'attachmentUrls': attachmentUrls,
       if (contentType != null) 'contentType': contentType,
+      // The reply button this answers — `{messageId, buttonId}`; the server
+      // checks it against the message before recording the choice.
+      if (reply != null) 'reply': reply,
     };
     try {
       // socket_io_client 3.x: emitWithAck() returns void (callback-only);

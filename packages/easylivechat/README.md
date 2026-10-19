@@ -36,7 +36,8 @@ Future<void> main() async {
     storage: InMemoryStorage(),
   );
 
-  // Optional: skip the pre-chat form for a user you already know.
+  // Optional: skip the pre-chat form for a user you already know. Add
+  // userId + userHash to verify who they are (see "Identity verification").
   EasyLiveChat.instance.identify(name: 'Jane', email: 'jane@example.com');
 
   // Start a new conversation, or resume the open one with its history.
@@ -146,6 +147,25 @@ Both forms are authored in the dashboard and arrive in
 await EasyLiveChat.instance.startSession(fields: {'order_id': '123'});
 ```
 
+A workspace can add **consent checkboxes** to the form
+(`PreChatFieldType.consent`): `label` is the sentence the visitor agrees to
+(tenant copy, up to 500 characters — render it verbatim and let it wrap) and
+`policyUrl` an optional `http(s)` privacy-policy link to open outside the app.
+The server only sends them to a client that says it can draw them, so a form of
+your own opts in, and passes the ticked ids — consent is never a `fields` value:
+
+```dart
+EasyLiveChat.instance.supportsConsent = true; // before open()
+await EasyLiveChat.instance.startSession(
+  fields: {'name': 'Ada'},
+  consents: ['privacy'], // the consent field ids the visitor ticked
+);
+```
+
+A required one left unticked fails with `CONSENT_REQUIRED` and its `fieldId`,
+like any other field error (`PreChatForm.missingConsent` checks it up front).
+The prebuilt `easylivechat_ui` form does all of this itself.
+
 After the chat ends, `endChat()` returns `true` when a post-chat survey should
 follow. Render `postChatForm` and submit:
 
@@ -155,6 +175,86 @@ await EasyLiveChat.instance.submitPostChat({'rating': '5'});
 
 Field types, validation rules and localized labels are on the models, and
 validation mirrors the server's so you can pre-validate for UX.
+
+## Identity verification
+
+Anyone can type any name into a chat. When your workspace releases account data
+to a visitor — the AI assistant looking up their orders, say — it has to know
+the signed-in user is who your app says. So your **backend** signs its own user
+id with the workspace's identity secret (dashboard → Settings → AI assistant →
+"Know who is signed in"), and the app passes both:
+
+```dart
+// userHash = hex(HMAC_SHA256(identitySecret, userId)) — made on YOUR server.
+// Never compute it in the app: the secret must not ship in a binary.
+EasyLiveChat.instance.identify(
+  userId: user.id,
+  userHash: user.chatHash,
+  name: user.name,
+  email: user.email,
+);
+await EasyLiveChat.instance.open();
+```
+
+They are sent as `userId` / `userHash` on every session call — the silent
+resume, the start and the token re-mint — and omitted for anonymous visitors.
+What happens depends on the workspace's setting: off ignores them; optional
+marks the contact verified when the hash checks out and simply does not trust it
+otherwise; **enforced** refuses a `userId` with a missing or wrong hash:
+
+```dart
+try {
+  await EasyLiveChat.instance.open();
+} on EasyLiveChatError catch (e) {
+  if (e.isIdentityNotVerified) {
+    // e.reason: IdentityNotVerifiedReason.noSecret | noHash | badHash
+  }
+}
+```
+
+Anonymous visitors are never refused, in any mode — support stays open to
+people who are not signed in.
+
+**Declare the identity on every launch, before the chat opens.** The SDK
+remembers which `userId` this device's visitor belongs to, and lines the two up
+the way the web widget does:
+
+- anonymous → signed in keeps the visitor: the conversation they already started
+  continues, now with the identity attached;
+- a **different** `userId`, or opening the chat with **none** after one was set,
+  forgets the stored visitor — a fresh visitorId and nothing to resume — so the
+  next person on a shared device never sees the last one's conversation.
+
+On sign-out call `EasyLiveChat.instance.clearIdentity()` (keeps the SDK booted)
+or `await EasyLiveChat.instance.reset(storage: …)` — the full logout, which
+drops the visitorId, token, profile and identified user id in every case and
+tears the SDK down. `identify()` may be called before `boot()`; it is applied
+when boot runs.
+
+## Help articles
+
+Your workspace's published help articles, readable without a chat session —
+an answer found there is a chat nobody had to start. Show them only when the
+workspace turned them on:
+
+```dart
+final chat = EasyLiveChat.instance;
+if (chat.widgetConfig.value?.helpArticlesEnabled ?? false) {
+  final top = await chat.helpArticles();          // the workspace's own order
+  final hits = await chat.searchHelp('refund');   // ranked; < 2 chars = top list
+  final article = await chat.getHelpArticle(hits.articles.first.id);
+  // article.body is markdown — render it as text, never as HTML.
+  await chat.rateHelpArticle(article.id, true);   // "Was this helpful?"
+}
+```
+
+`HelpArticleList` carries `enabled`, `articles` (`HelpArticleSummary`: `id`,
+`title`, `excerpt`, `category`, `updatedAt`) and `categories`; `HelpArticle`
+adds the markdown `body`, its `locale` and its public `url`. Articles come in
+`config.contentLocale` when the workspace wrote any in it. `getHelpArticle`
+records the reading for the workspace's help analytics on its own (a failed
+count never fails the call). [`easylivechat_ui`](https://pub.dev/packages/easylivechat_ui)
+ships a help screen and a safe renderer for the body.
 
 ## Storage
 
@@ -189,7 +289,9 @@ dropped network never crashes a build method:
 EasyLiveChat.instance.onError.listen((e) => debugPrint('$e'));
 ```
 
-Token expiry, reconnects and re-mints are handled internally.
+Token expiry, reconnects and re-mints are handled internally. Every error is an
+`EasyLiveChatError` with a `code` (`EasyLiveChatErrorCode`); a refused identity
+claim is `isIdentityNotVerified`, with the server's `reason`.
 
 ## System messages
 

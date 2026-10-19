@@ -11,7 +11,7 @@ core and re-exports it, so this is the only dependency you need.
 
 ```yaml
 dependencies:
-  easylivechat_ui: ^0.1.46
+  easylivechat_ui: ^0.1.73
 ```
 
 or
@@ -157,9 +157,52 @@ EasyLiveChat.instance.identify(
   name: user.name,
   email: user.email,
   phone: user.phone,
-  fields: {'plan': 'pro', 'userId': user.id}, // shown to the agent
+  fields: {'plan': 'pro'}, // shown to the agent
+  // Identity verification: your BACKEND computes
+  // userHash = hex(HMAC_SHA256(identitySecret, userId)).
+  userId: user.id,
+  userHash: user.chatHash,
 );
 ```
+
+With `userId` the SDK also keeps one visitor per person: a different user
+signing in on the device, or the chat opening with no `userId` after one was
+set, starts a fresh visitor, so nobody resumes the previous person's
+conversation. Call it on every launch before the chat opens, and
+`EasyLiveChat.instance.clearIdentity()` on sign-out. A workspace that
+**enforces** verification refuses a missing or wrong hash: the chat does not
+start, and `EasyLiveChat.instance.onError` carries an error with
+`isIdentityNotVerified` and a `reason` saying what to fix. See the core
+package's README.
+
+### Help articles
+
+Turn on "Show help articles" in the dashboard and the chat screen offers
+**Browse help articles** above the pre-chat form and the thread until the
+visitor has written. It opens `EasyLiveChatHelpScreen`: search over your top
+articles, the article itself, "Was this helpful?", and "Still need help? Start
+a chat", which comes back to the chat. Give help its own entry in your app too:
+
+```dart
+if (EasyLiveChat.instance.widgetConfig.value?.helpArticlesEnabled ?? false) {
+  Navigator.of(context).push(MaterialPageRoute(
+    builder: (_) => EasyLiveChatHelpScreen(
+      // Optional: route "Start a chat" yourself (default: opens the chat
+      // screen in place of the help screen).
+      onStartChat: () => openMyChat(context),
+      // Optional: handle links yourself (default: url_launcher).
+      onOpenLink: (uri) => launchUrl(uri),
+    ),
+  ));
+}
+```
+
+Article bodies are drawn natively by `ElcHelpMarkdown` — headings, lists,
+**bold**, *italic*, `code`, links and images — with no HTML and no WebView;
+only http(s)/mailto:/tel: links and http(s) images are ever live. Use it
+directly if you build your own help UI on the core's `searchHelp()` /
+`getHelpArticle()`. `EasyLiveChatScreen(showHelpArticles: false)` hides the
+entry.
 
 ### Show an unread badge
 
@@ -249,10 +292,13 @@ Every widget takes `themeOverride`, `directionOverride`, `onPickAttachments`,
 | `EasyLiveChatLauncher` | Floating bubble with unread badge. `alignment:` to move it, `useBottomSheet: true` to open as a sheet |
 | `EasyLiveChatScreen` | The full chat screen, for your own navigation |
 | `EasyLiveChatEndChatButton` | Explicit end-chat action for an app bar |
+| `EasyLiveChatHelpScreen` | Help articles: search, reader, "Was this helpful?", start a chat. `onStartChat:`, `onOpenLink:`, `initialArticleId:` |
+| `ElcHelpMarkdown` | Renders a help article's markdown body natively (no HTML) |
 | `SecurePrefsStorage` | Durable storage default (secure storage + shared prefs) |
 
-The core's API — `identify`, `open`, `messages`, `unreadCount`, `phase`,
-`sendMessage` — is re-exported here and documented in
+The core's API — `identify`, `clearIdentity`, `open`, `messages`,
+`unreadCount`, `phase`, `sendMessage`, `searchHelp`, `getHelpArticle` — is
+re-exported here and documented in
 [`easylivechat`](https://pub.dev/packages/easylivechat).
 
 ## Troubleshooting

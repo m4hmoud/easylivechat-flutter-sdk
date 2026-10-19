@@ -83,7 +83,10 @@ class _RecordingRest extends RestClient {
     String? contentLocale,
     bool resumeOnly = false,
     Map<String, String>? fields,
+    List<String>? consents,
     Map<String, String>? attributes,
+    String? userId,
+    String? userHash,
   }) async {
     lastResume = {
       'name': name,

@@ -21,11 +21,14 @@ export 'src/storage.dart'
 export 'src/models/enums.dart';
 export 'src/models/chat_message.dart';
 export 'src/models/message_card.dart' show MessageCard, MessageCardButton;
+export 'src/models/bot_buttons.dart'
+    show BotButton, BotButtons, BotReply, buttonsOpen, chosenButtonId;
 export 'src/models/quick_replies.dart'
     show QuickReplyOffer, quickRepliesOnOffer;
 export 'src/models/pre_chat_form.dart';
 export 'src/models/post_chat_form.dart';
 export 'src/models/widget_config.dart';
+export 'src/models/help_article.dart';
 export 'src/models/results.dart';
 export 'src/session_controller.dart'
     show ChatPhase, ConnectionState, EasyLiveChatLifecycle;
