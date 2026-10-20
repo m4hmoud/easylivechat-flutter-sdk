@@ -11,6 +11,7 @@ import 'models/chat_message.dart';
 import 'models/enums.dart';
 import 'models/help_article.dart';
 import 'models/pre_chat_form.dart';
+import 'models/reactions.dart';
 import 'models/results.dart';
 import 'models/widget_config.dart';
 import 'rest_client.dart';
@@ -90,6 +91,13 @@ class SessionController {
   /// the meantime" — the first is untrue while the assistant is answering.
   final ValueNotifier<bool> assistantCovers = ValueNotifier(false);
   final ValueNotifier<int> unreadCount = ValueNotifier(0);
+
+  /// Where the visitor stands while they wait for a person, or null when
+  /// nobody is waiting — see [QueueStatus]. Set by the session, moved by
+  /// `queue:update`, and cleared by anything that means somebody is here now:
+  /// the chat assigned, a team message, a team member (or the assistant)
+  /// starting to type.
+  final ValueNotifier<QueueStatus?> queue = ValueNotifier(null);
 
   /// How far into the thread an agent has read: everything the visitor sent at
   /// or before this instant has been seen.
@@ -494,6 +502,8 @@ class SessionController {
       unreadCount.value = 0;
       agentTyping.value = false;
       assistantTyping.value = false;
+      // The previous person's place in the queue is not the next person's.
+      queue.value = null;
       _setMessages(const []);
     }
     // Whatever identify() just declared is the NEW person's and stays; a
@@ -539,6 +549,8 @@ class SessionController {
     nextOpenLocal.value = res.nextOpenLocal;
     workspaceTimezone.value = res.timezone;
     assistantCovers.value = res.assistantCovers;
+    _transcriptEmailEnabled = res.transcriptEmailEnabled;
+    _replyEmailEnabled = res.replyEmailEnabled;
     // Deliberately NOT ChatPhase.offline. A visitor who arrives out of hours
     // continues into the ordinary chat and simply sees a notice (bind
     // [workspaceClosed]) — their message becomes a PENDING conversation that is
@@ -702,6 +714,8 @@ class SessionController {
       nextOpenLocal.value = res.nextOpenLocal;
       workspaceTimezone.value = res.timezone;
       assistantCovers.value = res.assistantCovers;
+      _transcriptEmailEnabled = res.transcriptEmailEnabled;
+      _replyEmailEnabled = res.replyEmailEnabled;
       _chatAvailabilityMode = res.chatAvailabilityMode;
       _asyncEnabled = res.asyncEnabled;
 
@@ -901,6 +915,7 @@ class SessionController {
     // anything this thread's history has to say and show its first messages as
     // already read.
     agentLastReadAt.value = null;
+    queue.value = res.queue;
     _forgetUnsent(res.unsentIds, conversationId: res.conversationId);
     _setMessages(_dedupSort(
         res.messages.where((m) => !_unsentIds.contains(m.id)).toList()));
@@ -1002,6 +1017,49 @@ class SessionController {
       attachmentUrls: message.attachmentUrls,
     );
   }
+
+  /// The visitor reacts to one of the team's messages with [emoji], or takes
+  /// their reaction back (null). One per person per message: another emoji
+  /// replaces theirs.
+  ///
+  /// Shown at once and put back as it was if the server says no — the web
+  /// widget's rule. Resolves true when the server took it. False, with nothing
+  /// changed, when there is no live socket or the message is not one the
+  /// visitor may react to ([ChatMessage.canReact]); false, with the thread
+  /// restored, when the server refused (`NOT_REACTABLE`, `RATE_LIMITED`, …).
+  Future<bool> react(String messageId, String? emoji) async {
+    final socket = _socket;
+    if (socket == null || !socket.isConnected) return false;
+    final held = _heldMessage(messageId);
+    if (held == null || !held.canReact) return false;
+    final wanted = (emoji == null || emoji.isEmpty) ? null : emoji;
+    final before = held.reactions;
+    _replaceReactions(messageId, held.withMyReaction(wanted).reactions);
+    final ack = await socket.react(messageId: messageId, emoji: wanted);
+    if (_disposed) return false;
+    _replaceReactions(messageId, ack.ok ? ack.reactions : before);
+    return ack.ok;
+  }
+
+  /// A tap on [emoji] for [messageId]: the visitor's own reaction already →
+  /// take it back; anything else → set it ([ChatMessage.toggledReaction],
+  /// asked of the message as it is now, not as the caller last saw it).
+  Future<bool> toggleReaction(String messageId, String emoji) {
+    final held = _heldMessage(messageId);
+    if (held == null) return Future.value(false);
+    return react(messageId, held.toggledReaction(emoji));
+  }
+
+  ChatMessage? _heldMessage(String id) {
+    for (final m in messages.value) {
+      if (m.id == id) return m;
+    }
+    return null;
+  }
+
+  /// Hand the controller a socket without connecting one. Tests only.
+  @visibleForTesting
+  void attachSocketForTesting(WidgetSocket socket) => _socket = socket;
 
   /// Emit `typing { isTyping }` (caller debounces).
   void setTyping(bool isTyping) {
@@ -1271,6 +1329,57 @@ class SessionController {
     }
   }
 
+  // ── emails to the visitor ──
+
+  bool _transcriptEmailEnabled = false;
+  bool _replyEmailEnabled = false;
+
+  /// "Email me this chat" is on offer — the workspace's switch, from the
+  /// config. False until the config is in, and on an older server.
+  bool get transcriptEmailEnabled => _transcriptEmailEnabled;
+
+  /// "Get the reply by email" is on offer — ask for an address while nobody
+  /// can answer, so a reply that comes after the visitor left still reaches
+  /// them.
+  bool get replyEmailEnabled => _replyEmailEnabled;
+
+  /// The address on the visitor's contact (masked) and what is on offer.
+  Future<VisitorEmailState> visitorEmail() async {
+    _requireToken('The visitor\'s email');
+    return _guardAuth(() => rest.getVisitorEmail(token: _token!));
+  }
+
+  /// "Email me the reply": [email] goes on the visitor's contact. Resolves
+  /// with it masked; `INVALID_EMAIL` or `EMAIL_UNSUBSCRIBED` otherwise.
+  Future<String> setVisitorEmail(String email) async {
+    _requireToken('Saving the visitor\'s email');
+    return _guardAuth(
+        () => rest.postVisitorEmail(token: _token!, email: email.trim()));
+  }
+
+  /// "Email me this chat" — this conversation, or the one that just ended,
+  /// to [email] or (null) the address already on the contact. Resolves with
+  /// where it went, masked. Refusals: `NO_CONTACT_EMAIL` (ask for one),
+  /// `INVALID_EMAIL`, `EMAIL_UNSUBSCRIBED`, `TRANSCRIPT_RATE_LIMITED`,
+  /// `TRANSCRIPT_DISABLED`.
+  Future<String> emailTranscript({String? email}) async {
+    _requireToken('Emailing the chat');
+    final convId = _conversationId;
+    if (convId == null) {
+      throw const EasyLiveChatError(EasyLiveChatErrorCode.noToken,
+          message: 'Emailing the chat needs a conversation.');
+    }
+    return _guardAuth(() => rest.postTranscript(
+        token: _token!, conversationId: convId, email: email));
+  }
+
+  void _requireToken(String what) {
+    if (_token == null) {
+      throw EasyLiveChatError(EasyLiveChatErrorCode.noToken,
+          message: '$what requires an active session token.');
+    }
+  }
+
   /// Submit the tenant's post-chat survey for the conversation just closed.
   ///
   /// [fields] is keyed by field **id** — what
@@ -1384,6 +1493,7 @@ class SessionController {
     // Belongs to the conversation being let go of, and only moves forward —
     // left set, it would rule the next one's opening messages already read.
     agentLastReadAt.value = null;
+    queue.value = null;
   }
 
   // ── presence / lifecycle ──
@@ -1452,6 +1562,9 @@ class SessionController {
 
     _socketSubs.add(socket.onMessageNew.listen(handleMessageNew));
     _socketSubs.add(socket.onMessageUpdated.listen(handleMessageUpdated));
+    _socketSubs.add(socket.onQueue.listen(handleQueueUpdate));
+    _socketSubs.add(socket.onReactions
+        .listen((e) => handleReactions(e.messageId, e.reactions)));
     _socketSubs.add(socket.onMessageDeleted.listen(
         (d) => handleMessageDeleted(d.id, conversationId: d.conversationId)));
     _socketSubs.add(socket.onAgentTyping.listen(_handleAgentTyping));
@@ -1534,7 +1647,9 @@ class SessionController {
       // Already have it (e.g. our own echo already reconciled) — refresh row,
       // keeping the sender's face if the refresh arrived without one.
       final next = List<ChatMessage>.of(list)
-        ..[existingIdx] = msg.withIdentityFrom(list[existingIdx]);
+        ..[existingIdx] = msg
+            .withIdentityFrom(list[existingIdx])
+            .withReactionsFrom(list[existingIdx]);
       _setMessages(_dedupSort(next));
       return;
     }
@@ -1558,6 +1673,12 @@ class SessionController {
         _setMessages(_dedupSort(next));
         return;
       }
+    }
+
+    // Somebody from the team wrote — a person, the assistant, an automated
+    // line: nobody is waiting any more.
+    if (!msg.isFromCustomer && msg.senderType != SenderType.system) {
+      queue.value = null;
     }
 
     // 3) Genuinely new message. Unread counts only AGENT replies the user
@@ -1590,8 +1711,37 @@ class SessionController {
     // it; on older servers that copy carries no sender name or photo. Replacing
     // wholesale erased the agent's face from a bubble that already had one —
     // see [ChatMessage.withIdentityFrom].
-    final next = List<ChatMessage>.of(list)..[idx] = msg.withIdentityFrom(list[idx]);
+    //
+    // Reactions the same way: an update that leaves them out keeps the chips on
+    // screen ([ChatMessage.withReactionsFrom]).
+    final next = List<ChatMessage>.of(list)
+      ..[idx] = msg.withIdentityFrom(list[idx]).withReactionsFrom(list[idx]);
     _setMessages(_dedupSort(next));
+  }
+
+  /// `queue:update` (null: the chat was assigned). Tests only beyond the
+  /// socket.
+  @visibleForTesting
+  void handleQueueUpdate(QueueStatus? status) {
+    if (!_disposed) queue.value = status;
+  }
+
+  /// `message:reactions`: one message's reactions, the whole list as the
+  /// visitor may see it. Replaces the list on the message it names; a message
+  /// this client does not hold is ignored. Never a message — nothing is
+  /// counted unread and [onMessage] does not fire.
+  @visibleForTesting
+  void handleReactions(String messageId, List<MessageReaction> reactions) {
+    _replaceReactions(messageId, reactions);
+  }
+
+  void _replaceReactions(String messageId, List<MessageReaction> reactions) {
+    final list = messages.value;
+    final idx = list.indexWhere((m) => m.id == messageId);
+    if (idx == -1) return;
+    final next = List<ChatMessage>.of(list)
+      ..[idx] = list[idx].withReactions(reactions);
+    _setMessages(next);
   }
 
   /// `message:deleted`: an agent unsent a message.
@@ -1640,6 +1790,8 @@ class SessionController {
       return;
     }
     agentTyping.value = true;
+    // Someone is answering: the wait is over even before their first word.
+    queue.value = null;
     // The server only ever sends `isTyping:true`, so arm a 4s auto-clear.
     _typingTimer = Timer(const Duration(seconds: 4), () {
       agentTyping.value = false;
@@ -1660,6 +1812,7 @@ class SessionController {
     assistantTyping.value = isTyping;
     agentTyping.value = isTyping;
     if (!isTyping) return;
+    queue.value = null;
     _typingTimer = Timer(const Duration(seconds: 45), () {
       agentTyping.value = false;
       assistantTyping.value = false;
@@ -1675,6 +1828,7 @@ class SessionController {
     if (_closedHandled.contains(closedConversationId)) return;
     if (_ratedConversations.contains(closedConversationId)) return;
     _closedHandled.add(closedConversationId);
+    queue.value = null;
     _setPhase(ChatPhase.feedback);
   }
 
@@ -2125,6 +2279,7 @@ class SessionController {
     messages.dispose();
     agentTyping.dispose();
     unreadCount.dispose();
+    queue.dispose();
   }
 }
 

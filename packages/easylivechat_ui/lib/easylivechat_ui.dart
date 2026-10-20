@@ -24,5 +24,10 @@ export 'src/end_chat_button.dart';
 export 'src/help_screen.dart' show EasyLiveChatHelpScreen;
 export 'src/views/help_markdown_view.dart' show ElcHelpMarkdown, ElcOpenLink;
 export 'src/picked_file.dart' show ElcPickedFile, ElcAttachmentPicker;
+// For hosts drawing their own thread on the core's `ChatMessage.linkPreview`
+// and `reactions`: the same card, chips, quick row and picker.
+export 'src/views/link_preview_view.dart' show ElcLinkPreviewCard;
+export 'src/views/reactions_view.dart'
+    show ElcReactionChips, ElcQuickReactions, showElcEmojiPicker;
 // ElcStrings.overrideAll(...) lets a host fully own the chrome translations.
 export 'src/l10n.dart' show ElcStrings;

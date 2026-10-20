@@ -12,7 +12,7 @@ package, so you would not depend on both.
 
 ```yaml
 dependencies:
-  easylivechat: ^0.1.42
+  easylivechat: ^0.1.57
 ```
 
 or
@@ -326,6 +326,127 @@ if (offer != null) {
 
 `quickRepliesOnOffer` is the web widget's rule: only the newest message offers
 them, and only until the visitor or the team says something else.
+
+## Reactions
+
+Messages carry reactions, as the visitor may see them: on the team's messages
+their own, on theirs the team's — never an agent's name. One per person per
+message, as on WhatsApp: another emoji replaces yours, the same one again takes
+it back.
+
+```dart
+for (final g in groupReactions(message.reactions)) {
+  // One chip per emoji: g.emoji, g.count, g.mine (the visitor's own).
+}
+
+if (message.canReact) {           // the team's messages, once the server has them
+  // The row every client shows first: quickReactions (👍 ❤️ 😂 😮 😢 🙏).
+  await EasyLiveChat.instance.toggleReaction(message, '👍');
+  // or set / take back explicitly: react(message, '❤️') / react(message, null)
+}
+```
+
+`react` goes over the same `message:react` socket event the web widget uses.
+The thread shows the change at once and puts it back if the server says no
+(more than twenty in ten seconds, a message that takes none); the future says
+which. Reactions from the team, or from the visitor's other devices, arrive live
+on `message:reactions` and replace the message's list in `messages` — a
+`message:updated` that leaves the field out keeps it. A reaction is not a
+message: no `onMessage`, no unread count.
+
+## Link previews
+
+A link in a message gets a preview card — title, site, a line of description and
+a picture — made once by the server and stored on the message, so no visitor's
+device ever fetches the linked page:
+
+```dart
+final preview = message.linkPreview; // null when there is none, or it is malformed
+if (preview != null && config.linkPreviews && message.cards.isEmpty) {
+  // preview.siteName, preview.title, preview.description (may be null)
+  // preview.imageUrl: /uploads/… (resolveUrl it) or https — may still fail to load
+  // preview.uri: http(s) only, ready for url_launcher
+}
+```
+
+It is read through the same checks the web uses (lengths capped, the link
+`http:`/`https:` only, the picture our own upload or `https:`), and usually lands
+a moment after the message, as a `message:updated`. `config.linkPreviews` is the
+workspace's switch.
+
+## Light and dark
+
+`config.colorScheme` is the workspace's choice: `WidgetColorScheme.light`,
+`dark`, or `auto` — follow the device. Existing workspaces were kept on light; new
+ones start on auto. An older server sends nothing, which reads as light.
+
+```dart
+final dark = config.colorScheme.resolveDark(
+    deviceDark: MediaQuery.platformBrightnessOf(context) == Brightness.dark);
+```
+
+The dark look is derived from the one light look the workspace set — the web
+widget's rule, which `easylivechat_ui` follows: the brand stays where the
+visitor sees it as a fill, the light surfaces become a dark ground and card.
+`config.launcherLabel` (a few words beside the launcher's icon, or null) and
+`config.launcherSize` (`small` 48, `medium` 56, `large` 64) are the launcher's
+options.
+
+## Closed and busy
+
+While the workspace is shut, say so above the thread. The web widget's rule, in
+order:
+
+1. `config.offlineInfoText` — the business's own notice — when it wrote one.
+   It always wins, whatever the mode and whether or not the assistant covers.
+   (Not `offlineMessage`: that is the leave-a-message prompt, with a default
+   nobody typed.)
+2. `composerLocked` (`NOTICE_ONLY`): when the team is back (`nextOpenLocal`),
+   or that it will be soon.
+3. `availabilityReason == 'NO_AGENTS'`: everyone's busy — or, while
+   `assistantCovers`, that the assistant can help in the meantime.
+4. Otherwise closed — the assistant's version while it covers — followed by the
+   reopening time, which stays: it is when a person is back.
+
+All of these update live from `workspace:availability`.
+
+## Waiting in the queue
+
+```dart
+ValueListenableBuilder<QueueStatus?>(
+  valueListenable: EasyLiveChat.instance.queue,
+  builder: (context, q, _) => q == null
+      ? const SizedBox.shrink()
+      : Text('${q.text}  #${q.position} · ~${q.minutes} min'),
+);
+```
+
+Non-null while the visitor waits for a person: the place, the expected minutes
+and the workspace's own words, with the visitor's name and place filled in. Show
+it above the conversation, not instead of it. It turns null the moment somebody
+is there — the chat assigned, a team message, someone typing.
+
+## Emails to the visitor
+
+The web widget's "Email me this chat" and "Get the reply by email", for your own
+UI. Both need a session, and addresses come back masked — the device may not be
+the visitor's.
+
+```dart
+if (EasyLiveChat.instance.transcriptEmailEnabled) {
+  final sentTo = await EasyLiveChat.instance.emailTranscript(); // a•••@example.com
+}
+
+final state = await EasyLiveChat.instance.visitorEmail(); // emailHint, unsubscribed
+if (EasyLiveChat.instance.replyEmailEnabled && state.emailHint == null) {
+  await EasyLiveChat.instance.setVisitorEmail('ava@example.com');
+}
+```
+
+`emailTranscript()` sends to the address on the contact; pass `email:` when the
+visitor typed one. Refusals are `EasyLiveChatError`s with the server's code:
+`NO_CONTACT_EMAIL` (ask for an address), `INVALID_EMAIL`, `EMAIL_UNSUBSCRIBED`,
+`TRANSCRIPT_RATE_LIMITED`.
 
 ## Push notifications
 

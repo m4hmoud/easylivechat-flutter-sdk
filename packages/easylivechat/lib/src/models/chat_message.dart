@@ -1,7 +1,9 @@
 import 'enums.dart';
 import 'js_text.dart';
 import 'bot_buttons.dart';
+import 'link_preview.dart';
 import 'message_card.dart';
+import 'reactions.dart';
 
 /// A rehosted attachment (rich shape the server fills in once the media
 /// re-host worker runs; arrives via `message:updated`). Prefer this over the
@@ -128,6 +130,10 @@ class ChatMessage {
   /// never break decoding.
   final Map<String, dynamic>? metadata;
 
+  /// The reactions as the server last said, or null when the row said nothing
+  /// about them — see [reactions] and [withReactionsFrom].
+  final List<MessageReaction>? _reactions;
+
   const ChatMessage({
     required this.id,
     required this.conversationId,
@@ -148,7 +154,52 @@ class ChatMessage {
     this.isOptimistic = false,
     this.failed = false,
     this.metadata,
-  });
+    List<MessageReaction>? reactions,
+  }) : _reactions = reactions;
+
+  /// The reactions on this message, as the visitor may see them: on the
+  /// team's messages only their own, on theirs the team's — never an agent's
+  /// name (see `MessageReaction`). Oldest first. Draw them as chips with
+  /// [groupReactions].
+  ///
+  /// Kept current by the live `message:reactions` event; a
+  /// `message:updated` that leaves the field out keeps what is on screen.
+  List<MessageReaction> get reactions => _reactions ?? const [];
+
+  /// The visitor's own reaction on this message, if any.
+  String? get myReaction {
+    for (final r in reactions) {
+      if (r.isMine) return r.emoji;
+    }
+    return null;
+  }
+
+  /// Whether the visitor may react to this message: the team's messages — a
+  /// person's, the assistant's, an automated line's — once the server has
+  /// them. Never their own, never a system notice or a submitted survey.
+  ///
+  /// An automated line reaches the visitor as `AUTOMATED`, which this SDK
+  /// reads as [SenderType.unknown]; it is the team's all the same. The server
+  /// has the last word either way, and refuses what it will not take.
+  bool get canReact =>
+      !isLocalTemp &&
+      !isFromCustomer &&
+      senderType != SenderType.system &&
+      postChat == null;
+
+  /// What a tap on [emoji] means: the visitor's own already → take it back
+  /// (null), anything else → set it. Pass the answer to
+  /// `EasyLiveChat.react`.
+  String? toggledReaction(String emoji) =>
+      sameEmoji(myReaction, emoji) ? null : emoji;
+
+  /// The preview of the link in this message, made by the server — or null.
+  ///
+  /// Read from `metadata.linkPreview` through [LinkPreview.tryParse], so a
+  /// malformed or hostile one is simply absent. Draw it under the bubble —
+  /// not on a card message, which has its own image and buttons — and only
+  /// while the workspace leaves `WidgetConfigModel.linkPreviews` on.
+  LinkPreview? get linkPreview => LinkPreview.tryParse(metadata?['linkPreview']);
 
   /// The i18n key of a SYSTEM notice (`conversation.transferred`), or null.
   String? get systemI18nKey {
@@ -335,6 +386,11 @@ class ChatMessage {
       metadata: j['metadata'] is Map
           ? (j['metadata'] as Map).cast<String, dynamic>()
           : null,
+      // Absent means "not said" (an older server, a partial row), which
+      // [withReactionsFrom] tells apart from "none" — a present null is none.
+      reactions: j.containsKey('reactions')
+          ? MessageReaction.listFrom(j['reactions'])
+          : null,
     );
   }
 
@@ -402,8 +458,53 @@ class ChatMessage {
       isOptimistic: isOptimistic,
       failed: failed,
       metadata: metadata,
+      reactions: _reactions,
     );
   }
+
+  /// Keep the reactions a row that says nothing about them would erase.
+  ///
+  /// The same problem as [withIdentityFrom], for the same reason: clients
+  /// replace a message by id, and not every `message:updated` carries the
+  /// whole row. One that leaves `reactions` out keeps the ones on screen, as
+  /// on the web; one that says `[]` means they are gone.
+  ChatMessage withReactionsFrom(ChatMessage previous) {
+    if (_reactions != null || previous._reactions == null) return this;
+    return withReactions(previous._reactions);
+  }
+
+  /// This message with its reactions replaced.
+  ChatMessage withReactions(List<MessageReaction> reactions) => ChatMessage(
+        id: id,
+        conversationId: conversationId,
+        tenantId: tenantId,
+        senderAgentId: senderAgentId,
+        senderName: senderName,
+        senderAvatarUrl: senderAvatarUrl,
+        senderJobTitle: senderJobTitle,
+        body: body,
+        senderType: senderType,
+        contentType: contentType,
+        attachmentUrls: attachmentUrls,
+        attachments: attachments,
+        deliveryStatus: deliveryStatus,
+        readByAgent: readByAgent,
+        createdAt: createdAt,
+        editedAt: editedAt,
+        isOptimistic: isOptimistic,
+        failed: failed,
+        metadata: metadata,
+        reactions: List<MessageReaction>.unmodifiable(reactions),
+      );
+
+  /// This message with the visitor's own reaction set to [emoji] — or taken
+  /// back (null) — and the team's left as they are. What the thread shows the
+  /// moment the visitor taps, before the server answers.
+  ChatMessage withMyReaction(String? emoji) => withReactions([
+        for (final r in reactions)
+          if (!r.isMine) r,
+        if (emoji != null) MessageReaction(emoji: emoji, by: ReactionBy.customer),
+      ]);
 
   ChatMessage copyWith({
     String? id,
@@ -433,6 +534,7 @@ class ChatMessage {
       isOptimistic: isOptimistic ?? this.isOptimistic,
       failed: failed ?? this.failed,
       metadata: metadata,
+      reactions: _reactions,
     );
   }
 

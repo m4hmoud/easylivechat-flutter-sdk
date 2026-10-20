@@ -14,6 +14,7 @@ import 'views/feedback_prompt_view.dart';
 import 'views/closed_notice_view.dart';
 import 'views/post_chat_form_view.dart';
 import 'views/pre_chat_form_view.dart';
+import 'views/queue_notice_view.dart';
 import 'views/thread_view.dart';
 
 /// Full chat surface — a phase router bound to `EasyLiveChat.instance.phase`.
@@ -278,9 +279,19 @@ class _EasyLiveChatScreenState extends State<EasyLiveChatScreen>
       child: ValueListenableBuilder<WidgetConfigModel?>(
         valueListenable: EasyLiveChat.instance.widgetConfig,
         builder: (context, config, _) {
+          // Light, dark, or the device's own appearance — the workspace's
+          // choice. Asking MediaQuery also rebuilds this when the device
+          // switches while the chat is open.
+          final device =
+              MediaQuery.maybePlatformBrightnessOf(context) ?? Brightness.light;
           var theme = config != null
               ? EasyLiveChatTheme.fromConfig(config,
-                  override: widget.themeOverride)
+                  override: widget.themeOverride, platformBrightness: device)
+              // Light until the config says otherwise. The web widget follows
+              // the device before its config is in, but every workspace that
+              // existed before dark mode was kept on light, so here that
+              // would flash most chats dark and back — and the config is
+              // usually in before this screen is up anyway.
               : (widget.themeOverride ?? _fallbackTheme);
           if (widget.directionOverride != null) {
             theme = theme.copyWith(direction: widget.directionOverride);
@@ -361,10 +372,29 @@ class _EasyLiveChatScreenState extends State<EasyLiveChatScreen>
             // PENDING conversation the team picks up when they are back.
             // Also when only the composer is locked: an input that refuses to
             // type with nothing explaining why reads as a broken app.
-            if (EasyLiveChat.instance.isBooted &&
-                (EasyLiveChat.instance.workspaceClosed ||
-                    EasyLiveChat.instance.composerLocked))
-              ClosedNoticeBanner(config: config, theme: theme),
+            // Live: availability arrives over the socket while the visitor
+            // is in the thread, and the banner comes and goes with it.
+            ListenableBuilder(
+              listenable: elcAvailabilityListenable(),
+              builder: (context, _) => EasyLiveChat.instance.isBooted &&
+                      (EasyLiveChat.instance.workspaceClosed ||
+                          EasyLiveChat.instance.composerLocked)
+                  ? ClosedNoticeBanner(config: config, theme: theme)
+                  : const SizedBox.shrink(),
+            ),
+            // Waiting for a person: a notice above the conversation, which
+            // stays readable and writable underneath it.
+            if (EasyLiveChat.instance.isBooted)
+              ValueListenableBuilder<QueueStatus?>(
+                valueListenable: EasyLiveChat.instance.queue,
+                builder: (context, queue, _) => queue == null
+                    ? const SizedBox.shrink()
+                    : ElcQueueNotice(
+                        status: queue,
+                        theme: theme,
+                        strings: ElcStrings.of(widget.locale ?? config?.locale),
+                      ),
+              ),
             // Help first, while there is nothing written yet: an answer found
             // there is a chat nobody had to wait on.
             if (widget.showHelpArticles && config != null)
@@ -376,6 +406,11 @@ class _EasyLiveChatScreenState extends State<EasyLiveChatScreen>
                             theme: theme, config: config, screen: widget)
                         : const SizedBox.shrink(),
               ),
+            // New team messages, said to a screen reader as they arrive.
+            ElcThreadAnnouncer(
+              strings: ElcStrings.of(widget.locale ?? config?.locale),
+              direction: theme.direction,
+            ),
             Expanded(
               child: ThreadView(
                 theme: theme,
@@ -405,7 +440,7 @@ class _EasyLiveChatScreenState extends State<EasyLiveChatScreen>
 
   Widget _spinner(EasyLiveChatTheme theme) => _Centered(
         child: CircularProgressIndicator(
-          valueColor: AlwaysStoppedAnimation<Color>(theme.primary),
+          valueColor: AlwaysStoppedAnimation<Color>(theme.primaryInk),
         ),
       );
 
@@ -471,7 +506,10 @@ class _ErrorRetry extends StatelessWidget {
             const SizedBox(height: 20),
             FilledButton(
               onPressed: onRetry,
-              style: FilledButton.styleFrom(backgroundColor: theme.primary),
+              style: FilledButton.styleFrom(
+                backgroundColor: theme.primary,
+                foregroundColor: theme.onPrimary,
+              ),
               child: Text(retryLabel),
             ),
           ],
@@ -523,7 +561,7 @@ class _HelpEntry extends StatelessWidget {
           child: Row(
             children: [
               ExcludeSemantics(
-                child: Icon(Icons.help_outline, size: 20, color: t.primary),
+                child: Icon(Icons.help_outline, size: 20, color: t.primaryInk),
               ),
               const SizedBox(width: 10),
               Expanded(

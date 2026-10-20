@@ -156,10 +156,16 @@ class _EasyLiveChatHelpScreenState extends State<EasyLiveChatHelpScreen> {
 
   ElcStrings get _s => ElcStrings.of(widget.locale ?? _config?.locale);
 
-  EasyLiveChatTheme _theme() {
+  /// The chat's own look, light or dark as the workspace chose — the help
+  /// screen is part of the same conversation with the business.
+  EasyLiveChatTheme _theme(BuildContext context) {
     final cfg = _config;
+    final device =
+        MediaQuery.maybePlatformBrightnessOf(context) ?? Brightness.light;
     var theme = cfg != null
-        ? EasyLiveChatTheme.fromConfig(cfg, override: widget.themeOverride)
+        ? EasyLiveChatTheme.fromConfig(cfg,
+            override: widget.themeOverride, platformBrightness: device)
+        // Light until the config says otherwise, as the chat screen.
         : (widget.themeOverride ?? _fallbackTheme);
     if (widget.directionOverride != null) {
       theme = theme.copyWith(direction: widget.directionOverride);
@@ -284,7 +290,7 @@ class _EasyLiveChatHelpScreenState extends State<EasyLiveChatHelpScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = _theme();
+    final theme = _theme(context);
     final s = _s;
     return PopScope(
       // Back from an article returns to the list rather than leaving help.
@@ -370,7 +376,9 @@ class _EasyLiveChatHelpScreenState extends State<EasyLiveChatHelpScreen> {
         },
         textInputAction: TextInputAction.search,
         style: TextStyle(color: t.text, fontSize: 16),
-        cursorColor: t.primary,
+        cursorColor: t.primaryInk,
+        // The dark keyboard on iOS while the chat is dark.
+        keyboardAppearance: t.brightness,
         decoration: InputDecoration(
           hintText: s.helpSearchPlaceholder,
           hintStyle: TextStyle(color: muted),
@@ -527,7 +535,7 @@ class _EasyLiveChatHelpScreenState extends State<EasyLiveChatHelpScreen> {
               ElcHelpMarkdown(
                 markdown: article.body,
                 textColor: t.text,
-                linkColor: t.primary,
+                linkColor: t.primaryInk,
                 surfaceColor: t.surface,
                 onOpenLink: widget.onOpenLink,
               ),
@@ -623,7 +631,7 @@ class _EasyLiveChatHelpScreenState extends State<EasyLiveChatHelpScreen> {
               onPressed: _startChat,
               style: FilledButton.styleFrom(
                 backgroundColor: t.primary,
-                foregroundColor: _onColor(t.primary),
+                foregroundColor: t.onPrimary,
                 minimumSize: const Size.fromHeight(44),
                 shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(10)),
@@ -643,7 +651,7 @@ class _EasyLiveChatHelpScreenState extends State<EasyLiveChatHelpScreen> {
           child: Semantics(
             label: s.helpLoading,
             child: CircularProgressIndicator(
-              valueColor: AlwaysStoppedAnimation<Color>(t.primary),
+              valueColor: AlwaysStoppedAnimation<Color>(t.primaryInk),
             ),
           ),
         ),
@@ -673,15 +681,12 @@ class _EasyLiveChatHelpScreenState extends State<EasyLiveChatHelpScreen> {
             const SizedBox(height: 12),
             TextButton(
               onPressed: onRetry,
-              style: TextButton.styleFrom(foregroundColor: t.primary),
+              style: TextButton.styleFrom(foregroundColor: t.primaryInk),
               child: Text(s.retry),
             ),
           ],
         ),
       );
-
-  static Color _onColor(Color background) =>
-      background.computeLuminance() > 0.5 ? Colors.black : Colors.white;
 
   static const EasyLiveChatTheme _fallbackTheme = EasyLiveChatTheme(
     primary: Color(0xFF2563EB),

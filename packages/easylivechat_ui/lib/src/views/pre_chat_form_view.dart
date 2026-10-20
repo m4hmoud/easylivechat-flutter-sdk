@@ -200,8 +200,8 @@ class _PreChatFormViewState extends State<PreChatFormView> {
                   const SizedBox(height: 4),
                   Text(
                     _formError!,
-                    style: const TextStyle(
-                      color: _FormErrorColor.color,
+                    style: TextStyle(
+                      color: _theme.danger,
                       fontSize: 13,
                     ),
                   ),
@@ -293,6 +293,9 @@ class _PreChatFormViewState extends State<PreChatFormView> {
           maxLines: f.type == PreChatFieldType.textarea ? 4 : 1,
           minLines: f.type == PreChatFieldType.textarea ? 3 : 1,
           style: TextStyle(color: t.text, fontSize: 15),
+          cursorColor: t.primaryInk,
+          // The dark keyboard on iOS while the chat is dark.
+          keyboardAppearance: t.brightness,
           autovalidateMode: AutovalidateMode.onUserInteraction,
           onChanged: (_) {
             if (_serverFieldErrors.remove(f.id) != null) setState(() {});
@@ -307,10 +310,10 @@ class _PreChatFormViewState extends State<PreChatFormView> {
             contentPadding:
                 const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
             enabledBorder: _border(t.text.withValues(alpha: 0.15)),
-            focusedBorder: _border(t.primary, width: 1.5),
-            errorBorder: _border(_FormErrorColor.color),
-            focusedErrorBorder: _border(_FormErrorColor.color, width: 1.5),
-            errorStyle: const TextStyle(color: _FormErrorColor.color),
+            focusedBorder: _border(t.primaryInk, width: 1.5),
+            errorBorder: _border(t.danger),
+            focusedErrorBorder: _border(t.danger, width: 1.5),
+            errorStyle: TextStyle(color: t.danger),
           ),
         ),
       ],
@@ -360,9 +363,10 @@ class _PreChatFormViewState extends State<PreChatFormView> {
                   child: Checkbox(
                     value: checked,
                     activeColor: t.primary,
+                    checkColor: t.onPrimary,
                     side: BorderSide(
                       color: state.hasError
-                          ? _FormErrorColor.color
+                          ? t.danger
                           : t.text.withValues(alpha: 0.45),
                       width: 1.5,
                     ),
@@ -395,7 +399,7 @@ class _PreChatFormViewState extends State<PreChatFormView> {
                       if (policyUrl != null)
                         _PolicyLink(
                           label: _s.privacyPolicy,
-                          color: t.primary,
+                          color: t.primaryInk,
                           onTap: () => _openPolicy(policyUrl),
                         ),
                     ],
@@ -463,7 +467,7 @@ class _PreChatFormViewState extends State<PreChatFormView> {
         padding: const EdgeInsetsDirectional.only(top: 6, start: 4),
         child: Text(
           msg,
-          style: const TextStyle(color: _FormErrorColor.color, fontSize: 12),
+          style: TextStyle(color: _theme.danger, fontSize: 12),
         ),
       );
 
@@ -472,7 +476,7 @@ class _PreChatFormViewState extends State<PreChatFormView> {
         borderRadius: BorderRadius.circular(10),
         border: Border.all(
           color: hasError
-              ? _FormErrorColor.color
+              ? _theme.danger
               : _theme.text.withValues(alpha: 0.15),
         ),
       );
@@ -537,10 +541,4 @@ class _PolicyLink extends StatelessWidget {
       ),
     );
   }
-}
-
-/// Shared destructive color for validation/errors (no `error` slot on the
-/// theme contract, so the views define one consistently).
-abstract final class _FormErrorColor {
-  static const Color color = Color(0xFFDC2626);
 }

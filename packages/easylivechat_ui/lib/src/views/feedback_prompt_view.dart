@@ -97,7 +97,7 @@ class _FeedbackPromptViewState extends State<FeedbackPromptView> {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(Icons.check_circle_rounded, size: 56, color: t.primary),
+        Icon(Icons.check_circle_rounded, size: 56, color: t.primaryInk),
         const SizedBox(height: 16),
         Text(
           _s.thanksForFeedback,
@@ -142,7 +142,7 @@ class _FeedbackPromptViewState extends State<FeedbackPromptView> {
               iconSize: 40,
               icon: Icon(
                 filled ? Icons.star_rounded : Icons.star_border_rounded,
-                color: filled ? t.primary : t.text.withValues(alpha: 0.3),
+                color: filled ? t.primaryInk : t.text.withValues(alpha: 0.3),
               ),
             );
           }),
@@ -154,6 +154,9 @@ class _FeedbackPromptViewState extends State<FeedbackPromptView> {
           minLines: 2,
           maxLines: 4,
           style: TextStyle(color: t.text, fontSize: 15),
+          cursorColor: t.primaryInk,
+          // The dark keyboard on iOS while the chat is dark.
+          keyboardAppearance: t.brightness,
           decoration: InputDecoration(
             hintText: _s.addAComment,
             hintStyle: TextStyle(color: t.text.withValues(alpha: 0.4)),
@@ -171,7 +174,7 @@ class _FeedbackPromptViewState extends State<FeedbackPromptView> {
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(color: t.primary, width: 1.5),
+              borderSide: BorderSide(color: t.primaryInk, width: 1.5),
             ),
           ),
         ),
@@ -179,7 +182,7 @@ class _FeedbackPromptViewState extends State<FeedbackPromptView> {
           const SizedBox(height: 12),
           Text(
             _error!,
-            style: const TextStyle(color: Color(0xFFDC2626), fontSize: 13),
+            style: TextStyle(color: t.danger, fontSize: 13),
           ),
         ],
         const SizedBox(height: 20),
@@ -192,6 +195,8 @@ class _FeedbackPromptViewState extends State<FeedbackPromptView> {
               backgroundColor: t.primary,
               foregroundColor: _onColor(t.primary),
               disabledBackgroundColor: t.primary.withValues(alpha: 0.4),
+              // Ours, not the host's: its disabled grey is for its own page.
+              disabledForegroundColor: t.text.withValues(alpha: 0.5),
               elevation: 0,
               padding: EdgeInsets.zero,
               shape: RoundedRectangleBorder(

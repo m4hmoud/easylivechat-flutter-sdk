@@ -1,4 +1,5 @@
 import 'chat_message.dart';
+import 'reactions.dart';
 
 /// Result of `POST /:slug/session`. On a `resumeOnly` call with no active
 /// conversation, [token] is null and [hasActiveConversation] is false.
@@ -14,6 +15,10 @@ class SessionResult {
   /// [MessagePage.unsentIds].
   final List<String> unsentIds;
 
+  /// Where the visitor stands while they wait for a person (`queued`), or
+  /// null when nobody is waiting — see [QueueStatus].
+  final QueueStatus? queue;
+
   const SessionResult({
     this.token,
     this.conversationId,
@@ -22,6 +27,7 @@ class SessionResult {
     required this.hasActiveConversation,
     this.messages = const [],
     this.unsentIds = const [],
+    this.queue,
   });
 
   factory SessionResult.fromJson(Map<String, dynamic> j) => SessionResult(
@@ -32,7 +38,59 @@ class SessionResult {
         hasActiveConversation: j['hasActiveConversation'] == true,
         messages: _msgs(j['messages']),
         unsentIds: _ids(j['unsentIds']),
+        queue: j['queued'] == true
+            ? QueueStatus._read(j['queuePosition'], j['queueMinutes'],
+                j['queueInfoText'])
+            : null,
       );
+}
+
+/// The visitor is waiting for a person — the web widget's queue notice.
+///
+/// Waiting is a notice above the conversation, not a screen of its own: the
+/// visitor reads what has been said and writes their question while they
+/// wait. The server says so on the session (`queued`) and moves it on with
+/// `queue:update`; anything that means "somebody is here now" ends it — the
+/// chat being assigned, a team message arriving, someone starting to type.
+/// The assistant covering does not queue anyone: it answers.
+class QueueStatus {
+  /// Place in the queue, 1 for next; 0 when the server could not say.
+  final int position;
+
+  /// The expected wait in minutes; meaningful only with a [position].
+  final int minutes;
+
+  /// The workspace's queue notice in the visitor's language, with their name
+  /// and place already filled in by the server. May be empty.
+  final String text;
+
+  const QueueStatus({this.position = 0, this.minutes = 0, this.text = ''});
+
+  static QueueStatus _read(Object? position, Object? minutes, Object? text) =>
+      QueueStatus(
+        position: position is num && position > 0 ? position.toInt() : 0,
+        minutes: minutes is num && minutes > 0 ? minutes.round() : 0,
+        text: text is String ? text.trim() : '',
+      );
+
+  /// `queue:update` — null when it says the chat was assigned (the wait is
+  /// over).
+  static QueueStatus? fromUpdate(Map<String, dynamic> j) => j['assigned'] == true
+      ? null
+      : _read(j['position'], j['minutes'], j['text']);
+
+  @override
+  bool operator ==(Object other) =>
+      other is QueueStatus &&
+      other.position == position &&
+      other.minutes == minutes &&
+      other.text == text;
+
+  @override
+  int get hashCode => Object.hash(position, minutes, text);
+
+  @override
+  String toString() => 'QueueStatus(#$position, ~$minutes min, "$text")';
 }
 
 /// A page of history from `GET /:slug/messages` (oldest→newest). [nextCursor]
@@ -181,6 +239,41 @@ class StoredProfile {
       );
 }
 
+/// What `GET /:slug/visitor-email` says about emailing the visitor: the
+/// address on their contact — masked, because the device may not be theirs —
+/// and whether the workspace offers each email.
+class VisitorEmailState {
+  /// `a•••@example.com`, or null when the contact has no address.
+  final String? emailHint;
+
+  /// The address asked not to be written to; the server will refuse to.
+  final bool unsubscribed;
+
+  /// "Email me this chat" is on offer.
+  final bool transcriptEnabled;
+
+  /// "Get the reply by email" is on offer.
+  final bool replyEmailEnabled;
+
+  const VisitorEmailState({
+    this.emailHint,
+    this.unsubscribed = false,
+    this.transcriptEnabled = false,
+    this.replyEmailEnabled = false,
+  });
+
+  factory VisitorEmailState.fromJson(Map<String, dynamic> j) {
+    final hint = j['emailHint'];
+    return VisitorEmailState(
+      emailHint: hint is String && hint.trim().isNotEmpty ? hint : null,
+      unsubscribed: j['unsubscribed'] == true,
+      // Absent on an older server, which offers neither.
+      transcriptEnabled: j['transcriptEnabled'] == true,
+      replyEmailEnabled: j['replyEmailEnabled'] == true,
+    );
+  }
+}
+
 /// Socket ack for `message:send`.
 class SendAck {
   final bool ok;
@@ -198,6 +291,59 @@ class SendAck {
       );
     }
     return const SendAck(ok: false, error: 'NO_ACK');
+  }
+}
+
+/// `message:reactions` — one message's reactions after someone changed them,
+/// as the visitor may see them (the whole list, not the change).
+class ReactionsEvent {
+  final String messageId;
+
+  /// The conversation it is in; empty when the server left it out.
+  final String conversationId;
+  final List<MessageReaction> reactions;
+
+  const ReactionsEvent({
+    required this.messageId,
+    this.conversationId = '',
+    required this.reactions,
+  });
+
+  /// Null for a payload that names no message.
+  static ReactionsEvent? tryParse(Map<String, dynamic> j) {
+    final id = j['messageId'];
+    if (id is! String || id.isEmpty) return null;
+    return ReactionsEvent(
+      messageId: id,
+      conversationId: (j['conversationId'] ?? '').toString(),
+      reactions: MessageReaction.listFrom(j['reactions']),
+    );
+  }
+}
+
+/// Socket ack for `message:react`: `{ ok: true, reactions }` — the message's
+/// list as the visitor sees it once the server applied theirs — or
+/// `{ ok: false, error }` (`NOT_REACTABLE`, `INVALID_EMOJI`,
+/// `MESSAGE_NOT_FOUND`, `RATE_LIMITED` past twenty in ten seconds, `FAILED`).
+class ReactionAck {
+  final bool ok;
+  final List<MessageReaction> reactions;
+  final String? error;
+
+  const ReactionAck(
+      {required this.ok, this.reactions = const [], this.error});
+
+  factory ReactionAck.fromAck(Object? raw) {
+    if (raw is Map) {
+      return ReactionAck(
+        // Truthy only, as the web reads it: an ack that does not say ok
+        // is not one.
+        ok: raw['ok'] == true,
+        reactions: MessageReaction.listFrom(raw['reactions']),
+        error: raw['error']?.toString(),
+      );
+    }
+    return const ReactionAck(ok: false, error: 'NO_ACK');
   }
 }
 

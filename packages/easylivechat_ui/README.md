@@ -11,7 +11,7 @@ core and re-exports it, so this is the only dependency you need.
 
 ```yaml
 dependencies:
-  easylivechat_ui: ^0.1.73
+  easylivechat_ui: ^0.1.74
 ```
 
 or
@@ -145,6 +145,35 @@ assistant's Yes / No when it offers to hand over, are one-tap buttons under
 the message, as in the web widget. Both follow your workspace's colours and
 the visitor's language and direction.
 
+**Reactions.** A long press on one of the team's messages opens the quick row
+(👍 ❤️ 😂 😮 😢 🙏) and a + for every emoji, by category, the visitor's recent
+ones first; the same emoji again takes it back. Chips under a bubble show the
+visitor's own reaction and the team's on theirs — never an agent's name — and
+change live. Screen readers get a "React" action on the message instead of the
+long press. Reacting needs a live connection and a workspace that takes
+messages, as on the web.
+
+**Link previews.** A link the server could preview gets a card under the
+bubble — the site, the title, a line of description, the picture — that opens
+in the visitor's browser. A picture that will not load simply goes. Your
+dashboard's switch turns them off.
+
+**Light and dark.** The chat follows your workspace's colour scheme: light,
+dark, or the device's own appearance. Dark is derived from your one light look,
+exactly as the web widget does it — your brand stays on the send button, the
+visitor's bubbles and the launcher; the surfaces become a dark ground and card
+with every text on them at AA or better. Every view follows: thread, composer,
+forms, survey, help screen, cards, notices, sheets, the launcher. A `themeOverride`
+still wins, in either scheme. The launcher takes your dashboard's size and, when
+you wrote some, the words beside its icon.
+
+**Closed, busy, queued.** While you are shut, a notice sits above the thread —
+your own notice when you wrote one, always; otherwise ours in the visitor's
+language, saying the assistant can help while it covers and when a person is
+back. The full closed screen says the same. A visitor waiting for a person sees
+their place and the expected wait above the conversation, which stays readable
+and writable underneath; it goes the moment somebody is there.
+
 ## Recipes
 
 ### Identify a signed-in user
@@ -239,6 +268,23 @@ Layout direction is deliberately *not* taken from the override — it follows th
 resolved locale, so a colours-only override cannot accidentally force an RTL
 workspace back to LTR.
 
+An override is used as given in light and dark alike. To follow your own app's
+dark mode, pass the scheme you are in — `primaryInk` (the brand as text: links,
+outlined buttons) and `danger` are optional, and `brightness` is read off the
+background when you leave it out:
+
+```dart
+EasyLiveChatTheme(
+  primary: scheme.primary,
+  background: scheme.surface,
+  surface: scheme.surfaceContainerHighest,
+  text: scheme.onSurface,
+  primaryInk: scheme.primary,
+  danger: scheme.error,
+  brightness: scheme.brightness,
+)
+```
+
 ### End the conversation
 
 Backing out of the screen does **not** end the chat — reopening resumes it with
@@ -294,6 +340,8 @@ Every widget takes `themeOverride`, `directionOverride`, `onPickAttachments`,
 | `EasyLiveChatEndChatButton` | Explicit end-chat action for an app bar |
 | `EasyLiveChatHelpScreen` | Help articles: search, reader, "Was this helpful?", start a chat. `onStartChat:`, `onOpenLink:`, `initialArticleId:` |
 | `ElcHelpMarkdown` | Renders a help article's markdown body natively (no HTML) |
+| `ElcLinkPreviewCard` | A message's link preview card, for your own thread |
+| `ElcReactionChips`, `ElcQuickReactions`, `showElcEmojiPicker` | Reaction chips, the quick row and the whole picker, for your own thread |
 | `SecurePrefsStorage` | Durable storage default (secure storage + shared prefs) |
 
 The core's API — `identify`, `clearIdentity`, `open`, `messages`,

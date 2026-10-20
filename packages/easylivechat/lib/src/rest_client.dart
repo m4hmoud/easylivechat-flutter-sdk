@@ -287,6 +287,62 @@ class RestClient {
     }
   }
 
+  /// `GET /:slug/visitor-email` — Bearer [token]: the address on the
+  /// visitor's contact, masked, and whether the workspace offers the emails.
+  Future<VisitorEmailState> getVisitorEmail({required String token}) async {
+    try {
+      final res = await _dio.get<dynamic>(
+        '$_base/$_slug/visitor-email',
+        options: Options(headers: _headers(token)),
+      );
+      if (!_ok(res.statusCode)) throwFor(res);
+      return VisitorEmailState.fromJson(_asMap(res.data));
+    } on DioException catch (e) {
+      throw _networkError(e);
+    }
+  }
+
+  /// `POST /:slug/visitor-email { email }` — Bearer [token]: "email me the
+  /// reply". Answers the address as stored, masked (`emailHint`).
+  Future<String> postVisitorEmail({
+    required String token,
+    required String email,
+  }) async {
+    try {
+      final res = await _dio.post<dynamic>(
+        '$_base/$_slug/visitor-email',
+        data: {'email': email},
+        options: Options(headers: _headers(token)),
+      );
+      if (!_ok(res.statusCode)) throwFor(res);
+      return (_asMap(res.data)['emailHint'] ?? '').toString();
+    } on DioException catch (e) {
+      throw _networkError(e);
+    }
+  }
+
+  /// `POST /:slug/conversations/:id/transcript { email? }` — Bearer [token];
+  /// the token's conversationId must equal [conversationId]. "Email me this
+  /// chat": to [email], or to the address on the contact when it is null.
+  /// Answers where it went, masked (`sentTo`).
+  Future<String> postTranscript({
+    required String token,
+    required String conversationId,
+    String? email,
+  }) async {
+    try {
+      final res = await _dio.post<dynamic>(
+        '$_base/$_slug/conversations/$conversationId/transcript',
+        data: {if (email != null && email.trim().isNotEmpty) 'email': email.trim()},
+        options: Options(headers: _headers(token)),
+      );
+      if (!_ok(res.statusCode)) throwFor(res);
+      return (_asMap(res.data)['sentTo'] ?? '').toString();
+    } on DioException catch (e) {
+      throw _networkError(e);
+    }
+  }
+
   /// `POST /:slug/push/register` — the device to notify when an agent replies
   /// and this app is closed. Authed by the widget token: the server takes the
   /// tenant and the contact from it, never from this body.

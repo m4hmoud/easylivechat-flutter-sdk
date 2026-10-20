@@ -3,15 +3,17 @@ import 'dart:math' as math;
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:easylivechat/easylivechat.dart';
-import 'package:flutter/material.dart';
+import 'package:flutter/material.dart' hide ConnectionState;
 
 import '../l10n.dart';
 import '../theme.dart';
 import 'bubble_shape.dart';
 import 'image_viewer.dart';
+import 'link_preview_view.dart';
 import 'linkified_text.dart';
 import 'message_card_view.dart';
 import 'quick_replies_view.dart';
+import 'reactions_view.dart';
 import 'voice_note_tile.dart';
 
 /// The message thread (native analog of the web `Thread.tsx`).
@@ -101,6 +103,9 @@ class _ThreadViewState extends State<ThreadView> {
     // The quick replies are disabled while the workspace takes no messages,
     // and that can change with the visitor already looking at them.
     EasyLiveChat.instance.visitorMode.addListener(_onVisitorMode);
+    // Reacting needs a live socket, as on the web: the quick row closes and
+    // the chips turn to labels while the connection is down.
+    EasyLiveChat.instance.connection.addListener(_onVisitorMode);
     // Older history loads as the visitor scrolls up, and only then.
     //
     // It used to also pull one page the moment the thread appeared. That made
@@ -119,6 +124,7 @@ class _ThreadViewState extends State<ThreadView> {
   void dispose() {
     EasyLiveChat.instance.messages.removeListener(_onMessages);
     EasyLiveChat.instance.visitorMode.removeListener(_onVisitorMode);
+    EasyLiveChat.instance.connection.removeListener(_onVisitorMode);
     _scroll.removeListener(_onScroll);
     _scroll.dispose();
     super.dispose();
@@ -127,6 +133,10 @@ class _ThreadViewState extends State<ThreadView> {
   void _onVisitorMode() {
     if (mounted) setState(() {});
   }
+
+  bool get _canReact =>
+      EasyLiveChat.instance.connection.value == ConnectionState.connected &&
+      !EasyLiveChat.instance.composerLocked;
 
   void _onMessages() {
     final msgs = EasyLiveChat.instance.messages.value;
@@ -213,7 +223,8 @@ class _ThreadViewState extends State<ThreadView> {
 
   /// A tap on a reply button (under a message, or on its card): sent with the
   /// button's id, so the server records which one was meant.
-  Future<void> _sendButton(ChatMessage message, String buttonId, String label) async {
+  Future<void> _sendButton(
+      ChatMessage message, String buttonId, String label) async {
     if (widget.onQuickReply == null || _sendingQuickReply) return;
     // Asked again at the moment of the tap, as for quick replies.
     if (!buttonsOpen(EasyLiveChat.instance.messages.value, message.id)) return;
@@ -310,8 +321,9 @@ class _ThreadViewState extends State<ThreadView> {
                               : const <String>[];
                           final open =
                               hasButtons && buttonsOpen(messages, m.id);
-                          final chosen =
-                              hasButtons ? chosenButtonId(messages, m.id) : null;
+                          final chosen = hasButtons
+                              ? chosenButtonId(messages, m.id)
+                              : null;
                           return MessageBubble(
                             key: ValueKey(m.id),
                             message: m,
@@ -337,6 +349,15 @@ class _ThreadViewState extends State<ThreadView> {
                                 ? null
                                 : (id, label) =>
                                     unawaited(_sendButton(m, id, label)),
+                            // While connected, and while the workspace takes
+                            // messages — the web widget's rule.
+                            onReact: _canReact
+                                ? (emoji) => unawaited(
+                                    EasyLiveChat.instance.react(m, emoji))
+                                : null,
+                            showLinkPreview: EasyLiveChat.instance.widgetConfig
+                                    .value?.linkPreviews ??
+                                true,
                           );
                         }
                         // Trailing typing indicator — named for the assistant
@@ -433,6 +454,16 @@ class MessageBubble extends StatelessWidget {
   /// is under way).
   final void Function(String id, String label)? onButton;
 
+  /// Sets the visitor's reaction on this message to an emoji, or takes it
+  /// back (null) — `EasyLiveChat.react`. Given, a long press on one of the
+  /// team's messages ([ChatMessage.canReact]) opens the quick row, and the
+  /// visitor's own chip takes theirs back. Null: the chips are labels only.
+  final void Function(String? emoji)? onReact;
+
+  /// Draw the link's preview card under the bubble (`ChatMessage.linkPreview`)
+  /// — the workspace's `linkPreviews` switch.
+  final bool showLinkPreview;
+
   const MessageBubble({
     super.key,
     required this.message,
@@ -446,6 +477,8 @@ class MessageBubble extends StatelessWidget {
     this.showButtons = false,
     this.chosenButtonId,
     this.onButton,
+    this.onReact,
+    this.showLinkPreview = true,
   });
 
   bool get _isCustomer => message.isFromCustomer;
@@ -506,7 +539,7 @@ class MessageBubble extends StatelessWidget {
                     fontSize: 11,
                     fontWeight: FontWeight.w500,
                     color: started
-                        ? theme.primary
+                        ? theme.primaryInk
                         : theme.text.withValues(alpha: 0.55),
                   ),
                 ),
@@ -591,6 +624,89 @@ class MessageBubble extends StatelessWidget {
     final maxBubble =
         MediaQuery.of(context).size.width * (withAvatar ? 0.68 : 0.78);
 
+    // A card draws as a card, and only as a card: its body is the
+    // plain-text version for clients that can't draw one, and its
+    // attachment is the card's own image — drawing either as well would
+    // say it all twice.
+    // A CARD message whose card doesn't validate falls through to the
+    // bubble and reads as that text, like every other client.
+    final Widget? main = cards.length > 1
+        ? ElcCardCarousel(
+            cards: cards,
+            theme: theme,
+            semanticLabel: strings.cards,
+            chosenReplyId: buttons == null ? null : chosenButtonId,
+            onReply: buttons == null ? null : answer,
+          )
+        : cards.length == 1
+            ? ElcMessageCardView(
+                card: cards.first,
+                theme: theme,
+                maxWidth: maxBubble,
+                chosenReplyId: buttons == null ? null : chosenButtonId,
+                onReply: buttons == null ? null : answer,
+              )
+            // Buttons with no words of their own: just the buttons, no empty bubble.
+            : chips == null || body.isNotEmpty || tiles.isNotEmpty
+                ? ConstrainedBox(
+                    constraints: BoxConstraints(
+                      maxWidth: maxBubble,
+                    ),
+                    child: Container(
+                      // A message that is only self-drawn media gets no bubble. The
+                      // bubble exists to put a surface behind text; wrapped around a
+                      // photo or a voice note it becomes a second card around a first
+                      // one — on the visitor's own side the full accent colour, so
+                      // their own images arrived matted in orange and their own
+                      // recording in a teal frame.
+                      padding: _isBareMedia
+                          ? EdgeInsets.zero
+                          : const EdgeInsets.symmetric(
+                              horizontal: 14, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: _isBareMedia ? Colors.transparent : bubbleColor,
+                        borderRadius:
+                            ElcBubbleShape.radius(fromCustomer: _isCustomer),
+                        border: _isCustomer || _isBareMedia
+                            ? null
+                            : ElcBubbleShape.teamBorder(theme),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (tiles.isNotEmpty) ...[
+                            ...tiles,
+                            if (body.isNotEmpty) const SizedBox(height: 8),
+                          ],
+                          if (body.isNotEmpty)
+                            LinkifiedText(
+                              text: body,
+                              style: TextStyle(
+                                  color: textColor, fontSize: 15, height: 1.35),
+                              // On the accent-colored customer bubble the accent is the
+                              // background, so a link there keeps the bubble's own
+                              // foreground and relies on the underline; agent bubbles
+                              // sit on `surface`, where the accent reads correctly.
+                              linkColor:
+                                  _isCustomer ? textColor : theme.primaryInk,
+                            ),
+                          // Attachment-only message with no resolvable media still
+                          // needs *something* visible so it never renders empty.
+                          if (body.isEmpty && tiles.isEmpty)
+                            Text(
+                              strings.attachment,
+                              style: TextStyle(
+                                  color: textColor.withValues(alpha: 0.7),
+                                  fontSize: 14,
+                                  fontStyle: FontStyle.italic),
+                            ),
+                        ],
+                      ),
+                    ),
+                  )
+                : null;
+
     final column = Column(
       crossAxisAlignment: align,
       children: [
@@ -632,83 +748,24 @@ class MessageBubble extends StatelessWidget {
               ),
             ),
           ),
-        // A card draws as a card, and only as a card: its body is the
-        // plain-text version for clients that can't draw one, and its
-        // attachment is the card's own image — drawing either as well would
-        // say it all twice.
-        // A CARD message whose card doesn't validate falls through to the
-        // bubble and reads as that text, like every other client.
-        if (cards.length > 1)
-          ElcCardCarousel(
-            cards: cards,
+        if (main != null)
+          // The team's messages take a reaction once the server has them.
+          ElcReactable(
             theme: theme,
-            semanticLabel: strings.cards,
-            chosenReplyId: buttons == null ? null : chosenButtonId,
-            onReply: buttons == null ? null : answer,
-          )
-        else if (cards.length == 1)
-          ElcMessageCardView(
-            card: cards.first,
+            strings: strings,
+            mine: message.myReaction,
+            onPick: onReact != null && message.canReact
+                ? (emoji) => onReact!(message.toggledReaction(emoji))
+                : null,
+            child: main,
+          ),
+        // The link's preview, made by the server. Not on a card, which has
+        // its own picture and buttons.
+        if (cards.isEmpty && showLinkPreview && message.linkPreview != null)
+          ElcLinkPreviewCard(
+            preview: message.linkPreview!,
             theme: theme,
             maxWidth: maxBubble,
-            chosenReplyId: buttons == null ? null : chosenButtonId,
-            onReply: buttons == null ? null : answer,
-          )
-        // Buttons with no words of their own: just the buttons, no empty bubble.
-        else if (chips == null || body.isNotEmpty || tiles.isNotEmpty)
-          ConstrainedBox(
-            constraints: BoxConstraints(
-              maxWidth: maxBubble,
-            ),
-            child: Container(
-              // A message that is only self-drawn media gets no bubble. The
-              // bubble exists to put a surface behind text; wrapped around a
-              // photo or a voice note it becomes a second card around a first
-              // one — on the visitor's own side the full accent colour, so
-              // their own images arrived matted in orange and their own
-              // recording in a teal frame.
-              padding: _isBareMedia
-                  ? EdgeInsets.zero
-                  : const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-              decoration: BoxDecoration(
-                color: _isBareMedia ? Colors.transparent : bubbleColor,
-                borderRadius: ElcBubbleShape.radius(fromCustomer: _isCustomer),
-                border: _isCustomer || _isBareMedia
-                    ? null
-                    : ElcBubbleShape.teamBorder(theme),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  if (tiles.isNotEmpty) ...[
-                    ...tiles,
-                    if (body.isNotEmpty) const SizedBox(height: 8),
-                  ],
-                  if (body.isNotEmpty)
-                    LinkifiedText(
-                      text: body,
-                      style:
-                          TextStyle(color: textColor, fontSize: 15, height: 1.35),
-                      // On the accent-colored customer bubble the accent is the
-                      // background, so a link there keeps the bubble's own
-                      // foreground and relies on the underline; agent bubbles
-                      // sit on `surface`, where the accent reads correctly.
-                      linkColor: _isCustomer ? textColor : theme.primary,
-                    ),
-                  // Attachment-only message with no resolvable media still
-                  // needs *something* visible so it never renders empty.
-                  if (body.isEmpty && tiles.isEmpty)
-                    Text(
-                      strings.attachment,
-                      style: TextStyle(
-                          color: textColor.withValues(alpha: 0.7),
-                          fontSize: 14,
-                          fontStyle: FontStyle.italic),
-                    ),
-                ],
-              ),
-            ),
           ),
         if (chips != null)
           ConstrainedBox(
@@ -721,7 +778,8 @@ class MessageBubble extends StatelessWidget {
               onSelected: answer == null
                   ? null
                   : (label) {
-                      final b = chips.buttons.firstWhere((b) => b.label == label);
+                      final b =
+                          chips.buttons.firstWhere((b) => b.label == label);
                       answer(b.id, b.label);
                     },
             ),
@@ -736,6 +794,16 @@ class MessageBubble extends StatelessWidget {
               onSelected: onQuickReply,
             ),
           ),
+        // The visitor's own reaction on the team's messages, the team's on
+        // theirs. Their own chip takes it back.
+        ElcReactionChips(
+          reactions: message.reactions,
+          theme: theme,
+          strings: strings,
+          fromCustomer: _isCustomer,
+          onRemoveMine:
+              onReact != null && message.canReact ? () => onReact!(null) : null,
+        ),
         const SizedBox(height: 2),
         _meta(textColorMuted: theme.text.withValues(alpha: 0.45)),
       ],
@@ -804,11 +872,11 @@ class MessageBubble extends StatelessWidget {
                 .catchError((_) => '');
           },
           child: Text(strings.sendFailedRetry,
-              style: const TextStyle(
-                color: _ThreadErrorColor.color,
+              style: TextStyle(
+                color: theme.danger,
                 fontSize: 10,
                 decoration: TextDecoration.underline,
-                decorationColor: _ThreadErrorColor.color,
+                decorationColor: theme.danger,
               )),
         ));
     } else if (receipt != null) {
@@ -817,7 +885,7 @@ class MessageBubble extends StatelessWidget {
         ..add(_ReceiptTicks(
           receipt: receipt,
           mutedColor: textColorMuted,
-          readColor: theme.primary,
+          readColor: theme.primaryInk,
           strings: strings,
         ));
     }
@@ -1162,7 +1230,7 @@ class _AgentAvatar extends StatelessWidget {
       child: Text(
         initial,
         style: TextStyle(
-          color: theme.primary,
+          color: theme.primaryInk,
           fontSize: 12,
           fontWeight: FontWeight.w700,
         ),
@@ -1271,11 +1339,6 @@ class _TypingRowState extends State<_TypingRow>
       ),
     );
   }
-}
-
-/// Destructive color for failed-send markers (kept local to the thread view).
-abstract final class _ThreadErrorColor {
-  static const Color color = Color(0xFFDC2626);
 }
 
 /// The visitor's own send status, in the idiom every messaging app uses:
@@ -1435,6 +1498,72 @@ class _PostChatCard extends StatelessWidget {
   }
 }
 
+/// What a screen reader is told when the team writes — the web widget's
+/// polite live region (apps/widget/src/lib/announce.ts): the newest message
+/// from the team, as "Sara: Hello", or "New message: Hello" when the
+/// workspace hides names. Nothing for the visitor's own words, for system
+/// notices, or for history — only messages that arrive while the thread is
+/// up. Draws nothing.
+class ElcThreadAnnouncer extends StatefulWidget {
+  final ElcStrings strings;
+  final TextDirection direction;
+
+  const ElcThreadAnnouncer(
+      {super.key, required this.strings, required this.direction});
+
+  /// What to say for [m], or null for nothing.
+  @visibleForTesting
+  static String? announcementFor(ChatMessage m, ElcStrings strings) {
+    if (m.isFromCustomer || m.senderType == SenderType.system) return null;
+    final text = (m.body ?? '').replaceAll(RegExp(r'\s+'), ' ').trim();
+    if (text.isEmpty) return null;
+    // Long replies are cut, not read out whole.
+    final message = String.fromCharCodes(text.runes.take(300));
+    final name = m.senderName?.trim() ?? '';
+    return name.isEmpty
+        ? strings.incomingMessageUnnamed.replaceAll('{message}', message)
+        : strings.incomingMessage
+            .replaceAll('{name}', name)
+            .replaceAll('{message}', message);
+  }
+
+  @override
+  State<ElcThreadAnnouncer> createState() => _ElcThreadAnnouncerState();
+}
+
+class _ElcThreadAnnouncerState extends State<ElcThreadAnnouncer> {
+  StreamSubscription<ChatMessage>? _sub;
+  String? _said;
+
+  @override
+  void initState() {
+    super.initState();
+    if (!EasyLiveChat.instance.isBooted) return;
+    _sub = EasyLiveChat.instance.onMessage.listen((m) {
+      final said = ElcThreadAnnouncer.announcementFor(m, widget.strings);
+      if (said != null && mounted) setState(() => _said = said);
+    });
+  }
+
+  @override
+  void dispose() {
+    _sub?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // A live region the platform reads out when its words change; not the
+    // whole list, which would read out every page of history.
+    return Semantics(
+      container: true,
+      liveRegion: true,
+      label: _said ?? '',
+      textDirection: widget.direction,
+      child: const SizedBox.shrink(),
+    );
+  }
+}
 
 /// The small "AI" pill beside an assistant message's sender name.
 @visibleForTesting
@@ -1455,7 +1584,7 @@ class AiBadge extends StatelessWidget {
       child: Text(
         label,
         style: TextStyle(
-          color: theme.primary,
+          color: theme.primaryInk,
           fontSize: 10,
           fontWeight: FontWeight.w700,
           height: 1.2,

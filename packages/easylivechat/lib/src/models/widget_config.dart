@@ -1,7 +1,60 @@
 import '../errors.dart';
 import 'enums.dart';
+import 'js_text.dart';
 import 'post_chat_form.dart';
 import 'pre_chat_form.dart';
+
+/// The look a workspace chose for its chat: light, dark, or following the
+/// visitor's device (`auto`).
+///
+/// Dark is never designed twice. A workspace sets one look — its primary,
+/// background and text colours — and almost always for a light page; the dark
+/// one is derived from it (the brand fills kept, the light surfaces swapped
+/// for a dark ground and card). See `EasyLiveChatTheme.fromConfig` in
+/// `easylivechat_ui`, which does that the way the web widget does.
+enum WidgetColorScheme {
+  light,
+  dark,
+
+  /// Follow the device's appearance — the setting a new workspace starts on.
+  auto;
+
+  /// The scheme a config asks for. A server older than the setting sends
+  /// nothing, which reads as [light] — what every chat was before it — so a
+  /// missing field never changes anyone's look. Workspaces that existed when
+  /// it arrived were kept on light too; new ones start on [auto].
+  static WidgetColorScheme fromWire(Object? w) => switch (w) {
+        'dark' => dark,
+        'auto' => auto,
+        _ => light,
+      };
+
+  /// Light or dark, given the device's own setting. Only [auto] asks it.
+  bool resolveDark({required bool deviceDark}) => switch (this) {
+        light => false,
+        dark => true,
+        auto => deviceDark,
+      };
+}
+
+/// The launcher's size — the web loader's `LAUNCHER_PX`. [medium] is the 56
+/// it always was.
+enum LauncherSize {
+  small(48),
+  medium(56),
+  large(64);
+
+  /// The launcher's diameter (and the pill's height) in logical pixels.
+  final double diameter;
+  const LauncherSize(this.diameter);
+
+  /// [medium] for anything else, so an older server draws what it always did.
+  static LauncherSize fromWire(Object? w) => switch (w) {
+        'small' => small,
+        'large' => large,
+        _ => medium,
+      };
+}
 
 /// The full `WidgetConfig` row returned by `GET /:slug/config`, plus the
 /// resolved [preChatForm]. Drives all theming/locale/RTL and feature toggles.
@@ -23,10 +76,43 @@ class WidgetConfigModel {
   /// Flutter). Hosts override via the UI theme instead.
   final String? customCss;
 
+  /// Light, dark, or following the device — see [WidgetColorScheme];
+  /// [WidgetColorScheme.light] when an older server leaves it out.
+  final WidgetColorScheme colorScheme;
+
+  /// A few words beside the launcher's icon ("Chat with us"), in the
+  /// visitor's language — the server resolves the translation — or null for
+  /// the plain round launcher. One line, at most 40 characters.
+  final String? launcherLabel;
+
+  /// How big the launcher is; [LauncherSize.medium] when an older server
+  /// leaves it out.
+  final LauncherSize launcherSize;
+
+  /// Whether a link in a message shows its preview card
+  /// (`ChatMessage.linkPreview`). The workspace's switch; true when an older
+  /// server leaves it out, as on the web — a preview it never made is simply
+  /// absent.
+  final bool linkPreviews;
+
   // Copy
   final String welcomeTitle;
   final String welcomeSubtitle;
+
+  /// The leave-a-message prompt from the widget copy settings. NOT the closed
+  /// notice — that is [offlineInfoText]. This column carries a schema default
+  /// nobody typed ("We're offline — leave us a message."), so showing it as
+  /// the notice put English in front of every visitor and invited a message
+  /// from workspaces that take none.
   final String offlineMessage;
+
+  /// The business's own closed notice (Settings → Availability), in the
+  /// visitor's language, or null when nobody wrote one. When set it ALWAYS
+  /// wins — on the banner above the thread and on the closed screen alike,
+  /// whatever the mode and whether or not the assistant covers. Without one,
+  /// the client words the notice itself: closed or busy, the assistant's
+  /// version while it answers, the reopening time.
+  final String? offlineInfoText;
 
   /// Stands in for `%name%` when the visitor hasn't identified. Set by the
   /// tenant as "Default customer name".
@@ -72,9 +158,14 @@ class WidgetConfigModel {
     this.logoUrl,
     this.soundUrl,
     this.customCss,
+    this.colorScheme = WidgetColorScheme.light,
+    this.launcherLabel,
+    this.launcherSize = LauncherSize.medium,
+    this.linkPreviews = true,
     required this.welcomeTitle,
     required this.welcomeSubtitle,
     required this.offlineMessage,
+    this.offlineInfoText,
     this.defaultCustomerName,
     required this.position,
     required this.locale,
@@ -103,9 +194,14 @@ class WidgetConfigModel {
       logoUrl: j['logoUrl'] as String?,
       soundUrl: j['soundUrl'] as String?,
       customCss: j['customCss'] as String?,
+      colorScheme: WidgetColorScheme.fromWire(j['colorScheme']),
+      launcherLabel: _launcherWords(j['launcherLabel']),
+      launcherSize: LauncherSize.fromWire(j['launcherSize']),
+      linkPreviews: j['linkPreviews'] != false,
       welcomeTitle: s('welcomeTitle', 'Chat with us'),
       welcomeSubtitle: s('welcomeSubtitle', "We're here to help"),
       offlineMessage: s('offlineMessage', "We're offline — leave a message"),
+      offlineInfoText: _trimmedOrNull(j['offlineInfoText']),
       defaultCustomerName: (j['defaultCustomerName'] as String?)?.trim(),
       position: s('position', 'bottom-right'),
       locale: s('locale', 'en'),
@@ -204,6 +300,16 @@ class WorkspaceAvailability {
   }
 }
 
+/// The launcher's words as the shared `cleanLauncherLabel` keeps them: one
+/// line, at most 40 characters, null when there is nothing to show.
+String? _launcherWords(Object? v) {
+  if (v is! String) return null;
+  final one = jsTrim(jsCollapseWhitespace(v));
+  if (one.isEmpty) return null;
+  final capped = jsTrim(String.fromCharCodes(one.runes.take(40)));
+  return capped.isEmpty ? null : capped;
+}
+
 String? _trimmedOrNull(Object? v) {
   if (v is! String) return null;
   final t = v.trim();
@@ -261,6 +367,14 @@ class ConfigResponse {
   /// [WorkspaceAvailability.assistantCovers].
   final bool assistantCovers;
 
+  /// "Email me this chat" is on offer (`EasyLiveChat.emailTranscript`).
+  /// False when an older server leaves it out: not offered.
+  final bool transcriptEmailEnabled;
+
+  /// "Get the reply by email" is on offer (`EasyLiveChat.setVisitorEmail`) —
+  /// ask for an address while nobody can answer. False when absent.
+  final bool replyEmailEnabled;
+
   const ConfigResponse({
     required this.tenantId,
     required this.config,
@@ -275,6 +389,8 @@ class ConfigResponse {
     this.nextOpenLocal,
     this.timezone,
     this.assistantCovers = false,
+    this.transcriptEmailEnabled = false,
+    this.replyEmailEnabled = false,
   });
 
   /// True when the tenant chose to show a notice and take nothing.
@@ -322,6 +438,8 @@ class ConfigResponse {
       nextOpenLocal: _trimmedOrNull(j['nextOpenLocal']),
       timezone: _trimmedOrNull(j['timezone']),
       assistantCovers: j['assistantCovers'] == true,
+      transcriptEmailEnabled: j['transcriptEmailEnabled'] == true,
+      replyEmailEnabled: j['replyEmailEnabled'] == true,
     );
   }
 }

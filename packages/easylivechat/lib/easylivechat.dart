@@ -21,6 +21,15 @@ export 'src/storage.dart'
 export 'src/models/enums.dart';
 export 'src/models/chat_message.dart';
 export 'src/models/message_card.dart' show MessageCard, MessageCardButton;
+export 'src/models/link_preview.dart' show LinkPreview;
+export 'src/models/reactions.dart'
+    show
+        MessageReaction,
+        ReactionBy,
+        ReactionGroup,
+        groupReactions,
+        quickReactions,
+        sameEmoji;
 export 'src/models/bot_buttons.dart'
     show BotButton, BotButtons, BotReply, buttonsOpen, chosenButtonId;
 export 'src/models/quick_replies.dart'

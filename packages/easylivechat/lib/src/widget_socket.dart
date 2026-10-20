@@ -30,6 +30,8 @@ class WidgetSocket {
   final _onMessageNew = StreamController<ChatMessage>.broadcast();
   final _onMessageUpdated = StreamController<ChatMessage>.broadcast();
   final _onMessageDeleted = StreamController<DeletedMessage>.broadcast();
+  final _onReactions = StreamController<ReactionsEvent>.broadcast();
+  final _onQueue = StreamController<QueueStatus?>.broadcast();
   final _onAgentTyping = StreamController<bool>.broadcast();
   final _onAssistantTyping = StreamController<bool>.broadcast();
   final _onAvailability = StreamController<bool>.broadcast();
@@ -52,6 +54,17 @@ class WidgetSocket {
   /// `message:deleted` — `{ id, conversationId }`: an agent unsent a message.
   /// The message leaves the thread with no placeholder.
   Stream<DeletedMessage> get onMessageDeleted => _onMessageDeleted.stream;
+
+  /// `message:reactions` — `{ conversationId, messageId, reactions }`: a
+  /// message's reactions changed (the visitor's own, from another device, or
+  /// the team's on theirs). The visitor's view of the whole list, to replace
+  /// by id. Never a message: no unread, no chime.
+  Stream<ReactionsEvent> get onReactions => _onReactions.stream;
+
+  /// The visitor's place while they wait for a person: `queue:update`, and
+  /// null once the chat is assigned (`queue:update { assigned }` or
+  /// `conversation:assigned`).
+  Stream<QueueStatus?> get onQueue => _onQueue.stream;
 
   /// `agent:typing` — payload is `{ isTyping }` only; never an explicit false,
   /// so the controller arms a ~4s auto-clear.
@@ -178,6 +191,21 @@ class WidgetSocket {
           conversationId: (m?['conversationId'] ?? '').toString(),
         ));
       }
+    });
+
+    socket.on('message:reactions', (data) {
+      final m = _asMap(data);
+      final event = m == null ? null : ReactionsEvent.tryParse(m);
+      if (event != null && !_onReactions.isClosed) _onReactions.add(event);
+    });
+
+    socket.on('queue:update', (data) {
+      final m = _asMap(data);
+      if (m != null && !_onQueue.isClosed) _onQueue.add(QueueStatus.fromUpdate(m));
+    });
+
+    socket.on('conversation:assigned', (_) {
+      if (!_onQueue.isClosed) _onQueue.add(null);
     });
 
     socket.on('agent:typing', (data) {
@@ -315,6 +343,26 @@ class WidgetSocket {
     }
   }
 
+  /// Emit `message:react { messageId, emoji }` and await the ack — the
+  /// visitor reacts to one of the team's messages with [emoji], or takes
+  /// theirs back with null. One per person per message: another emoji
+  /// replaces theirs.
+  Future<ReactionAck> react({required String messageId, String? emoji}) async {
+    final socket = _socket;
+    if (socket == null || !socket.connected) {
+      return const ReactionAck(ok: false, error: 'NOT_CONNECTED');
+    }
+    try {
+      final raw = await socket.emitWithAckAsync('message:react', {
+        'messageId': messageId,
+        'emoji': emoji,
+      }).timeout(const Duration(seconds: 15), onTimeout: () => null);
+      return ReactionAck.fromAck(raw);
+    } catch (e) {
+      return ReactionAck(ok: false, error: _describeError(e));
+    }
+  }
+
   /// Emit `typing { isTyping }` (caller debounces).
   void setTyping(bool isTyping) {
     _socket?.emit('typing', {'isTyping': isTyping});
@@ -372,6 +420,8 @@ class WidgetSocket {
     _onMessageNew.close();
     _onMessageUpdated.close();
     _onMessageDeleted.close();
+    _onReactions.close();
+    _onQueue.close();
     _onAgentTyping.close();
     _onAssistantTyping.close();
     _onAvailability.close();

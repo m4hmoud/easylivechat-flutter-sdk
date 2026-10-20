@@ -185,7 +185,8 @@ class _CardButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final accent = theme.primary;
+    // The brand as ink on the card: it has to read in dark as well.
+    final accent = theme.primaryInk;
     // One node per button — a link, named by its label — rather than folded
     // into the card or into the button beside it.
     return Semantics(
@@ -238,12 +239,13 @@ class _ReplyButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Filled with the brand once chosen; until then the brand as ink.
     final accent = theme.primary;
-    final onAccent =
-        accent.computeLuminance() > 0.5 ? const Color(0xFF0F172A) : Colors.white;
+    final ink = theme.primaryInk;
+    final onAccent = theme.onPrimary;
     final fg = chosen
         ? onAccent
-        : accent.withValues(alpha: onPressed == null || dimmed ? 0.5 : 1);
+        : ink.withValues(alpha: onPressed == null || dimmed ? 0.5 : 1);
     return Semantics(
       container: true,
       button: true,

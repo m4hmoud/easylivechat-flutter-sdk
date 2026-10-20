@@ -169,7 +169,7 @@ class _PostChatFormViewState extends State<PostChatFormView> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.check_circle_outline, size: 44, color: t.primary),
+            Icon(Icons.check_circle_outline, size: 44, color: t.primaryInk),
             const SizedBox(height: 14),
             Text(
               _s.thanksForFeedback,
@@ -181,7 +181,7 @@ class _PostChatFormViewState extends State<PostChatFormView> {
             // was terminal: the survey submitted and then simply sat there.
             TextButton(
               onPressed: _leave,
-              child: Text(_s.closeChat, style: TextStyle(color: t.primary)),
+              child: Text(_s.closeChat, style: TextStyle(color: t.primaryInk)),
             ),
           ],
         ),
@@ -212,7 +212,7 @@ class _PostChatFormViewState extends State<PostChatFormView> {
           if (_formError != null) ...[
             Text(
               _formError!,
-              style: const TextStyle(color: _ErrorColor.color, fontSize: 13),
+              style: TextStyle(color: _theme.danger, fontSize: 13),
             ),
             const SizedBox(height: 12),
           ],
@@ -276,7 +276,7 @@ class _PostChatFormViewState extends State<PostChatFormView> {
                           ? Icons.star_rounded
                           : Icons.star_border_rounded,
                       color: star <= current
-                          ? t.primary
+                          ? t.primaryInk
                           : t.text.withValues(alpha: 0.35),
                     ),
                   ),
@@ -312,6 +312,7 @@ class _PostChatFormViewState extends State<PostChatFormView> {
                   Checkbox(
                     value: checked,
                     activeColor: t.primary,
+                    checkColor: t.onPrimary,
                     onChanged: _submitting
                         ? null
                         : (v) {
@@ -392,6 +393,9 @@ class _PostChatFormViewState extends State<PostChatFormView> {
           maxLines: multiline ? 4 : 1,
           minLines: multiline ? 3 : 1,
           style: TextStyle(color: t.text, fontSize: 15),
+          cursorColor: t.primaryInk,
+          // The dark keyboard on iOS while the chat is dark.
+          keyboardAppearance: t.brightness,
           autovalidateMode: AutovalidateMode.onUserInteraction,
           validator: (_) => _localValidate(f),
           decoration: InputDecoration(
@@ -403,10 +407,10 @@ class _PostChatFormViewState extends State<PostChatFormView> {
             contentPadding:
                 const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
             enabledBorder: _border(t.text.withValues(alpha: 0.15)),
-            focusedBorder: _border(t.primary, width: 1.5),
-            errorBorder: _border(_ErrorColor.color),
-            focusedErrorBorder: _border(_ErrorColor.color, width: 1.5),
-            errorStyle: const TextStyle(color: _ErrorColor.color),
+            focusedBorder: _border(t.primaryInk, width: 1.5),
+            errorBorder: _border(t.danger),
+            focusedErrorBorder: _border(t.danger, width: 1.5),
+            errorStyle: TextStyle(color: t.danger),
           ),
         ),
       ],
@@ -484,7 +488,7 @@ class _PostChatFormViewState extends State<PostChatFormView> {
         padding: const EdgeInsets.only(top: 6),
         child: Text(
           msg,
-          style: const TextStyle(color: _ErrorColor.color, fontSize: 12),
+          style: TextStyle(color: _theme.danger, fontSize: 12),
         ),
       );
 
@@ -513,12 +517,6 @@ class _PostChatFormViewState extends State<PostChatFormView> {
       bg.computeLuminance() > 0.5 ? const Color(0xFF0F172A) : Colors.white;
 }
 
-/// Matches the pre-chat form's error red rather than the theme, which has no
-/// error colour of its own.
-abstract final class _ErrorColor {
-  static const color = Color(0xFFDC2626);
-}
-
 /// One tappable answer in a select question.
 ///
 /// The whole row is the target, not just the little circle — on a phone the
@@ -544,9 +542,9 @@ class _RadioRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final border = hasError
-        ? _ErrorColor.color
+        ? theme.danger
         : selected
-            ? theme.primary
+            ? theme.primaryInk
             : theme.text.withValues(alpha: 0.25);
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
@@ -576,7 +574,7 @@ class _RadioRow extends StatelessWidget {
                     shape: BoxShape.circle,
                     border: Border.all(
                       color: selected
-                          ? theme.primary
+                          ? theme.primaryInk
                           : theme.text.withValues(alpha: 0.35),
                       width: 2,
                     ),
@@ -588,7 +586,7 @@ class _RadioRow extends StatelessWidget {
                             height: 10,
                             decoration: BoxDecoration(
                               shape: BoxShape.circle,
-                              color: theme.primary,
+                              color: theme.primaryInk,
                             ),
                           ),
                         )

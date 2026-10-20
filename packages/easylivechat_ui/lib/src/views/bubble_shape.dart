@@ -25,7 +25,9 @@ abstract final class ElcBubbleShape {
       );
 
   /// The team's messages sit on the neutral surface, lifted off the thread by
-  /// a hairline. (The visitor's own sit on the accent and need none.)
-  static Border teamBorder(EasyLiveChatTheme theme) =>
-      Border.all(color: theme.text.withValues(alpha: 0.08));
+  /// a hairline. (The visitor's own sit on the accent and need none.) A shade
+  /// firmer in dark, where the light theme's soft contrast does not show — the
+  /// web's `#34363c` on its dark card.
+  static Border teamBorder(EasyLiveChatTheme theme) => Border.all(
+      color: theme.text.withValues(alpha: theme.isDark ? 0.12 : 0.08));
 }

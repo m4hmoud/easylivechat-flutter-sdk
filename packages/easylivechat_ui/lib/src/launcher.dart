@@ -2,8 +2,10 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:easylivechat/easylivechat.dart';
 import 'package:flutter/material.dart';
 
+import 'bidi.dart';
 import 'chat_screen.dart';
 import 'chime.dart';
+import 'l10n.dart';
 import 'picked_file.dart';
 import 'theme.dart';
 
@@ -21,6 +23,11 @@ import 'theme.dart';
 /// ```
 /// On tap it lazily opens the session (`EasyLiveChat.instance.open()`) and
 /// pushes an [EasyLiveChatScreen].
+///
+/// The workspace's launcher options apply as on the web: its size
+/// (`WidgetConfigModel.launcherSize` — 48, 56 or 64) and, when it wrote some,
+/// a few words beside the icon (`launcherLabel`), which turn the circle into a
+/// pill. The bubble is the brand colour in light and dark alike.
 class EasyLiveChatLauncher extends StatefulWidget {
   /// Host theme override; non-null fields win over the server config.
   final EasyLiveChatTheme? themeOverride;
@@ -88,10 +95,13 @@ class _EasyLiveChatLauncherState extends State<EasyLiveChatLauncher> {
         : Alignment.bottomRight;
   }
 
-  EasyLiveChatTheme _resolveTheme(WidgetConfigModel? config) {
+  EasyLiveChatTheme _resolveTheme(
+      BuildContext context, WidgetConfigModel? config) {
     if (config != null) {
       return EasyLiveChatTheme.fromConfig(config,
-          override: widget.themeOverride);
+          override: widget.themeOverride,
+          platformBrightness: MediaQuery.maybePlatformBrightnessOf(context) ??
+              Brightness.light);
     }
     // Pre-boot fallback so the bubble can paint before config loads.
     return widget.themeOverride ??
@@ -167,41 +177,88 @@ class _EasyLiveChatLauncherState extends State<EasyLiveChatLauncher> {
     // boot there is no config notifier to listen to, so paint the fallback
     // bubble directly (a later rebuild re-reads `isBooted`).
     if (!EasyLiveChat.instance.isBooted) {
-      return _buildScaffold(null);
+      return _buildScaffold(context, null);
     }
     return ValueListenableBuilder<WidgetConfigModel?>(
       valueListenable: EasyLiveChat.instance.widgetConfig,
-      builder: (context, config, _) => _buildScaffold(config),
+      builder: (context, config, _) => _buildScaffold(context, config),
     );
   }
 
-  Widget _buildScaffold(WidgetConfigModel? config) {
-    final theme = _resolveTheme(config);
+  Widget _buildScaffold(BuildContext context, WidgetConfigModel? config) {
+    final theme = _resolveTheme(context, config);
     final alignment = _alignmentFromConfig(config);
     return SafeArea(
       child: Align(
         alignment: alignment,
         child: Padding(
           padding: const EdgeInsets.all(16),
-          child: _buildBubble(theme),
+          child: _buildBubble(theme, config),
         ),
       ),
     );
   }
 
-  Widget _buildBubble(EasyLiveChatTheme theme) {
+  Widget _buildBubble(EasyLiveChatTheme theme, WidgetConfigModel? config) {
     final onPrimary = _onColor(theme.primary);
-    final bubble = Material(
-      color: theme.primary,
-      shape: const CircleBorder(),
-      elevation: 6,
-      child: InkWell(
-        customBorder: const CircleBorder(),
-        onTap: _onTap,
-        child: SizedBox(
-          width: 56,
-          height: 56,
-          child: Center(child: _buildIcon(onPrimary)),
+    final size = config?.launcherSize.diameter ?? LauncherSize.medium.diameter;
+    final label = config?.launcherLabel;
+    final scale = size / LauncherSize.medium.diameter;
+    // The icon in a box the launcher's own size, so it stays a circle on its
+    // own and the start of the pill when there are words beside it.
+    final icon = SizedBox(
+      width: size,
+      height: size,
+      child: Center(child: _buildIcon(onPrimary, scale)),
+    );
+    final bubble = Semantics(
+      button: true,
+      // The words when the workspace wrote some, "Open chat" otherwise — the
+      // web loader's `aria-label`.
+      label: label ?? ElcStrings.of(widget.locale ?? config?.locale).openChat,
+      excludeSemantics: true,
+      child: Material(
+        color: theme.primary,
+        shape: label == null ? const CircleBorder() : const StadiumBorder(),
+        elevation: 6,
+        child: InkWell(
+          customBorder:
+              label == null ? const CircleBorder() : const StadiumBorder(),
+          onTap: _onTap,
+          child: label == null
+              ? icon
+              : SizedBox(
+                  height: size,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      icon,
+                      Transform.translate(
+                        // Pulled in toward the icon, as on the web
+                        // (`margin-inline-start: -6px`).
+                        offset: Offset(
+                            Directionality.of(context) == TextDirection.rtl
+                                ? 6
+                                : -6,
+                            0),
+                        child: Padding(
+                          padding: const EdgeInsetsDirectional.only(end: 14),
+                          child: Text(
+                            label,
+                            maxLines: 1,
+                            textDirection: textDirectionOf(label),
+                            style: TextStyle(
+                              color: onPrimary,
+                              fontSize: size >= 64 ? 16 : 15,
+                              fontWeight: FontWeight.w600,
+                              height: 1,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
         ),
       ),
     );
@@ -210,20 +267,20 @@ class _EasyLiveChatLauncherState extends State<EasyLiveChatLauncher> {
       clipBehavior: Clip.none,
       children: [
         bubble,
-        Positioned(
+        PositionedDirectional(
           top: -2,
-          right: -2,
+          end: -2,
           child: _UnreadBadge(background: theme.background, text: theme.text),
         ),
       ],
     );
   }
 
-  Widget _buildIcon(Color onPrimary) {
+  Widget _buildIcon(Color onPrimary, double scale) {
     if (_opening) {
       return SizedBox(
-        width: 22,
-        height: 22,
+        width: 22 * scale,
+        height: 22 * scale,
         child: CircularProgressIndicator(
           strokeWidth: 2.5,
           valueColor: AlwaysStoppedAnimation<Color>(onPrimary),
@@ -238,15 +295,15 @@ class _EasyLiveChatLauncherState extends State<EasyLiveChatLauncher> {
       return ClipOval(
         child: CachedNetworkImage(
           imageUrl: iconUrl,
-          width: 32,
-          height: 32,
+          width: 32 * scale,
+          height: 32 * scale,
           fit: BoxFit.cover,
           errorWidget: (_, __, ___) =>
-              Icon(Icons.chat_bubble, color: onPrimary, size: 26),
+              Icon(Icons.chat_bubble, color: onPrimary, size: 26 * scale),
         ),
       );
     }
-    return Icon(Icons.chat_bubble, color: onPrimary, size: 26);
+    return Icon(Icons.chat_bubble, color: onPrimary, size: 26 * scale);
   }
 
   /// Black or white text/icon depending on the bubble color's luminance.

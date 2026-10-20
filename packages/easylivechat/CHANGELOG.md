@@ -1,5 +1,50 @@
 # Changelog
 
+## 0.1.57
+
+- **Reactions.** `ChatMessage.reactions` — the visitor's view of a message's
+  reactions (`MessageReaction`: `emoji`, `by` `ReactionBy.agent` /
+  `customer`; never an agent's name) — read off history, `message:updated`
+  and the live `message:reactions`, which replaces the list by id. A
+  `message:updated` that leaves the field out keeps the reactions on screen;
+  `[]` clears them. `EasyLiveChat.react(message, emoji)` reacts to one of the
+  team's messages over `message:react` (null takes it back) and
+  `toggleReaction(message, emoji)` sets or takes back, decided against the
+  message as it is now: shown at once, put back if the server refuses
+  (`NOT_REACTABLE`, `RATE_LIMITED` past twenty in ten seconds), resolving to
+  whether it took. `ChatMessage.canReact`, `myReaction`, `toggledReaction`,
+  and `groupReactions` / `sameEmoji` / `quickReactions` (👍 ❤️ 😂 😮 😢 🙏 —
+  the row every client shows) for drawing chips. A reaction is not a message:
+  no `onMessage`, no unread count.
+- **Link previews.** `ChatMessage.linkPreview` reads the card the server made
+  for a link in the message (`metadata.linkPreview`) through a port of the
+  shared parser: `LinkPreview` with `url` / `uri` (http(s) only), `title`,
+  `description`, `siteName` (the host without `www.` when the site gave
+  none) and `imageUrl` (our `/uploads/…` or https). Malformed or hostile
+  previews read as none. `WidgetConfigModel.linkPreviews` is the workspace's
+  switch (true when absent).
+- **Light and dark.** `WidgetConfigModel.colorScheme`
+  (`WidgetColorScheme.light` / `dark` / `auto`, with `resolveDark(deviceDark:)`);
+  an older server's missing field reads as light, so nobody's look changes.
+  `launcherLabel` (one line, 40 characters) and `launcherSize`
+  (`LauncherSize.small` 48 / `medium` 56 / `large` 64).
+- **The closed notice.** `WidgetConfigModel.offlineInfoText` — the business's
+  own closed notice, null when nobody wrote one — which wins over every
+  built-in wording. (`offlineMessage` is the leave-a-message prompt, not the
+  notice.)
+- **Waiting in the queue.** `EasyLiveChat.queue` — a `QueueStatus` (`position`,
+  `minutes`, the workspace's `text`) while the visitor waits for a person,
+  from the session's `queued` fields and `queue:update`; null once someone is
+  there (the chat assigned, `conversation:assigned`, a team message, someone
+  or the assistant typing). `SessionResult.queue` carries it.
+- **Emails to the visitor.** `emailTranscript({email})` ("Email me this
+  chat", to the address on the contact or the one given), `visitorEmail()`
+  (`VisitorEmailState`: the masked address and what is on offer) and
+  `setVisitorEmail(email)` ("Get the reply by email"), over the web widget's
+  endpoints; addresses come back masked. `transcriptEmailEnabled` /
+  `replyEmailEnabled` from the config (off on an older server).
+  `ConfigResponse` carries both.
+
 ## 0.1.56
 
 - **Reply buttons.** `ChatMessage.botButtons` reads the buttons under a

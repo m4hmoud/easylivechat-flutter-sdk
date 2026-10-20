@@ -1,5 +1,63 @@
 # Changelog
 
+## 0.1.74
+
+- Requires `easylivechat` ^0.1.57: reactions, link previews, the colour
+  scheme, the business's closed notice, the queue and the visitor emails.
+  All re-exported here.
+- **Reactions.** A long press on one of the team's messages — or the screen
+  reader's "React" action — opens the quick row in place under it, so the
+  pressed message stays put (one open at a time): 👍 ❤️ 😂 😮 😢 🙏, the
+  visitor's own marked, and a + for the whole picker (category
+  tabs over every emoji the web's picker has, in its order, the device's
+  recent ones first; no search — its words are English only). The same emoji
+  again takes it back. Chips under a bubble show the visitor's own reaction
+  and the team's on theirs, counted, never named; the visitor's own chip takes
+  it back. Live, through `EasyLiveChat.react`, while connected and while the
+  workspace takes messages — the web widget's rule. `MessageBubble` takes
+  `onReact`; `ElcReactionChips`, `ElcQuickReactions` and `showElcEmojiPicker`
+  are exported for hosts drawing their own thread.
+- **Link previews.** `ElcLinkPreviewCard` under the bubble: the site, the
+  title (two lines), a line of description and the 64-pixel picture, each line
+  facing the way its words read. A tap opens the link in the browser, never in
+  the app; a picture that fails to load goes and the words take its room. Not
+  on a card message; hidden by the workspace's switch (`MessageBubble`
+  `showLinkPreview`).
+- **Dark mode.** `EasyLiveChatTheme.fromConfig` takes `platformBrightness` and
+  follows the workspace's scheme — `auto` is the device's appearance, and the
+  chat screen, help screen, launcher and end-chat dialog pass it, so they
+  switch when the device does. Dark is the web widget's palette, derived from
+  the one light look: our dark ground and card tinted toward the brand, light
+  text, the brand kept as the fill; a workspace whose own background is
+  already dark keeps it. New theme tokens: `primaryInk` (the brand as text —
+  links, outlined quick replies and card buttons, focus borders, the AI
+  badge, stars, read ticks; nudged until it reads, in light too for a pale
+  brand), `danger`, `brightness` / `isDark`, `onPrimary`. Every view uses
+  them — thread, composer, pre-chat and post-chat forms, CSAT, help screen,
+  cards, notices, sheets; text fields get the dark keyboard on iOS; the image
+  viewer stays black in both. Light until the config is in — every workspace
+  that predates dark mode was kept on light, so following the device first
+  would flash most chats dark and back. A `themeOverride` still wins, in
+  either scheme.
+- **The closed notice follows the web exactly.** The business's own notice
+  (`offlineInfoText`) always wins — on the banner and on the closed screen —
+  even while the assistant covers (the banner used to drop it then).
+  Without one, the assistant's wording while it covers, on the closed screen
+  too (it never said so there), with the reopening time kept; a locked
+  composer is told when the team is back. The leave-a-message default is no
+  longer shown as the notice. Both update live with the availability.
+- **The queue.** While the visitor waits for a person, a notice above the
+  thread: "Queue", the workspace's words, and the place and expected wait;
+  gone the moment someone is there.
+- **The launcher** takes the workspace's size (48 / 56 / 64) and its words,
+  which turn the circle into a pill; a screen reader hears them, or "Open
+  chat".
+- **Screen readers** hear new team messages as they arrive ("Sara: Hello"),
+  through a polite live region (`ElcThreadAnnouncer`) — not the history.
+- 20 new strings in all 13 languages (reactions, the picker's categories,
+  the queue, the announcement, "Open chat"), worded as in the web widget;
+  Badini written for this release.
+
 ## 0.1.73
 
 - **Reply buttons no longer show twice.** A message with buttons (a bot

@@ -1047,6 +1047,10 @@ class _ComposerBarState extends State<ComposerBar> {
         onEditingComplete: () => _controller.clearComposing(),
         onSubmitted: (_) => _send(),
         style: TextStyle(color: t.text, fontSize: 15),
+        // Ours, not the host app's: its accent may not show on a dark chat.
+        cursorColor: t.primaryInk,
+        // The dark keyboard on iOS while the chat is dark.
+        keyboardAppearance: t.brightness,
         decoration: InputDecoration(
           isCollapsed: true,
           border: InputBorder.none,
@@ -1226,10 +1230,10 @@ class _ComposerBarState extends State<ComposerBar> {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      color: const Color(0xFFDC2626).withValues(alpha: 0.1),
+      color: _theme.danger.withValues(alpha: 0.1),
       child: Text(
         msg,
-        style: const TextStyle(color: Color(0xFFDC2626), fontSize: 12),
+        style: TextStyle(color: _theme.danger, fontSize: 12),
       ),
     );
   }

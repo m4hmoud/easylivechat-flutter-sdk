@@ -12,6 +12,12 @@ import 'package:flutter/widgets.dart';
 /// to [Color]. [direction] derives from `WidgetConfig.direction` (`ar`/`ku` →
 /// RTL) and is fed to a [Directionality] wrapping the chat subtree.
 ///
+/// Light or dark follows the workspace's `colorScheme` — light, dark, or the
+/// device's own appearance (`auto`); see [EasyLiveChatTheme.fromConfig]. The
+/// dark look is derived from the workspace's one light look the way the web
+/// widget derives it (`packages/shared/src/widget-theme.ts`), never designed
+/// twice.
+///
 /// `customCss` is intentionally not represented here — raw CSS cannot map to
 /// Flutter and is ignored (a documented no-op). Hosts customize via `override`.
 class EasyLiveChatTheme {
@@ -36,6 +42,10 @@ class EasyLiveChatTheme {
   /// Optional launcher-bubble icon (absolute URL); falls back to a chat glyph.
   final String? bubbleIconUrl;
 
+  final Color? _primaryInk;
+  final Color? _danger;
+  final Brightness? _brightness;
+
   const EasyLiveChatTheme({
     required this.primary,
     required this.background,
@@ -44,12 +54,56 @@ class EasyLiveChatTheme {
     this.direction = TextDirection.ltr,
     this.logoUrl,
     this.bubbleIconUrl,
-  });
+    Color? primaryInk,
+    Color? danger,
+    Brightness? brightness,
+  })  : _primaryInk = primaryInk,
+        _danger = danger,
+        _brightness = brightness;
+
+  /// The brand used as INK — links in the team's bubbles, outlined buttons,
+  /// the AI badge, an icon on a surface — as opposed to [primary] used as a
+  /// FILL (the send button, the visitor's own bubble, the launcher).
+  ///
+  /// The two differ only where the brand would not read as text: a yellow on
+  /// white, a mid-tone on the dark surfaces. This is then the least step
+  /// darker (on light) or lighter (on dark) that does read. A brand blue on
+  /// white stays exactly the brand blue. Defaults to [primary] on a theme
+  /// built by hand.
+  Color get primaryInk => _primaryInk ?? primary;
+
+  /// Errors and the failed-send marker: a red that reads on [background].
+  Color get danger =>
+      _danger ?? (brightness == Brightness.dark ? _darkDanger : _lightDanger);
+
+  /// Light or dark. Set by [EasyLiveChatTheme.fromConfig]; on a theme built by
+  /// hand it is read off [background] unless given.
+  Brightness get brightness => _brightness ?? _estimateBrightness(background);
+
+  /// The chat is drawn dark.
+  bool get isDark => brightness == Brightness.dark;
+
+  /// Text and icons on a [primary] fill: near-black on a light brand, white
+  /// on a dark one.
+  Color get onPrimary => primary.computeLuminance() > 0.5
+      ? const Color(0xFF0F172A)
+      : const Color(0xFFFFFFFF);
 
   /// Build a theme from the server [WidgetConfigModel].
   ///
-  /// When [override] is supplied its colors take precedence, and `logoUrl` /
-  /// `bubbleIconUrl` use the override value when present, otherwise the config.
+  /// Light or dark is the workspace's `colorScheme`; `auto` follows
+  /// [platformBrightness] — pass `MediaQuery.platformBrightnessOf(context)`,
+  /// which also rebuilds the caller when the device switches. Light is the
+  /// workspace's own colours, as it always was. Dark keeps the brand where the
+  /// visitor sees it as a fill (the send button, their own bubble, the
+  /// launcher) and swaps the light surfaces for a dark ground and card,
+  /// tinted a little toward the brand, with every text on them reading at AA
+  /// or better. A workspace whose own background is already dark designed a
+  /// dark chat, and keeps it in both.
+  ///
+  /// When [override] is supplied its colors take precedence — in either
+  /// scheme: a host's explicit theme still wins. `logoUrl` / `bubbleIconUrl`
+  /// use the override value when present, otherwise the config.
   ///
   /// [direction] is intentionally NOT taken from the override: layout direction
   /// is a function of locale/content, not branding, and always follows the
@@ -58,23 +112,59 @@ class EasyLiveChatTheme {
   factory EasyLiveChatTheme.fromConfig(
     WidgetConfigModel c, {
     EasyLiveChatTheme? override,
+    Brightness platformBrightness = Brightness.light,
   }) {
-    final base = EasyLiveChatTheme(
-      primary: parseHexColor(c.primaryColor, fallback: const Color(0xFF2563EB)),
-      background:
-          parseHexColor(c.backgroundColor, fallback: const Color(0xFFFFFFFF)),
-      // The server has no dedicated surface color; derive it from the
-      // background so bubbles/composer read as a subtle raised layer.
-      surface: _deriveSurface(
-        parseHexColor(c.backgroundColor, fallback: const Color(0xFFFFFFFF)),
-      ),
-      text: parseHexColor(c.textColor, fallback: const Color(0xFF0F172A)),
-      direction: c.direction == LocaleDirection.rtl
-          ? TextDirection.rtl
-          : TextDirection.ltr,
-      logoUrl: c.logoUrl,
-      bubbleIconUrl: c.bubbleIconUrl,
-    );
+    final dark = c.colorScheme
+        .resolveDark(deviceDark: platformBrightness == Brightness.dark);
+    final primary =
+        parseHexColor(c.primaryColor, fallback: const Color(0xFF2563EB));
+    final ownBackground =
+        parseHexColor(c.backgroundColor, fallback: const Color(0xFFFFFFFF));
+    final ownText =
+        parseHexColor(c.textColor, fallback: const Color(0xFF0F172A));
+    final direction = c.direction == LocaleDirection.rtl
+        ? TextDirection.rtl
+        : TextDirection.ltr;
+
+    final EasyLiveChatTheme base;
+    if (!dark || ownBackground.computeLuminance() < _darkThemeLuminance) {
+      // Light — and a workspace's own dark design, in either scheme. The
+      // server has no dedicated surface color; derive it from the background
+      // so bubbles/composer read as a subtle raised layer.
+      final surface = _deriveSurface(ownBackground);
+      final ownDark = _estimateBrightness(ownBackground) == Brightness.dark;
+      base = EasyLiveChatTheme(
+        primary: primary,
+        background: ownBackground,
+        surface: surface,
+        text: ownText,
+        direction: direction,
+        logoUrl: c.logoUrl,
+        bubbleIconUrl: c.bubbleIconUrl,
+        // As text, the brand reads at 3:1 on a light page — the web's light
+        // rule — and at AA on the bubbles of a dark one.
+        primaryInk: ownDark
+            ? inkOn(primary, surface, 4.5)
+            : inkOn(primary, ownBackground, 3),
+      );
+    } else {
+      // Our dark ground and card, leaning a little toward the brand: enough
+      // to feel theirs, not enough to colour the text.
+      final card = mixColors(_darkCard, primary, _brandTint);
+      final ground = mixColors(_darkGround, primary, _brandTint);
+      base = EasyLiveChatTheme(
+        primary: primary,
+        background: ground,
+        surface: card,
+        // Their own text colour only if it is already made for a dark card.
+        text: contrastRatio(ownText, card) >= 7 ? ownText : _darkText,
+        direction: direction,
+        logoUrl: c.logoUrl,
+        bubbleIconUrl: c.bubbleIconUrl,
+        primaryInk: inkOn(primary, card, 4.5),
+        brightness: Brightness.dark,
+      );
+    }
     if (override == null) return base;
     return EasyLiveChatTheme(
       primary: override.primary,
@@ -85,6 +175,9 @@ class EasyLiveChatTheme {
       direction: base.direction,
       logoUrl: override.logoUrl ?? base.logoUrl,
       bubbleIconUrl: override.bubbleIconUrl ?? base.bubbleIconUrl,
+      primaryInk: override._primaryInk,
+      danger: override._danger,
+      brightness: override._brightness,
     );
   }
 
@@ -98,6 +191,9 @@ class EasyLiveChatTheme {
     TextDirection? direction,
     String? logoUrl,
     String? bubbleIconUrl,
+    Color? primaryInk,
+    Color? danger,
+    Brightness? brightness,
   }) {
     return EasyLiveChatTheme(
       primary: primary ?? this.primary,
@@ -107,6 +203,11 @@ class EasyLiveChatTheme {
       direction: direction ?? this.direction,
       logoUrl: logoUrl ?? this.logoUrl,
       bubbleIconUrl: bubbleIconUrl ?? this.bubbleIconUrl,
+      // A new primary without a new ink inks with itself: the old ink was
+      // worked out for a different colour.
+      primaryInk: primaryInk ?? (primary == null ? _primaryInk : null),
+      danger: danger ?? _danger,
+      brightness: brightness ?? _brightness,
     );
   }
 
@@ -147,6 +248,71 @@ class EasyLiveChatTheme {
       shift(_green(bg), lighten),
       shift(_blue(bg), lighten),
     );
+  }
+
+  // ── Dark (C2) ─────────────────────────────────────────────────────────────
+  //
+  // The web widget's own values (packages/shared/src/widget-theme.ts), so a
+  // visitor who meets the business on its site and in its app sees one dark.
+
+  /// Our dark ground and card, before the brand tint, and the text on them.
+  static const Color _darkGround = Color(0xFF121316);
+  static const Color _darkCard = Color(0xFF1E1F23);
+  static const Color _darkText = Color(0xFFECEDEF);
+
+  /// How far the dark surfaces lean toward the brand.
+  static const double _brandTint = 0.05;
+
+  /// A background a workspace has already made this dark is its dark theme.
+  static const double _darkThemeLuminance = 0.2;
+
+  static const Color _lightDanger = Color(0xFFDC2626);
+  static const Color _darkDanger = Color(0xFFF87171);
+
+  /// Flutter's own threshold (`ThemeData.estimateBrightnessForColor`), so a
+  /// host's hand-built theme is judged the way Material would judge it.
+  static Brightness _estimateBrightness(Color c) {
+    final l = c.computeLuminance();
+    return (l + 0.05) * (l + 0.05) > 0.15 ? Brightness.light : Brightness.dark;
+  }
+
+  /// [a] moved [t] (0…1) of the way toward [b], in sRGB, opaque — the
+  /// shared `mixColors`.
+  @visibleForTesting
+  static Color mixColors(Color a, Color b, double t) {
+    int mix(int x, int y) => (x + (y - x) * t).round().clamp(0, 255);
+    return Color.fromARGB(
+      0xFF,
+      mix(_red(a), _red(b)),
+      mix(_green(a), _green(b)),
+      mix(_blue(a), _blue(b)),
+    );
+  }
+
+  /// WCAG contrast ratio, 1…21.
+  @visibleForTesting
+  static double contrastRatio(Color a, Color b) {
+    final la = a.computeLuminance();
+    final lb = b.computeLuminance();
+    final hi = la > lb ? la : lb;
+    final lo = la > lb ? lb : la;
+    return (hi + 0.05) / (lo + 0.05);
+  }
+
+  /// [color] itself when it already reads at [ratio] against [ground];
+  /// otherwise the least step toward white (on a dark ground) or near-black
+  /// (on a light one) that does — the shared `inkOn`.
+  @visibleForTesting
+  static Color inkOn(Color color, Color ground, double ratio) {
+    if (contrastRatio(color, ground) >= ratio) return color;
+    final toward = ground.computeLuminance() > 0.5
+        ? const Color(0xFF111827)
+        : const Color(0xFFFFFFFF);
+    for (var step = 1; step <= 20; step++) {
+      final next = mixColors(color, toward, step / 20);
+      if (contrastRatio(next, ground) >= ratio) return next;
+    }
+    return toward;
   }
 
   // Channel accessors using the 32-bit packed ARGB value. `toARGB32()` replaces

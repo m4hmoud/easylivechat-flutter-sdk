@@ -213,6 +213,12 @@ class EasyLiveChat {
   ValueListenable<bool> get assistantCovers => _controller.assistantCovers;
   ValueListenable<int> get unreadCount => _controller.unreadCount;
 
+  /// The visitor's place while they wait for a person — position, expected
+  /// minutes and the workspace's own queue notice — or null when nobody is
+  /// waiting. Show it above the conversation, not instead of it: they can
+  /// read and write while they wait. Cleared the moment someone is there.
+  ValueListenable<QueueStatus?> get queue => _controller.queue;
+
   /// How far into the thread an agent has read.
   ///
   /// Only needed when building your own thread UI — pair it with
@@ -285,6 +291,27 @@ class EasyLiveChat {
           {required String buttonId, required String label}) =>
       _controller.sendMessage(label,
           reply: {'messageId': message.id, 'buttonId': buttonId});
+
+  /// React to one of the team's messages with [emoji], or take the
+  /// visitor's reaction back with null — the web widget's reactions, over the
+  /// same `message:react` socket event.
+  ///
+  /// One reaction per person per message: another emoji replaces theirs.
+  /// Offer it only where [ChatMessage.canReact] says so (the team's messages);
+  /// the six in [quickReactions] are the row every client shows first.
+  ///
+  /// Shown in [messages] at once and put back as it was if the server says
+  /// no. Resolves true once the server has it; false when there is no live
+  /// connection, the message is not one to react to, or the server refused
+  /// (more than twenty reactions in ten seconds, for one).
+  Future<bool> react(ChatMessage message, String? emoji) =>
+      _controller.react(message.id, emoji);
+
+  /// A tap on [emoji] under [message]: sets it, or — when it is already the
+  /// visitor's own reaction — takes it back. Decided against the message as
+  /// it is now. See [react].
+  Future<bool> toggleReaction(ChatMessage message, String emoji) =>
+      _controller.toggleReaction(message.id, emoji);
 
   /// Submit the tenant's post-chat survey (see
   /// [WidgetConfigModel.postChatForm]). Keyed by field id. A conversation that
@@ -369,6 +396,35 @@ class EasyLiveChat {
   /// answering again replaces it.
   Future<void> rateHelpArticle(String id, bool helpful) =>
       _controller.rateHelpArticle(id, helpful);
+
+  // ── emails to the visitor ──
+  //
+  // The web widget's "Email me this chat" and "Get the reply by email", over
+  // the same endpoints. Need a session; addresses come back masked — the
+  // device may not be the visitor's own.
+
+  /// "Email me this chat" is on offer in this workspace.
+  bool get transcriptEmailEnabled => _controller.transcriptEmailEnabled;
+
+  /// "Get the reply by email" is on offer: ask for an address once the
+  /// visitor has written while nobody can answer (closed, queued, nobody
+  /// accepting) and their contact has none ([visitorEmail]).
+  bool get replyEmailEnabled => _controller.replyEmailEnabled;
+
+  /// The address on the visitor's contact, masked, and what is on offer.
+  Future<VisitorEmailState> visitorEmail() => _controller.visitorEmail();
+
+  /// Keep [email] on the visitor's contact, for the reply. Resolves with it
+  /// masked. Throws `INVALID_EMAIL` / `EMAIL_UNSUBSCRIBED`.
+  Future<String> setVisitorEmail(String email) =>
+      _controller.setVisitorEmail(email);
+
+  /// Email the visitor this conversation (or the one that just ended) — to
+  /// [email], or to the address already on their contact. Resolves with where
+  /// it went, masked. Throws `NO_CONTACT_EMAIL` when there is none to send
+  /// to, `INVALID_EMAIL`, `EMAIL_UNSUBSCRIBED`, `TRANSCRIPT_RATE_LIMITED`.
+  Future<String> emailTranscript({String? email}) =>
+      _controller.emailTranscript(email: email);
 
   // ── offline + CSAT ──
   /// Leave a message for the team. [consents] are the consent fields the

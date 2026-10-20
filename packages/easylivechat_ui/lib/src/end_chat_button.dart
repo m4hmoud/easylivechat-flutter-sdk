@@ -56,16 +56,16 @@ class EasyLiveChatEndChatButton extends StatelessWidget {
     // to be. Falls back to the override, then to sane defaults.
     final t = theme ??
         (config != null
-            ? EasyLiveChatTheme.fromConfig(config)
+            ? EasyLiveChatTheme.fromConfig(config,
+                platformBrightness: MediaQuery.maybePlatformBrightnessOf(context) ??
+                    Brightness.light)
             : const EasyLiveChatTheme(
                 primary: Color(0xFF2563EB),
                 background: Color(0xFFFFFFFF),
                 surface: Color(0xFFF1F5F9),
                 text: Color(0xFF0F172A),
               ));
-    final onPrimary = t.primary.computeLuminance() > 0.5
-        ? const Color(0xFF0F172A)
-        : Colors.white;
+    final onPrimary = t.onPrimary;
 
     // Take the host app's typeface with us. `styleFrom(textStyle:)` REPLACES
     // a button's text style, so a bare TextStyle here drops the app's

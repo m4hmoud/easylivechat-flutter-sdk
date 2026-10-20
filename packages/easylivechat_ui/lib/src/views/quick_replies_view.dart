@@ -95,10 +95,11 @@ class _QuickReplyButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // The brand as a FILL once chosen or pressed, as INK while outlined — the
+    // ink reads on the page in light and dark alike.
     final accent = theme.primary;
-    final onAccent = accent.computeLuminance() > 0.5
-        ? const Color(0xFF0F172A)
-        : Colors.white;
+    final ink = theme.primaryInk;
+    final onAccent = theme.onPrimary;
     final button = OutlinedButton(
       onPressed: onPressed,
       style: ButtonStyle(
@@ -117,9 +118,11 @@ class _QuickReplyButton extends StatelessWidget {
         ),
         side: WidgetStateProperty.resolveWith(
           (states) => BorderSide(
-            color: states.contains(WidgetState.disabled) && !chosen
-                ? accent.withValues(alpha: 0.5)
-                : accent,
+            color: chosen
+                ? accent
+                : states.contains(WidgetState.disabled)
+                    ? ink.withValues(alpha: 0.5)
+                    : ink,
             width: 1.5,
           ),
         ),
@@ -133,19 +136,19 @@ class _QuickReplyButton extends StatelessWidget {
         foregroundColor: WidgetStateProperty.resolveWith((states) {
           if (chosen) return onAccent;
           if (states.contains(WidgetState.disabled)) {
-            return accent.withValues(alpha: 0.5);
+            return ink.withValues(alpha: 0.5);
           }
-          return states.contains(WidgetState.pressed) ? onAccent : accent;
+          return states.contains(WidgetState.pressed) ? onAccent : ink;
         }),
         overlayColor: WidgetStateProperty.resolveWith((states) {
           // Pressed fills with the accent itself; an overlay on top of that
           // would only muddy it.
           if (states.contains(WidgetState.pressed)) return Colors.transparent;
           if (states.contains(WidgetState.focused)) {
-            return accent.withValues(alpha: 0.12);
+            return ink.withValues(alpha: 0.12);
           }
           if (states.contains(WidgetState.hovered)) {
-            return accent.withValues(alpha: 0.10);
+            return ink.withValues(alpha: 0.10);
           }
           return null;
         }),
