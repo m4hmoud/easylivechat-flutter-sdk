@@ -448,38 +448,84 @@ visitor typed one. Refusals are `EasyLiveChatError`s with the server's code:
 `NO_CONTACT_EMAIL` (ask for an address), `INVALID_EMAIL`, `EMAIL_UNSUBSCRIBED`,
 `TRANSCRIPT_RATE_LIMITED`.
 
-## Push notifications
+## "Reply in the chat" links
 
-A reply that lands while your app is closed can ring the visitor's phone. Hand
-the SDK the Firebase token your app already receives:
-
-```dart
-final token = await FirebaseMessaging.instance.getToken();
-await EasyLiveChat.instance.setPushToken(
-  token,
-  platform: Platform.isIOS ? 'IOS' : 'ANDROID',
-);
-```
-
-The SDK adds no push dependency of its own, so your project keeps one Firebase
-setup and one permission prompt. Call it as soon as you have a token — before
-the visitor has opened a chat is the normal case, and the registration is held
-until there is a session to authenticate it with. Call it again when the token
-rotates (the old registration is dropped first), and pass `null` on sign-out.
-
-The notification is always sent. Nothing is suppressed server-side, because a
-connected socket is not a person looking at the screen — skip it in your own
-`onMessage` handler when the chat is already on screen:
+When the team answers a visitor who has gone, the workspace can email them, and
+the email's "Reply in the chat" button links back into the conversation: to the
+page they were on with `#elc_chat=<token>` in the fragment, or to our own chat
+page with `#resume=<token>`. If that link opens your app — a universal link /
+app link on your site's domain, or your own scheme you rewrite it into — hand it
+to `resumeFromLink` from your deep-link handler, then show the chat:
 
 ```dart
-FirebaseMessaging.onMessage.listen((m) {
-  if (m.data['type'] == 'visitor.message' && chatIsVisible) return;
-  // …otherwise show it yourself, or let the OS do it in the background.
+// e.g. with package:app_links — any deep-link source works the same way.
+AppLinks().uriLinkStream.listen((uri) async {
+  // identify(...) / clearIdentity() first, as before open().
+  if (await EasyLiveChat.instance.resumeFromLink(uri.toString())) {
+    navigatorKey.currentState?.push(
+      MaterialPageRoute(builder: (_) => const EasyLiveChatScreen()),
+    );
+  }
+  // false: not one of ours, expired, or refused — route it as usual.
 });
 ```
 
-`data` carries `type`, `conversationId`, `messageId` and `tenantId`, so a tap
-can open the right conversation.
+It takes the whole link or just the token. The token is traded with the server
+for the visitor that reaches that conversation (the web widget's own route),
+this device becomes that visitor — so the chat opens on any device the email is
+read on — and the conversation is resumed: `true` means it is in `messages`
+with `phase` on `chat`. `false`, never a throw, for a link that is not ours,
+one the server refuses (another workspace's, expired, a chat that is gone), no
+network, or a chat that could not be resumed. It needs `boot()`.
+
+Declare who is signed in first, exactly as before `open()`. While a user is
+signed in with a `userId`, a link to any visitor other than this device's own
+is refused (`false`): the SDK cannot tell whether that chat is theirs, and
+moving them into it would attach their verified identity to someone else's
+conversation. Signed-in users hear about replies from your own notifications
+(below); anonymous visitors follow the link as they would on the web.
+
+## Notifications
+
+EasyLiveChat does not notify your app's users itself, and needs no Firebase key
+from you: a key that can message every user of your app is not one to hand to a
+third party. Your own server sends the notification, on the `message.created`
+webhook (dashboard → Settings → Webhooks):
+
+1. Identify signed-in users with a **verified** id: `identify(userId:, userHash:)`
+   with the HMAC your server computes (see Identity verification). Only a
+   verified id is ever handed back — `contact.userId` is `null` otherwise.
+2. Subscribe an endpoint to `message.created`. Every delivery carries the
+   `message`, the `conversation` and its `contact`.
+3. For a reply from the team or the assistant — `message.senderType` is
+   `AGENT`, or `BOT` (`message.automatic` says which automatic sender) — with
+   `contact.userId` set, send your own push to that user's devices.
+   `contact.userId` is the `userId` you passed to `identify()`, so it is
+   already your own user id.
+4. Ignore the rest: the visitor's own messages (`CUSTOMER`), system lines, and
+   anonymous visitors (no `contact.userId` — they have the reply email).
+
+```js
+// Your server — verify X-Easylivechat-Signature-V2 first (see the webhook docs).
+app.post('/hooks/easylivechat', (req, res) => {
+  const { event, data } = req.body;
+  const reply = ['AGENT', 'BOT'].includes(data?.message?.senderType);
+  if (event === 'message.created' && reply && data.contact?.userId) {
+    notifyUser(data.contact.userId, {
+      title: 'New reply from support',
+      body: data.message.body ?? '',
+      data: { conversationId: data.conversationId },
+    });
+  }
+  res.sendStatus(200);
+});
+```
+
+Your app already knows whether the chat is on screen, so suppress the
+notification there, and open `EasyLiveChatScreen` when one is tapped.
+
+`setPushToken()` from 0.1.54–0.1.57 is deprecated and does nothing — no
+request, nothing held for later. Delete the call.
 
 ## Localization
 

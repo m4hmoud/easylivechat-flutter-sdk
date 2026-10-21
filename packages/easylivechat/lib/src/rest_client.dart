@@ -6,8 +6,8 @@ import 'models/help_article.dart';
 import 'models/results.dart';
 import 'models/widget_config.dart';
 
-/// 1:1 wrapper over the widget HTTP endpoints (session, history, forms, push,
-/// help articles) + `/api/uploads`.
+/// 1:1 wrapper over the widget HTTP endpoints (session, history, forms,
+/// visitor emails, help articles) + `/api/uploads`.
 ///
 /// Base: `<apiBase>/api/widget`. Tenant resolved by `:slug`. JWT-gated calls
 /// (`GET /messages`, `POST /feedback`, `POST /uploads`) take a Bearer token
@@ -343,45 +343,36 @@ class RestClient {
     }
   }
 
-  /// `POST /:slug/push/register` — the device to notify when an agent replies
-  /// and this app is closed. Authed by the widget token: the server takes the
-  /// tenant and the contact from it, never from this body.
-  Future<void> registerPush({
-    required String token,
-    required String pushToken,
-    required String platform,
-    String? locale,
-    String? appVersion,
-  }) async {
+  /// `POST /:slug/resume-link { token }` — public: trade an emailed "Reply
+  /// in the chat" link's token for the visitor that reaches its conversation.
+  ///
+  /// Null when the server refuses the link — another workspace's, expired, or
+  /// for a chat that is gone (`410 LINK_INVALID`); the server says no more
+  /// than that, on purpose. A transport failure throws `NETWORK`.
+  Future<ResumeLinkTarget?> postResumeLink(String token) async {
     try {
       final res = await _dio.post<dynamic>(
-        '$_base/$_slug/push/register',
-        data: {
-          'token': pushToken,
-          'platform': platform,
-          if (locale != null && locale.isNotEmpty) 'locale': locale,
-          if (appVersion != null && appVersion.isNotEmpty) 'appVersion': appVersion,
-        },
-        options: Options(headers: _headers(token)),
+        '$_base/$_slug/resume-link',
+        data: {'token': token},
+        options: Options(headers: _headers()),
       );
-      if (!_ok(res.statusCode)) throwFor(res);
-    } on DioException catch (e) {
-      throw _networkError(e);
-    }
-  }
-
-  /// `POST /:slug/push/unregister` — stop notifying this device.
-  Future<void> unregisterPush({
-    required String token,
-    required String pushToken,
-  }) async {
-    try {
-      final res = await _dio.post<dynamic>(
-        '$_base/$_slug/push/unregister',
-        data: {'token': pushToken},
-        options: Options(headers: _headers(token)),
+      if (!_ok(res.statusCode)) {
+        // A refused link is an answer, not an error. Anything else (the
+        // workspace's allowed domains, a 5xx) still is.
+        final status = res.statusCode ?? 0;
+        if (status == 410 || status == 404 || status == 400) return null;
+        throwFor(res);
+      }
+      final body = _asMap(res.data);
+      final visitorId = (body['visitorId'] as Object?)?.toString().trim();
+      if (visitorId == null || visitorId.isEmpty) return null;
+      final conversationId =
+          (body['conversationId'] as Object?)?.toString().trim();
+      return ResumeLinkTarget(
+        visitorId: visitorId,
+        conversationId:
+            (conversationId == null || conversationId.isEmpty) ? null : conversationId,
       );
-      if (!_ok(res.statusCode)) throwFor(res);
     } on DioException catch (e) {
       throw _networkError(e);
     }
@@ -658,4 +649,12 @@ class RestClient {
       cause: e,
     );
   }
+}
+
+/// Where an emailed "Reply in the chat" link leads: the visitor whose stored
+/// id reaches the conversation, and that conversation.
+class ResumeLinkTarget {
+  final String visitorId;
+  final String? conversationId;
+  const ResumeLinkTarget({required this.visitorId, this.conversationId});
 }

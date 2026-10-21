@@ -447,28 +447,65 @@ class EasyLiveChat {
   void heartbeat({String? currentUrl, String? currentTitle}) =>
       _controller.heartbeat(currentUrl: currentUrl, currentTitle: currentTitle);
 
-  /// The device to notify when an agent replies and the app is closed.
+  /// Does nothing. Kept so code written against 0.1.54–0.1.57 still compiles.
   ///
-  /// Hand over the FCM registration token your app already receives — the SDK
-  /// brings no push dependency of its own, so your project keeps one Firebase
-  /// setup and one notification permission prompt. Call it as soon as you have
-  /// a token, even before the visitor opens a chat: there is nothing to
-  /// authenticate a registration with until a session exists, so it is held and
-  /// sent the moment one does.
+  /// EasyLiveChat no longer sends notifications to your app's users, so it
+  /// no longer needs your Firebase project's key — a key that can message
+  /// every user of your app was not one to hand to a third party. Your own
+  /// server sends them instead, on the `message.created` webhook: for a reply
+  /// from the team or the assistant whose `contact.userId` is set — the
+  /// `userId` you passed to [identify] — notify that user's devices the way
+  /// you notify them of anything else. See "Notifications" in the README.
   ///
-  /// Call it again when the token rotates — the old registration is dropped
-  /// first. Pass `null` on sign-out to stop the notifications.
-  ///
-  /// Nothing is suppressed server-side, on purpose: a socket that is connected
-  /// does not mean a person who is looking. Suppress in your notification
-  /// handler when the chat is already on screen — your app is the only thing
-  /// that knows.
+  /// No request is made and nothing is held for later, before or after
+  /// [boot]. Delete the call.
+  @Deprecated('No-op. Notify your users from your own server on the '
+      'message.created webhook (contact.userId is the userId passed to '
+      'identify()); see "Notifications" in the README.')
   Future<void> setPushToken(
     String? pushToken, {
     required String platform,
     String? appVersion,
   }) =>
-      _controller.setPushToken(pushToken, platform: platform, appVersion: appVersion);
+      Future<void>.value();
+
+  // ── "Reply in the chat" ──
+
+  /// Open the conversation an emailed "Reply in the chat" link leads to.
+  ///
+  /// The workspace's emails to a visitor — "we've replied", a transcript —
+  /// link back into the chat: to the page they were on with
+  /// `#elc_chat=<token>`, or to our own chat page with `#resume=<token>`.
+  /// When that link opens your app (a universal link / app link on your
+  /// site's domain, or your own scheme), hand it here from your deep-link
+  /// handler — the whole link, or just the token:
+  ///
+  /// ```dart
+  /// if (await EasyLiveChat.instance.resumeFromLink(uri.toString())) {
+  ///   navigator.push(MaterialPageRoute(builder: (_) => const EasyLiveChatScreen()));
+  /// }
+  /// ```
+  ///
+  /// The token is traded with the server for the visitor that reaches that
+  /// conversation — the web widget's own route — and this device becomes that
+  /// visitor, so the chat opens on any device the email is read on. The
+  /// stored profile goes with the previous visitor, as on the web. Then the
+  /// conversation is resumed: true means it is in [messages] with [phase] on
+  /// `chat`, ready to show.
+  ///
+  /// False — never a throw — when [link] carries no token of ours, the server
+  /// refuses it (another workspace's, expired, a chat that is gone), the
+  /// network is down, or the chat could not be resumed.
+  ///
+  /// Identity first: call [identify] (or [clearIdentity]) before this, as
+  /// before [open], so it knows who is signed in. While a user is signed in
+  /// with a `userId`, a link to any visitor other than this device's own is
+  /// refused (false): the SDK cannot tell whether that chat is theirs, and
+  /// moving them into it would attach their identity to someone else's
+  /// conversation. Anonymous visitors follow the link as on the web.
+  ///
+  /// Needs [boot].
+  Future<bool> resumeFromLink(String link) => _controller.resumeFromLink(link);
 
   /// Tear everything down. After this you must [boot] again.
   void shutdown() {

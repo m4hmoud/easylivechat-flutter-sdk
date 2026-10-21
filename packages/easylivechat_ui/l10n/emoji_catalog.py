@@ -4,9 +4,10 @@
 The web widget, the dashboard and the app draw their emoji pickers from
 `packages/shared/src/emoji-data.ts` (emojibase-data, filtered to Emoji 13.0
 and older, no skin-tone variants). The reaction picker here draws the same
-emoji in the same order, so a visitor finds 🙌 where the web put it. Only the
-emoji are carried over: the table's search words are English, and the SDK's
-picker has no search.
+emoji in the same order, so a visitor finds 🙌 where the web put it, and
+searches the same words: the table's English names and tags, which is all the
+web's search reads too (`searchEmoji`, packages/shared/src/emoji.ts — ported in
+lib/src/views/emoji_search.dart).
 
 Run from the repo root after the shared table changes:
 
@@ -25,6 +26,11 @@ CATEGORIES = ['smileys', 'people', 'animals', 'food', 'travel',
               'activities', 'objects', 'symbols', 'flags']
 
 
+def dart_literal(value: str) -> str:
+    escaped = value.replace('\\', '\\\\').replace("'", r"\'").replace('$', r'\$')
+    return "'%s'" % escaped
+
+
 def main() -> int:
     src = SOURCE.read_text(encoding='utf-8')
     rows = {}
@@ -33,7 +39,7 @@ def main() -> int:
         if not m:
             print('error: no %s in %s' % (cat, SOURCE))
             return 1
-        rows[cat] = [entry.split(' ', 1)[0] for entry in m.group(1).split('|') if entry]
+        rows[cat] = [entry for entry in m.group(1).split('|') if entry]
 
     total = sum(len(v) for v in rows.values())
     lines = [
@@ -44,22 +50,18 @@ def main() -> int:
         '// MIT License, Copyright (c) 2017-2019 Miles Johnson,',
         '// https://github.com/milesj/emojibase), filtered to Emoji 13.0 and older',
         '// (so it draws on the phones visitors still use), without skin-tone',
-        '// variants. Emoji only, in the shared order: %d in all.' % total,
+        '// variants. In the shared order, with the shared English search words:',
+        '// %d emoji in all.' % total,
         '',
-        '/// The picker\'s categories, in tab order, each with its emoji separated',
-        '/// by single spaces. Split with [emojiOf].',
-        'const Map<String, String> emojiCatalog = {',
+        '/// The picker\'s categories, in tab order. Each is its entries joined by',
+        '/// `|`; an entry is the emoji, a space, then its lower-case English search',
+        '/// words separated by spaces — the shared table\'s own shape. Read it',
+        '/// through `emojiOf` and `searchEmoji` (emoji_search.dart).',
+        'const Map<String, String> emojiTable = {',
     ]
     for cat in CATEGORIES:
-        lines.append("  '%s': '%s'," % (cat, ' '.join(rows[cat])))
-    lines += [
-        '};',
-        '',
-        '/// One category\'s emoji, in order.',
-        'List<String> emojiOf(String category) =>',
-        "    (emojiCatalog[category] ?? '').split(' ').where((e) => e.isNotEmpty).toList();",
-        '',
-    ]
+        lines.append('  %s: %s,' % (dart_literal(cat), dart_literal('|'.join(rows[cat]))))
+    lines += ['};', '']
     OUT.write_text('\n'.join(lines), encoding='utf-8')
     print('wrote %s (%d emoji)' % (OUT, total))
     return 0

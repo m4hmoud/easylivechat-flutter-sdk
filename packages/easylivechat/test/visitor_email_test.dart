@@ -93,6 +93,30 @@ void main() {
       c.dispose();
     });
 
+    test('after the survey, it still goes for the chat that just ended',
+        () async {
+      // Submitting the post-chat survey lets the session go (so the next
+      // message starts a new chat). The web widget still offers the copy of
+      // the chat that ended, under the survey; so must this.
+      final (c, http) = await _session((path, body) {
+        if (path.endsWith('/post-chat')) return const FakeReply(200, {'ok': true});
+        if (path.endsWith('/visitor-email')) {
+          return const FakeReply(200, {'emailHint': 'a•••@example.com'});
+        }
+        return const FakeReply(200, {'ok': true, 'sentTo': 'a•••@example.com'});
+      });
+      await c.submitPostChat({'q1': 'Great'});
+      expect(c.conversationId, isNull);
+
+      expect((await c.visitorEmail()).emailHint, 'a•••@example.com');
+      expect(await c.emailTranscript(), 'a•••@example.com');
+      final sent = http.to('/conversations/conv-1/transcript').single;
+      expect(sent.headers['authorization'], 'Bearer widget-jwt');
+      expect(http.to('/session'), hasLength(1),
+          reason: 'never re-minted: a resume would reattach the closed chat');
+      c.dispose();
+    });
+
     test('needs a session', () {
       final c = SessionController(config: _config, storage: InMemoryStorage());
       expect(() => c.emailTranscript(),

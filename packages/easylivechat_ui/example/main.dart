@@ -95,10 +95,14 @@ class HomePage extends StatelessWidget {
         builder: (_) => Scaffold(
           appBar: AppBar(
             title: const Text('Support'),
-            // Backing out of the chat leaves the conversation open and
-            // resumable; ending it is this explicit button, which confirms
-            // and then shows the workspace's post-chat survey in place.
-            actions: const [EasyLiveChatEndChatButton()],
+            // The ⋯ holds "Email me this chat" when the workspace offers it,
+            // and draws nothing otherwise. Backing out of the chat leaves the
+            // conversation open and resumable; ending it is the explicit X,
+            // which confirms and then shows the post-chat survey in place.
+            actions: const [
+              EasyLiveChatMenuButton(),
+              EasyLiveChatEndChatButton(),
+            ],
           ),
           // `locale:` forces the chrome language when the host app already
           // knows it; without it the workspace locale is used.

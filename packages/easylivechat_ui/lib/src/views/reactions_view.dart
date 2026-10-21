@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:easylivechat/easylivechat.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart';
@@ -5,7 +7,7 @@ import 'package:flutter/services.dart';
 
 import '../l10n.dart';
 import '../theme.dart';
-import 'emoji_catalog.dart';
+import 'emoji_search.dart';
 
 /// Reactions in the visitor's thread — the native analog of the web widget's
 /// `components/Reactions.tsx`.
@@ -378,6 +380,9 @@ Future<String?> showElcEmojiPicker(
 }) {
   return showModalBottomSheet<String>(
     context: context,
+    // The search field brings the keyboard up; the sheet has to be free to
+    // rise above it rather than sit underneath.
+    isScrollControlled: true,
     // The page's own ground, not a tier of its own.
     backgroundColor: theme.background,
     barrierColor: theme.text.withValues(alpha: 0.18),
@@ -385,26 +390,41 @@ Future<String?> showElcEmojiPicker(
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
     ),
-    builder: (sheetContext) => Directionality(
-      textDirection: theme.direction,
-      child: SafeArea(
-        top: false,
-        child: SizedBox(
-          height: 360,
-          child: ElcEmojiPicker(
-            theme: theme,
-            strings: strings,
-            onPick: (emoji) => Navigator.of(sheetContext).pop(emoji),
+    builder: (sheetContext) {
+      final keyboard = MediaQuery.viewInsetsOf(sheetContext).bottom;
+      // 360 high, as before — less when the keyboard leaves less, but never
+      // so little that the grid has no row to show.
+      final room = MediaQuery.sizeOf(sheetContext).height -
+          keyboard -
+          MediaQuery.paddingOf(sheetContext).top -
+          48;
+      return Padding(
+        padding: EdgeInsets.only(bottom: keyboard),
+        child: Directionality(
+          textDirection: theme.direction,
+          child: SafeArea(
+            top: false,
+            child: SizedBox(
+              height: math.max(180.0, math.min(360.0, room)),
+              child: ElcEmojiPicker(
+                theme: theme,
+                strings: strings,
+                onPick: (emoji) => Navigator.of(sheetContext).pop(emoji),
+              ),
+            ),
           ),
         ),
-      ),
-    ),
+      );
+    },
   );
 }
 
-/// Category tabs over a grid of every emoji, the device's recent ones first.
-/// The same emoji in the same order as the web's picker; no search — its
-/// words are English only.
+/// A search field and category tabs over a grid of every emoji, the device's
+/// recent ones first — the web's picker (apps/widget EmojiPicker.tsx): the
+/// same emoji in the same order, and the same search ([searchEmoji]), which
+/// matches the emoji's English names and tags, each word by its start. While
+/// there is a query the grid shows its matches, best first; a tab clears it.
+/// Submitting the field picks the first match, as Enter does on the web.
 class ElcEmojiPicker extends StatefulWidget {
   final EasyLiveChatTheme theme;
   final ElcStrings strings;
@@ -427,6 +447,7 @@ class _ElcEmojiPickerState extends State<ElcEmojiPicker> {
   static const double _padding = 8;
 
   final ScrollController _scroll = ScrollController();
+  final TextEditingController _query = TextEditingController();
   late final List<(String, List<String>)> _sections = [
     if (elcRecentEmoji.isNotEmpty) ('recent', List.of(elcRecentEmoji)),
     for (final (id, _) in _categories)
@@ -434,6 +455,10 @@ class _ElcEmojiPickerState extends State<ElcEmojiPicker> {
   ];
   late String _active = _sections.first.$1;
   int _columns = 8;
+
+  /// The matches for the query, or null while there is none — then the grid
+  /// is the categories.
+  List<String>? _results;
 
   @override
   void initState() {
@@ -444,7 +469,19 @@ class _ElcEmojiPickerState extends State<ElcEmojiPicker> {
   @override
   void dispose() {
     _scroll.dispose();
+    _query.dispose();
     super.dispose();
+  }
+
+  void _search(String query) {
+    setState(() {
+      _results = query.trim().isEmpty ? null : searchEmoji(query);
+    });
+  }
+
+  void _clearSearch() {
+    _query.clear();
+    _search('');
   }
 
   /// Where each section starts: every row is one cell high, so the offsets
@@ -460,6 +497,7 @@ class _ElcEmojiPickerState extends State<ElcEmojiPicker> {
   }
 
   void _onScroll() {
+    if (_results != null || !_scroll.hasClients) return;
     final offsets = _offsets();
     var current = _sections.first.$1;
     for (var i = 0; i < offsets.length; i++) {
@@ -470,7 +508,21 @@ class _ElcEmojiPickerState extends State<ElcEmojiPicker> {
 
   void _jumpTo(String id) {
     final i = _sections.indexWhere((s) => s.$1 == id);
-    if (i == -1 || !_scroll.hasClients) return;
+    if (i == -1) return;
+    if (_results != null) {
+      // A tab leaves the search, as on the web: the categories come back,
+      // and the jump waits for them to be laid out.
+      _query.clear();
+      setState(() {
+        _results = null;
+        _active = id;
+      });
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _jumpTo(id);
+      });
+      return;
+    }
+    if (!_scroll.hasClients) return;
     final target = _offsets()[i].clamp(0.0, _scroll.position.maxScrollExtent);
     _scroll.jumpTo(target);
     setState(() => _active = id);
@@ -481,12 +533,63 @@ class _ElcEmojiPickerState extends State<ElcEmojiPicker> {
     widget.onPick(emoji);
   }
 
+  Widget _resultsGrid(
+      List<String> results, EasyLiveChatTheme t, ElcStrings s) {
+    if (results.isEmpty) {
+      return Center(
+        child: Semantics(
+          liveRegion: true,
+          child: Text(
+            s.emojiNoResults,
+            style: TextStyle(color: t.text.withValues(alpha: 0.6), fontSize: 14),
+          ),
+        ),
+      );
+    }
+    return Semantics(
+      container: true,
+      explicitChildNodes: true,
+      label: s.emojiResults,
+      child: GridView.builder(
+        padding: const EdgeInsets.fromLTRB(_padding, 8, _padding, _padding),
+        // The keyboard is usually up while the visitor searches; a drag
+        // through the matches puts it away.
+        keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: _columns,
+          mainAxisExtent: _cell,
+        ),
+        itemCount: results.length,
+        itemBuilder: (context, i) => _EmojiCell(
+          emoji: results[i],
+          theme: t,
+          onTap: () => _pick(results[i]),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final t = widget.theme;
     final s = widget.strings;
+    final results = _results;
     return Column(
       children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(_padding, 10, _padding, 0),
+          child: _EmojiSearchField(
+            controller: _query,
+            theme: t,
+            strings: s,
+            onChanged: _search,
+            onClear: _clearSearch,
+            onSubmitted: (_) {
+              final first = _results?.firstOrNull;
+              if (first != null) _pick(first);
+            },
+          ),
+        ),
         Semantics(
           container: true,
           explicitChildNodes: true,
@@ -501,7 +604,7 @@ class _ElcEmojiPickerState extends State<ElcEmojiPicker> {
                     _RoundButton(
                       theme: t,
                       tooltip: s.emojiCategory(id),
-                      selected: _active == id,
+                      selected: results == null && _active == id,
                       onTap: () => _jumpTo(id),
                       child: Text(icon,
                           style: const TextStyle(fontSize: 20, height: 1)),
@@ -515,6 +618,7 @@ class _ElcEmojiPickerState extends State<ElcEmojiPicker> {
           child: LayoutBuilder(builder: (context, box) {
             _columns =
                 ((box.maxWidth - 2 * _padding) / _cell).floor().clamp(1, 12);
+            if (results != null) return _resultsGrid(results, t, s);
             return CustomScrollView(
               controller: _scroll,
               slivers: [
@@ -563,6 +667,76 @@ class _ElcEmojiPickerState extends State<ElcEmojiPicker> {
           }),
         ),
       ],
+    );
+  }
+}
+
+class _EmojiSearchField extends StatelessWidget {
+  final TextEditingController controller;
+  final EasyLiveChatTheme theme;
+  final ElcStrings strings;
+  final ValueChanged<String> onChanged;
+  final VoidCallback onClear;
+  final ValueChanged<String> onSubmitted;
+
+  const _EmojiSearchField({
+    required this.controller,
+    required this.theme,
+    required this.strings,
+    required this.onChanged,
+    required this.onClear,
+    required this.onSubmitted,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final t = theme;
+    final border = OutlineInputBorder(
+      borderRadius: BorderRadius.circular(999),
+      borderSide: BorderSide(color: t.text.withValues(alpha: 0.12)),
+    );
+    return ValueListenableBuilder<TextEditingValue>(
+      valueListenable: controller,
+      builder: (context, value, _) => TextField(
+        controller: controller,
+        onChanged: onChanged,
+        onSubmitted: onSubmitted,
+        // Not focused on open: on a phone that raises the keyboard over the
+        // emoji, which is why the web only does it with a real keyboard.
+        textInputAction: TextInputAction.search,
+        autocorrect: false,
+        enableSuggestions: false,
+        keyboardAppearance: t.brightness,
+        cursorColor: t.primaryInk,
+        style: TextStyle(color: t.text, fontSize: 15),
+        decoration: InputDecoration(
+          isDense: true,
+          hintText: strings.emojiSearch,
+          hintStyle: TextStyle(color: t.text.withValues(alpha: 0.45)),
+          filled: true,
+          fillColor: t.surface,
+          contentPadding: const EdgeInsets.symmetric(vertical: 10),
+          prefixIcon: ExcludeSemantics(
+            child: Icon(Icons.search_rounded,
+                size: 20, color: t.text.withValues(alpha: 0.55)),
+          ),
+          prefixIconConstraints:
+              const BoxConstraints(minWidth: 40, minHeight: 40),
+          suffixIcon: value.text.isEmpty
+              ? null
+              : IconButton(
+                  onPressed: onClear,
+                  tooltip: strings.helpSearchClear,
+                  icon: Icon(Icons.close_rounded,
+                      size: 18, color: t.text.withValues(alpha: 0.6)),
+                ),
+          border: border,
+          enabledBorder: border,
+          focusedBorder: border.copyWith(
+            borderSide: BorderSide(color: t.primaryInk, width: 1.5),
+          ),
+        ),
+      ),
     );
   }
 }

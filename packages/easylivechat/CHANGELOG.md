@@ -1,5 +1,37 @@
 # Changelog
 
+## 0.1.58
+
+- **"Reply in the chat" from an email.** `EasyLiveChat.resumeFromLink(link)`
+  takes what your deep-link / universal-link handler is handed — the email's
+  link to your page (`#elc_chat=<token>`), our chat page's (`#resume=<token>`)
+  or the bare token — checks it is a token of ours (a JWT, as the web widget
+  checks), trades it with the server for the visitor that reaches that
+  conversation (`POST /resume-link`, the web widget's own route), becomes that
+  visitor — the stored profile goes with the previous one, as on the web — and
+  resumes, so the chat is on screen when you show it. Resolves true when it
+  is; false, never a throw, for a link that is not ours, one the server
+  refuses (another workspace's, expired, a chat that is gone), no network, or
+  a chat that could not be resumed. Identity first, as before `open()`: while
+  a user is signed in with a `userId`, a link to any visitor other than this
+  device's own is refused, so a signed-in person is never moved into — and
+  their verified identity never attached to — someone else's conversation.
+- **`setPushToken` is deprecated and does nothing.** EasyLiveChat no longer
+  notifies your app's users, so it no longer needs your Firebase project's
+  key. Your server does it on the `message.created` webhook: for a reply from
+  the team or the assistant whose `contact.userId` is set (the `userId` you
+  passed to `identify()`), notify that user's devices. The signature stays so
+  existing code compiles; the call makes no request and holds nothing for
+  later, before or after `boot()`. The registration queue, the token-rotation
+  handling and the unregister on an identity switch are gone with it. See
+  "Notifications" in the README.
+- **"Email me this chat" after the survey.** `emailTranscript()` and
+  `visitorEmail()` still reach the conversation that just ended once its
+  post-chat survey is in and the session has been let go of — with that
+  chat's own token, for that one request, never re-minted (a re-mint is a
+  resume, and would reattach the visitor to the closed thread). They threw
+  `NO_TOKEN` there before.
+
 ## 0.1.57
 
 - **Reactions.** `ChatMessage.reactions` — the visitor's view of a message's

@@ -181,15 +181,16 @@ class SessionController {
   /// would make the server demand boxes nobody drew.
   bool _configHasConsent = false;
 
-  // ── visitor push ──
-  // The device token the host app handed us, and the one the server currently
-  // knows about. They differ while a registration is queued (no session token
-  // yet) or in flight, which is exactly the window the queue exists for.
-  String? _pushToken;
-  String? _pushPlatform;
-  String? _pushAppVersion;
-  String? _registeredPushToken;
   String? _conversationId;
+
+  /// The token and conversation of the chat that just ENDED, once its session
+  /// has been let go of ([_finishEndedSession]) — kept for one thing only:
+  /// "Email me this chat" under the survey the visitor just answered, which
+  /// the web widget offers for the conversation that ended. Never used to
+  /// connect, send or re-mint; dropped the moment another session is adopted
+  /// or the visitor changes.
+  String? _endedToken;
+  String? _endedConversationId;
 
   /// Which conversation the LIVE socket handshook with. The server binds that
   /// at connect time, so this is the only way to notice the socket is now
@@ -469,30 +470,24 @@ class SessionController {
         p == ChatPhase.prechat ||
         p == ChatPhase.offline ||
         p == ChatPhase.feedback;
+    await _becomeVisitor(_uuid.v4());
+    return surfaceWasShowing;
+  }
 
-    // Best effort: stop the previous person's replies notifying this device.
-    // The next registration would move the device anyway (the server upserts
-    // by device token), but only once the new person opens a chat.
-    final pushToken = _registeredPushToken ?? _pushToken;
-    String? staleToken = _token;
-    if (staleToken == null) {
-      try {
-        staleToken = await storage.read(StorageKeys.token);
-      } catch (_) {}
-    }
-    if (pushToken != null && staleToken != null && staleToken.isNotEmpty) {
-      try {
-        await rest.unregisterPush(token: staleToken, pushToken: pushToken);
-      } catch (_) {}
-    }
-    _registeredPushToken = null;
-
+  /// Let go of the visitor on this device — its session, thread and stored
+  /// token, conversation and profile — and become [visitorId]: a fresh one
+  /// for a switch of person, or the one an emailed link names
+  /// ([resumeFromLink]). The stored `identifiedUserId` is left to the caller.
+  /// Ends on [ChatPhase.idle].
+  Future<void> _becomeVisitor(String visitorId) async {
     _stopHeartbeat();
     _teardownSocket();
     _teardownPresence();
     _socketConversationId = null;
     _token = null;
     _conversationId = null;
+    _endedToken = null;
+    _endedConversationId = null;
     _oldestCursor = null;
     _historyLoadedOnce = false;
     _unreadIds.clear();
@@ -518,14 +513,12 @@ class SessionController {
         await storage.delete(key);
       } catch (_) {}
     }
-    final vid = _uuid.v4();
-    _visitorId = vid;
+    _visitorId = visitorId;
     try {
-      await storage.write(StorageKeys.visitorId, vid);
+      await storage.write(StorageKeys.visitorId, visitorId);
     } catch (_) {}
     _helpSessionId = _uuid.v4();
     _setPhase(ChatPhase.idle);
-    return surfaceWasShowing;
   }
 
   /// `GET /config`. Sets [widgetConfig] + [isOpen]. If the workspace is outside
@@ -907,8 +900,10 @@ class SessionController {
       await storage.write(StorageKeys.conversationId, res.conversationId!);
     }
 
-    // A push registration held for want of a session token can go now.
-    unawaited(_flushPushRegistration());
+    // A new session: the chat that ended before it is no longer "the one that
+    // just ended".
+    _endedToken = null;
+    _endedConversationId = null;
 
     // Cleared before the seed, not after: the watermark only ever moves
     // forward, so one carried over from a previous conversation would outrank
@@ -1329,6 +1324,77 @@ class SessionController {
     }
   }
 
+  // ── "Reply in the chat" ──
+
+  /// Open the conversation an emailed "Reply in the chat" link names — see
+  /// `EasyLiveChat.resumeFromLink`.
+  ///
+  /// The web widget's `followResumeLink` (apps/widget Embed.tsx), with one
+  /// rule the widget does not have: while a user is signed in (`identify`
+  /// with a `userId`), a link to a visitor other than this device's own is
+  /// refused. Adopting it would send that person's verified claim on the
+  /// linked contact, and the server would attach their identity to a chat
+  /// nothing shows is theirs — a signed-in person taking over someone
+  /// else's conversation.
+  Future<bool> resumeFromLink(String link) async {
+    final token = resumeTokenFromLink(link);
+    if (token == null || _disposed) return false;
+    // Who is signed in decides what may happen below, so it is lined up
+    // first — exactly as before an open().
+    await _lineUpIdentity();
+    final ResumeLinkTarget? target;
+    try {
+      target = await rest.postResumeLink(token);
+    } catch (_) {
+      // Unreachable: the chat stays as it is. Not surfaced on onError — the
+      // chat screen would read an error before its config as "cannot load".
+      return false;
+    }
+    if (target == null || _disposed) return false;
+    // Let a running open()/resume finish first, so it cannot carry on for the
+    // visitor being replaced (and start a chat for the wrong one).
+    await _settleSessionCalls();
+    if (_disposed) return false;
+    if (target.visitorId != _visitorId) {
+      if (_userId != null || _claimUserId != null) return false;
+      // Become the visitor that reaches the chat. A stored profile was the
+      // last visitor's and goes (the widget's `adoptVisitorId`); the
+      // identifiedUserId is left alone — nobody is signed in to own it.
+      await _becomeVisitor(target.visitorId);
+      if (_disposed) return false;
+    } else if (phase.value == ChatPhase.chat &&
+        _token != null &&
+        (target.conversationId == null ||
+            target.conversationId == _conversationId)) {
+      return true; // already in it
+    }
+    if (widgetConfig.value == null) {
+      try {
+        await loadConfig();
+      } catch (_) {
+        _setPhase(_idlePhase());
+        return false;
+      }
+    }
+    return silentResume();
+  }
+
+  /// Wait out an [open] or [silentResume] already running.
+  Future<void> _settleSessionCalls() async {
+    final opening = _openInFlight;
+    if (opening != null) {
+      try {
+        await opening;
+      } catch (_) {}
+    }
+    final resuming = _silentResumeInFlight;
+    if (resuming != null) {
+      try {
+        await resuming.future;
+      } catch (_) {}
+    }
+  }
+
   // ── emails to the visitor ──
 
   bool _transcriptEmailEnabled = false;
@@ -1344,7 +1410,15 @@ class SessionController {
   bool get replyEmailEnabled => _replyEmailEnabled;
 
   /// The address on the visitor's contact (masked) and what is on offer.
+  ///
+  /// After the chat ended and its session was let go of, asked with that
+  /// chat's token — the same contact — so "Email me this chat" under the
+  /// survey can still name the address on file.
   Future<VisitorEmailState> visitorEmail() async {
+    final ended = _endedToken;
+    if (_token == null && ended != null) {
+      return rest.getVisitorEmail(token: ended);
+    }
     _requireToken('The visitor\'s email');
     return _guardAuth(() => rest.getVisitorEmail(token: _token!));
   }
@@ -1362,7 +1436,18 @@ class SessionController {
   /// where it went, masked. Refusals: `NO_CONTACT_EMAIL` (ask for one),
   /// `INVALID_EMAIL`, `EMAIL_UNSUBSCRIBED`, `TRANSCRIPT_RATE_LIMITED`,
   /// `TRANSCRIPT_DISABLED`.
+  ///
+  /// "The one that just ended" holds after its post-chat survey too, when the
+  /// session itself has already been let go of: that chat's own token is used
+  /// for this one request, directly — never re-minted, because a re-mint is a
+  /// resume, and resuming would reattach the visitor to the closed thread.
   Future<String> emailTranscript({String? email}) async {
+    final endedToken = _endedToken;
+    final endedConv = _endedConversationId;
+    if (_token == null && endedToken != null && endedConv != null) {
+      return rest.postTranscript(
+          token: endedToken, conversationId: endedConv, email: email);
+    }
     _requireToken('Emailing the chat');
     final convId = _conversationId;
     if (convId == null) {
@@ -1415,71 +1500,6 @@ class SessionController {
     }
   }
 
-  /// The device to notify when an agent replies and this app is closed.
-  ///
-  /// Call it as soon as the push SDK hands over a token — before a chat exists
-  /// is fine, and is the common case. There is no session token to authenticate
-  /// with until the visitor opens a conversation, so the registration is held
-  /// and sent the moment there is one.
-  ///
-  /// Calling it again with a different token moves the registration: the old
-  /// one is dropped first, so a token rotation cannot leave a dead row behind
-  /// that keeps receiving this person's replies. `null` unregisters.
-  Future<void> setPushToken(
-    String? pushToken, {
-    required String platform,
-    String? appVersion,
-  }) async {
-    final next = pushToken?.trim();
-    if (next != null && next.isEmpty) return;
-    if (next == _pushToken && next == _registeredPushToken) return;
-
-    final previous = _registeredPushToken;
-    _pushToken = next;
-    _pushPlatform = platform;
-    _pushAppVersion = appVersion;
-
-    if (previous != null && previous != next) {
-      await _unregisterPush(previous);
-    }
-    if (next != null) await _flushPushRegistration();
-  }
-
-  /// Send the held registration, if there is one and we can authenticate it.
-  /// Called after every session adoption, so the queue drains by itself.
-  Future<void> _flushPushRegistration() async {
-    final pushToken = _pushToken;
-    final token = _token;
-    final platform = _pushPlatform;
-    if (pushToken == null || token == null || platform == null) return;
-    if (_registeredPushToken == pushToken) return;
-    try {
-      await rest.registerPush(
-        token: token,
-        pushToken: pushToken,
-        platform: platform,
-        locale: _effectiveLocale,
-        appVersion: _pushAppVersion,
-      );
-      _registeredPushToken = pushToken;
-    } catch (_) {
-      // Left queued: the next session adoption tries again. A visitor who
-      // never gets a notification is a smaller failure than one who cannot
-      // open a chat because registering threw.
-    }
-  }
-
-  Future<void> _unregisterPush(String pushToken) async {
-    final token = _token;
-    if (_registeredPushToken == pushToken) _registeredPushToken = null;
-    if (token == null) return;
-    try {
-      await rest.unregisterPush(token: token, pushToken: pushToken);
-    } catch (_) {
-      // Best effort. The server prunes a token FCM reports as dead anyway.
-    }
-  }
-
   /// The conversation is over and its post-chat step is done — let go of it.
   ///
   /// Holding the socket open kept the visitor attached to a closed
@@ -1488,6 +1508,10 @@ class SessionController {
   void _finishEndedSession() {
     _teardownSocket();
     _socketConversationId = null;
+    if (_token != null && _conversationId != null) {
+      _endedToken = _token;
+      _endedConversationId = _conversationId;
+    }
     _conversationId = null;
     _token = null;
     // Belongs to the conversation being let go of, and only moves forward —
@@ -1949,7 +1973,6 @@ class SessionController {
           _token = res.token;
           _conversationId = res.conversationId ?? _conversationId;
           await storage.write(StorageKeys.token, res.token!);
-          unawaited(_flushPushRegistration());
           // Apply the fresh token. A LIVE socket won't re-read its handshake
           // auth on a no-op connect(), so force a fresh handshake — its
           // onConnect (with _hasConnectedOnce already true) then owns the gap
@@ -2324,6 +2347,41 @@ VisitorChange visitorChangeFor(
   if (stored == null) return VisitorChange.upgraded;
   return VisitorChange.switched;
 }
+
+/// The token in an emailed "Reply in the chat" link, or null when [link] is
+/// not one of ours.
+///
+/// Takes what a host's deep-link handler is handed: the email's link to the
+/// workspace's page (`…#elc_chat=<token>`, services/visitor-email-content.ts
+/// in the API), our own chat page's (`…/embed?…#resume=<token>`), or the bare
+/// token. The same check as the web (`readResumeToken`, apps/widget
+/// lib/resume-link.ts, and the loader's `takeChatLink`): a JWT — three
+/// base64url parts — or nothing. Lenient only about where the parameter sits
+/// (fragment or query, first or not), since a host may rewrite the link into
+/// its own scheme on the way in.
+String? resumeTokenFromLink(String link) {
+  final s = link.trim();
+  if (s.isEmpty) return null;
+  String? raw;
+  if (_jwtShape.hasMatch(s)) {
+    raw = s;
+  } else {
+    final m = _resumeParam.firstMatch(s);
+    if (m == null) return null;
+    raw = m.group(1);
+  }
+  if (raw == null || raw.isEmpty) return null;
+  final String token;
+  try {
+    token = Uri.decodeComponent(raw).trim();
+  } catch (_) {
+    return null;
+  }
+  return _jwtShape.hasMatch(token) ? token : null;
+}
+
+final RegExp _jwtShape = RegExp(r'^[\w-]+\.[\w-]+\.[\w-]+$');
+final RegExp _resumeParam = RegExp(r'(?:^|[#?&])(?:elc_chat|resume)=([^&#]*)');
 
 String? _trimmedOrNull(String? v) {
   if (v == null) return null;

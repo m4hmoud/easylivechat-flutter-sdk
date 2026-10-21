@@ -19,6 +19,8 @@ export 'src/storage_impl.dart';
 export 'src/launcher.dart';
 export 'src/chat_screen.dart';
 export 'src/end_chat_button.dart';
+// The header's ⋯ ("Email me this chat"), for a host's own app bar.
+export 'src/email_offers.dart' show EasyLiveChatMenuButton;
 // Help articles: the screen, and the article renderer for hosts that build
 // their own help UI on the core's searchHelp()/getHelpArticle().
 export 'src/help_screen.dart' show EasyLiveChatHelpScreen;

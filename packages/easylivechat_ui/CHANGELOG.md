@@ -1,5 +1,43 @@
 # Changelog
 
+## 0.1.75
+
+- Requires `easylivechat` ^0.1.58: `resumeFromLink()` for "Reply in the chat"
+  email links, `setPushToken()` deprecated to a no-op (notifications are your
+  server's, on the `message.created` webhook), and "Email me this chat" for
+  the chat that just ended after its survey. All re-exported here.
+- **"Email me this chat".** In the header's ⋯ — `EasyLiveChatMenuButton`, new,
+  for your own app bar beside `EasyLiveChatEndChatButton`, and in the
+  screen's own bar (`showAppBar`) — while the workspace offers transcripts and
+  the chat has something in it besides system lines; drawn not at all
+  otherwise. `EasyLiveChatMenuButton.emailTranscript()` for an app bar that
+  takes a callback. It opens an inline card above the thread (never a modal):
+  with an address on file a one-tap confirmation naming it, masked, and "Use
+  another address"; with none, the field. Sent, it says where for four
+  seconds and goes. Under the survey once a chat has ended, the same offer as
+  a link, for the chat that ended — before and after the survey is answered.
+- **"Get the reply by email".** The web widget's card above the thread, once
+  the visitor has written while nobody can answer — closed, queued, or nobody
+  accepting — and the workspace holds no address for them; with the
+  workspace's switch on and the composer not locked. Asked once per
+  conversation, and never again for it once answered or dismissed, across
+  launches too (`shared_preferences`, `easylivechat:replyEmailAsked`). Kept,
+  it says the address it will write to until dismissed.
+- Both cards check the address as the web does before sending, type it left
+  to right in every language, keep the masked address whole inside an
+  Arabic-script sentence, and say a refusal in place: rate-limited,
+  unsubscribed, not an address, or try again. Words in all thirteen
+  languages — the web widget's, and Badini (kmr) written for the SDK.
+- **Emoji search.** The picker gets the web's search field over its tabs:
+  each word typed must start one of an emoji's English names or tags (the
+  only words the shared table has, on the web too), exact words first, the
+  table's order breaking ties, at most 120; an emoji typed in finds itself.
+  Matches replace the categories, "No emoji found" when there are none; the
+  keyboard's search key picks the first match, as Enter does on the web, and
+  a tab or the × leaves the search. The sheet rises above the keyboard. The
+  generated `emoji_catalog.dart` now carries the shared search words
+  (`l10n/emoji_catalog.py`).
+
 ## 0.1.74
 
 - Requires `easylivechat` ^0.1.57: reactions, link previews, the colour

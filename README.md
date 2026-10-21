@@ -76,9 +76,17 @@ management you like.
 - ✅ **Help articles** — headless `searchHelp()` / `getHelpArticle()` /
   `rateHelpArticle()` in the core, `EasyLiveChatHelpScreen` + the native
   `ElcHelpMarkdown` renderer (no HTML/WebView) in the UI kit.
-- ⛔ **Background push** ("agent replied while the app was closed") needs a
-  server-side visitor push registry + fan-out (the backend currently pushes to
-  agents only). The `EasyLiveChatPush` hook is stubbed until then.
+- ✅ **Emails to the visitor** — "Email me this chat" and "Get the reply by
+  email" in the UI kit (the core's `emailTranscript()` / `setVisitorEmail()`),
+  and `resumeFromLink(link)` opens the conversation an emailed "Reply in the
+  chat" link leads to, from your app's deep-link handler.
+- **Notifications are your server's job.** EasyLiveChat does not push to your
+  app's users and needs no Firebase key from you: subscribe to the
+  `message.created` webhook, and for a reply from the team or the assistant
+  whose `contact.userId` is set (the `userId` you passed to `identify()`),
+  send your own push to that user's devices. `setPushToken()` is a deprecated
+  no-op. See "Notifications" in the
+  [core README](packages/easylivechat/README.md#notifications).
 - ⚠️ Rate-limiting on `message:send` / `/session`, a token-refresh route, and
   HEIC/MOV upload support are recommended follow-ups (see the spec §11).
 

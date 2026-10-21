@@ -4,6 +4,7 @@ import 'package:easylivechat/easylivechat.dart';
 import 'package:flutter/material.dart';
 
 import 'chime.dart';
+import 'email_offers.dart';
 import 'end_chat_button.dart';
 import 'help_screen.dart';
 import 'l10n.dart';
@@ -26,7 +27,14 @@ import 'views/thread_view.dart';
 ///  • `prechat` → [PreChatFormView];
 ///  • `chat` → a [Column] of [ThreadView] + [ComposerBar];
 ///  • `feedback` → [PostChatFormView] when the tenant configured a survey,
-///    otherwise [FeedbackPromptView].
+///    otherwise [FeedbackPromptView] — with "Email me this chat" under it when
+///    the workspace offers transcripts.
+///
+/// The web widget's two email offers come with the chat: "Email me this chat"
+/// from the header's ⋯ ([EasyLiveChatMenuButton] — in [showAppBar]'s bar, or
+/// your own), and "Get the reply by email" above the thread once the visitor
+/// has written while nobody can answer and we hold no address for them. Both
+/// are inline cards, and both only appear when the workspace switched them on.
 ///
 /// When the workspace shows help articles (`helpArticlesEnabled`), `prechat`
 /// and `chat` also carry a "Browse help articles" row until the visitor has
@@ -395,6 +403,13 @@ class _EasyLiveChatScreenState extends State<EasyLiveChatScreen>
                         strings: ElcStrings.of(widget.locale ?? config?.locale),
                       ),
               ),
+            // "Email me this chat" (opened from the ⋯) or "Get the reply by
+            // email" — inline cards, where the web widget puts them.
+            if (EasyLiveChat.instance.isBooted)
+              ElcEmailOffersSlot(
+                theme: theme,
+                strings: ElcStrings.of(widget.locale ?? config?.locale),
+              ),
             // Help first, while there is nothing written yet: an answer found
             // there is a chat nobody had to wait on.
             if (widget.showHelpArticles && config != null)
@@ -431,10 +446,20 @@ class _EasyLiveChatScreenState extends State<EasyLiveChatScreen>
         // everyone else keeps the built-in CSAT. Same rule as the web widget,
         // so a visitor's questions don't depend on which client they opened.
         final postChat = config?.postChatForm;
-        if (config != null && (postChat?.hasFields ?? false)) {
-          return PostChatFormView(config: config, theme: theme);
-        }
-        return FeedbackPromptView(theme: theme);
+        final Widget survey = config != null && (postChat?.hasFields ?? false)
+            ? PostChatFormView(config: config, theme: theme)
+            : FeedbackPromptView(theme: theme);
+        // A copy of the chat that just ended, to keep — under the survey,
+        // before and after it is answered, as on the web.
+        return Column(
+          children: [
+            Expanded(child: survey),
+            ElcTranscriptAfterChat(
+              theme: theme,
+              strings: ElcStrings.of(widget.locale ?? config?.locale),
+            ),
+          ],
+        );
     }
   }
 
@@ -662,6 +687,12 @@ class _ChatAppBar extends StatelessWidget {
                 fontWeight: FontWeight.w600,
               ),
             ),
+          ),
+          // The ⋯ — "Email me this chat" — only while it has something in it.
+          EasyLiveChatMenuButton(
+            color: onSurface,
+            locale: locale,
+            theme: theme,
           ),
           // Only while there is something to end — during the survey or the
           // offline notice this would close nothing.

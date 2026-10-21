@@ -147,7 +147,8 @@ the visitor's language and direction.
 
 **Reactions.** A long press on one of the team's messages opens the quick row
 (👍 ❤️ 😂 😮 😢 🙏) and a + for every emoji, by category, the visitor's recent
-ones first; the same emoji again takes it back. Chips under a bubble show the
+ones first, with a search over the emoji's English names, as on the web; the
+same emoji again takes it back. Chips under a bubble show the
 visitor's own reaction and the team's on theirs — never an agent's name — and
 change live. Screen readers get a "React" action on the message instead of the
 long press. Reacting needs a live connection and a workspace that takes
@@ -173,6 +174,15 @@ language, saying the assistant can help while it covers and when a person is
 back. The full closed screen says the same. A visitor waiting for a person sees
 their place and the expected wait above the conversation, which stays readable
 and writable underneath; it goes the moment somebody is there.
+
+**Emails to the visitor.** With your dashboard's switches on, the chat offers
+what the web widget offers. "Email me this chat" sits in the header's ⋯
+(`EasyLiveChatMenuButton`) and under the survey once a chat has ended: an inline
+card that confirms the address on file in one tap, or takes another. "Get the
+reply by email" appears above the thread once the visitor has written while
+nobody can answer — closed, queued, nobody accepting — and you hold no address
+for them; asked once per conversation, never again once answered or dismissed.
+Addresses are shown masked.
 
 ## Recipes
 
@@ -299,6 +309,47 @@ post-chat survey in place. If your app bar takes an icon and a callback
 instead, call `EasyLiveChatEndChatButton.confirmAndEnd(context)` — it no-ops
 when there is nothing to end.
 
+### Email me this chat
+
+The ⋯ menu holds "Email me this chat" and draws nothing while it has nothing in
+it, so it can sit in your app bar permanently, beside the end-chat button:
+
+```dart
+AppBar(actions: const [EasyLiveChatMenuButton(), EasyLiveChatEndChatButton()])
+```
+
+`EasyLiveChatScreen(showAppBar: true)` carries both already. For an app bar that
+takes a callback, `EasyLiveChatMenuButton.emailTranscript()` opens the card
+(false, doing nothing, when it is not on offer). The card opens above the
+thread; the chat that just ended gets the same offer under the survey without
+any of this.
+
+### Open the chat from a "Reply in the chat" email
+
+The workspace's emails link back into the conversation. When that link opens
+your app — a universal link / app link on your site's domain — pass it on and
+show the chat:
+
+```dart
+if (await EasyLiveChat.instance.resumeFromLink(uri.toString())) {
+  Navigator.of(context).push(
+    MaterialPageRoute(builder: (_) => const EasyLiveChatScreen()),
+  );
+}
+```
+
+Call `identify()` first, as you would before opening the chat: a signed-in user
+is never moved into another visitor's conversation. See the core package's
+README.
+
+### Notifications
+
+EasyLiveChat does not push to your users and needs no Firebase key from you.
+Your server sends them, on the `message.created` webhook: for a reply from the
+team or the assistant whose `contact.userId` is set — the `userId` you passed
+to `identify()` — notify that user's devices. `setPushToken()` is a deprecated
+no-op. The core package's README has the recipe.
+
 ### Language
 
 Chrome (buttons, labels, errors) ships in en, ar, ckb (Sorani), kmr (Badini),
@@ -338,6 +389,7 @@ Every widget takes `themeOverride`, `directionOverride`, `onPickAttachments`,
 | `EasyLiveChatLauncher` | Floating bubble with unread badge. `alignment:` to move it, `useBottomSheet: true` to open as a sheet |
 | `EasyLiveChatScreen` | The full chat screen, for your own navigation |
 | `EasyLiveChatEndChatButton` | Explicit end-chat action for an app bar |
+| `EasyLiveChatMenuButton` | The header's ⋯ — "Email me this chat" — for an app bar; drawn only when it has something in it |
 | `EasyLiveChatHelpScreen` | Help articles: search, reader, "Was this helpful?", start a chat. `onStartChat:`, `onOpenLink:`, `initialArticleId:` |
 | `ElcHelpMarkdown` | Renders a help article's markdown body natively (no HTML) |
 | `ElcLinkPreviewCard` | A message's link preview card, for your own thread |

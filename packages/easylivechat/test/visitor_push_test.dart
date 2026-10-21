@@ -1,16 +1,22 @@
-/// A push token handed over before there is a chat must not be dropped.
+/// `setPushToken` is a deprecated no-op.
 ///
-/// The host app gets its FCM token at launch, long before anyone opens the
-/// conversation — and a registration can only be authenticated with a session
-/// token, which does not exist yet. So the registration is held and sent when
-/// a session arrives. The other half is rotation: a new token must replace the
-/// old one, or the dead row keeps receiving this person's replies.
+/// The owner's decision (2026-10): workspaces no longer hand EasyLiveChat their
+/// Firebase key, so EasyLiveChat no longer notifies an app's users — the
+/// workspace's own server does, on the `message.created` webhook. What stays is
+/// the signature, so a host built against 0.1.54–0.1.57 still compiles. What
+/// must hold: the call makes no request and holds nothing for later — a token
+/// handed over before a chat existed used to be queued and sent the moment a
+/// session arrived, and that must not happen any more either.
 library;
 
+// The point of this file is the deprecated call.
+// ignore_for_file: deprecated_member_use_from_same_package
+
 import 'package:easylivechat/easylivechat.dart';
-import 'package:easylivechat/src/rest_client.dart';
 import 'package:easylivechat/src/session_controller.dart';
 import 'package:test/test.dart';
+
+import 'support/fake_http.dart';
 
 const _config = EasyLiveChatConfig(
   apiBase: 'https://api.example.test',
@@ -19,126 +25,49 @@ const _config = EasyLiveChatConfig(
 
 void main() {
   group('setPushToken', () {
-    test('holds the registration until a session can authenticate it', () async {
-      final rest = _RecordingRest(_config);
-      final controller = SessionController(config: _config, storage: InMemoryStorage());
-      controller.rest = rest;
-      await controller.boot();
+    tearDown(() => EasyLiveChat.instance.shutdown());
 
-      await controller.setPushToken('fcm-1', platform: 'ANDROID');
-      expect(rest.registered, isEmpty, reason: 'nothing to authenticate with yet');
-
-      // A session arrives: the held registration goes out by itself.
-      await controller.silentResume();
-      await Future<void>.delayed(Duration.zero);
-      expect(rest.registered, [
-        {'token': 'fcm-1', 'platform': 'ANDROID'},
-      ]);
+    test('is safe before boot, and does nothing', () async {
+      expect(EasyLiveChat.instance.isBooted, isFalse);
+      await EasyLiveChat.instance.setPushToken('fcm-1', platform: 'ANDROID');
+      await EasyLiveChat.instance.setPushToken(null, platform: 'IOS');
+      expect(EasyLiveChat.instance.isBooted, isFalse,
+          reason: 'a no-op must not boot or touch the controller');
     });
 
-    test('moves the registration when the device rotates its token', () async {
-      final rest = _RecordingRest(_config);
-      final controller = SessionController(config: _config, storage: InMemoryStorage());
-      controller.rest = rest;
-      await controller.boot();
-      await controller.silentResume();
-
-      await controller.setPushToken('fcm-1', platform: 'IOS');
-      await controller.setPushToken('fcm-2', platform: 'IOS');
-
-      expect(rest.registered.map((r) => r['token']), ['fcm-1', 'fcm-2']);
-      expect(rest.unregistered, ['fcm-1'], reason: 'the old row must not outlive the swap');
-    });
-
-    test('registers once for a token the server already has', () async {
-      final rest = _RecordingRest(_config);
-      final controller = SessionController(config: _config, storage: InMemoryStorage());
-      controller.rest = rest;
-      await controller.boot();
-      await controller.silentResume();
-
-      await controller.setPushToken('fcm-1', platform: 'ANDROID');
-      await controller.setPushToken('fcm-1', platform: 'ANDROID');
-      expect(rest.registered, hasLength(1));
-    });
-
-    test('null stops the notifications', () async {
-      final rest = _RecordingRest(_config);
-      final controller = SessionController(config: _config, storage: InMemoryStorage());
-      controller.rest = rest;
-      await controller.boot();
-      await controller.silentResume();
-
-      await controller.setPushToken('fcm-1', platform: 'ANDROID');
-      await controller.setPushToken(null, platform: 'ANDROID');
-      expect(rest.unregistered, ['fcm-1']);
-    });
-
-    test('a failed registration stays queued for the next session', () async {
-      final rest = _RecordingRest(_config, failRegister: true);
-      final controller = SessionController(config: _config, storage: InMemoryStorage());
-      controller.rest = rest;
-      await controller.boot();
-      await controller.silentResume();
-
-      await controller.setPushToken('fcm-1', platform: 'ANDROID');
-      expect(rest.registered, hasLength(1));
-
-      rest.failRegister = false;
-      await controller.silentResume();
-      await Future<void>.delayed(Duration.zero);
-      expect(rest.registered, hasLength(2), reason: 'retried when a session came back');
+    test('after boot too: completes, and throws nothing', () async {
+      await EasyLiveChat.instance.boot(_config);
+      await expectLater(
+        EasyLiveChat.instance
+            .setPushToken('fcm-1', platform: 'IOS', appVersion: '2.0.0'),
+        completes,
+      );
     });
   });
-}
 
-class _RecordingRest extends RestClient {
-  _RecordingRest(super.config, {this.failRegister = false});
+  test('a session no longer registers any device', () async {
+    final http = FakeHttp((r) {
+      if (r.path.endsWith('/session')) {
+        return const FakeReply(200, {
+          'token': 'widget-jwt',
+          'conversationId': 'conv-1',
+          'resumed': true,
+          'hasActiveConversation': true,
+          'messages': [],
+        });
+      }
+      return const FakeReply(404);
+    });
+    final c = SessionController(config: _config, storage: InMemoryStorage());
+    c.rest = fakeRest(_config, http);
+    await c.boot();
+    expect(await c.silentResume(), isTrue);
+    await Future<void>.delayed(Duration.zero);
 
-  bool failRegister;
-  final List<Map<String, String?>> registered = [];
-  final List<String> unregistered = [];
-
-  @override
-  Future<SessionResult> postSession({
-    required String visitorId,
-    String? name,
-    String? email,
-    String? phone,
-    String? page,
-    String? locale,
-    String? contentLocale,
-    bool resumeOnly = false,
-    Map<String, String>? fields,
-    List<String>? consents,
-    Map<String, String>? attributes,
-    String? userId,
-    String? userHash,
-  }) async =>
-      const SessionResult(
-        resumed: true,
-        hasActiveConversation: true,
-        token: 'widget-jwt',
-        conversationId: 'conv-1',
-      );
-
-  @override
-  Future<void> registerPush({
-    required String token,
-    required String pushToken,
-    required String platform,
-    String? locale,
-    String? appVersion,
-  }) async {
-    registered.add({'token': pushToken, 'platform': platform});
-    if (failRegister) throw Exception('network');
-  }
-
-  @override
-  Future<void> unregisterPush({
-    required String token,
-    required String pushToken,
-  }) async {
-    unregistered.add(pushToken);
-  }
+    expect(http.requests.map((r) => r.path).where((p) => p.contains('/push/')),
+        isEmpty,
+        reason: 'no /push/register or /push/unregister, ever');
+    expect(http.requests, hasLength(1));
+    c.dispose();
+  });
 }

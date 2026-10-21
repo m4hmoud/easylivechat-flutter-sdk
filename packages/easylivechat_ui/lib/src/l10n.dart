@@ -225,8 +225,56 @@ class ElcStrings {
         _ => id,
       };
 
+  /// The picker's search field (placeholder and screen-reader name). Its words
+  /// are the emoji's English names, as on the web.
+  String get emojiSearch => _t('emojiSearch');
+
+  /// In place of the grid when nothing matches the search.
+  String get emojiNoResults => _t('emojiNoResults');
+
+  /// Screen-reader name of the grid of matches.
+  String get emojiResults => _t('emojiResults');
+
   /// The launcher's screen-reader name when the workspace gave it no words.
   String get openChat => _t('openChat');
+
+  // ── emails to the visitor ──
+  //
+  // The web widget's words (apps/widget widgetStrings: EmailCard, Header).
+
+  /// "Email me this chat" — the ⋯ menu item, the link under the survey, and
+  /// the card's title.
+  String get emailTranscript => _t('emailTranscript');
+
+  /// The one-tap confirmation naming the address on file; caller
+  /// substitutes `{email}` (masked).
+  String get emailSendTo => _t('emailSendTo');
+
+  /// Swaps the confirmation for an address field.
+  String get emailOther => _t('emailOther');
+  String get emailSend => _t('emailSend');
+
+  /// After the copy went; caller substitutes `{email}` (masked).
+  String get emailSentTo => _t('emailSentTo');
+  String get emailFailed => _t('emailFailed');
+  String get emailRateLimited => _t('emailRateLimited');
+  String get emailUnsubscribed => _t('emailUnsubscribed');
+  String get cancel => _t('cancel');
+
+  /// Screen-reader name / tooltip of the × on a card that has said its piece.
+  String get dismiss => _t('dismiss');
+
+  /// "Get the reply by email", offered while nobody can answer.
+  String get notifyTitle => _t('notifyTitle');
+  String get notifyBody => _t('notifyBody');
+  String get notifyButton => _t('notifyButton');
+
+  /// After the address was kept; caller substitutes `{email}` (masked).
+  String get notifySaved => _t('notifySaved');
+  String get notifyDismiss => _t('notifyDismiss');
+
+  /// The ⋯ in the chat's header.
+  String get moreOptions => _t('moreOptions');
 
   // ── waiting for a person ──
 
@@ -497,6 +545,25 @@ class ElcStrings {
       'queueWait': '#{position} · ~{minutes} min',
       'incomingMessage': '{name}: {message}',
       'incomingMessageUnnamed': 'New message: {message}',
+      'emailTranscript': 'Email me this chat',
+      'emailSendTo': "We'll send a copy to {email}.",
+      'emailOther': 'Use another address',
+      'emailSend': 'Send',
+      'emailSentTo': 'Sent to {email}.',
+      'emailFailed': "We couldn't send it. Try again in a moment.",
+      'emailRateLimited': "You've asked for this chat a few times already. Try again later.",
+      'emailUnsubscribed': 'This address has unsubscribed from our emails.',
+      'cancel': 'Cancel',
+      'dismiss': 'Dismiss',
+      'notifyTitle': 'Get the reply by email',
+      'notifyBody': "We'll answer here. Leave your email in case you've gone by then.",
+      'notifyButton': 'Email me',
+      'notifySaved': "We'll email {email} if you've left by the time we reply.",
+      'notifyDismiss': 'Not now',
+      'moreOptions': 'More options',
+      'emojiSearch': 'Search emoji',
+      'emojiNoResults': 'No emoji found',
+      'emojiResults': 'Results',
     },
     'ar': {
       'send': 'إرسال',
@@ -607,6 +674,25 @@ class ElcStrings {
       'queueWait': 'الدور {position} · نحو {minutes} دقيقة',
       'incomingMessage': '{name}: {message}',
       'incomingMessageUnnamed': 'رسالة جديدة: {message}',
+      'emailTranscript': 'أرسل لي هذه المحادثة بالبريد',
+      'emailSendTo': 'سنرسل نسخة إلى {email}.',
+      'emailOther': 'استخدم عنوانًا آخر',
+      'emailSend': 'إرسال',
+      'emailSentTo': 'أُرسلت إلى {email}.',
+      'emailFailed': 'تعذّر الإرسال. حاول مرة أخرى بعد قليل.',
+      'emailRateLimited': 'طلبت هذه المحادثة عدة مرات بالفعل. حاول لاحقًا.',
+      'emailUnsubscribed': 'ألغى هذا العنوان اشتراكه في رسائلنا.',
+      'cancel': 'إلغاء',
+      'dismiss': 'إغلاق',
+      'notifyTitle': 'استلم الرد بالبريد الإلكتروني',
+      'notifyBody': 'سنرد هنا. اترك بريدك الإلكتروني في حال غادرت قبل ذلك.',
+      'notifyButton': 'راسلني',
+      'notifySaved': 'سنراسل {email} إذا كنت قد غادرت عند ردنا.',
+      'notifyDismiss': 'ليس الآن',
+      'moreOptions': 'خيارات إضافية',
+      'emojiSearch': 'ابحث عن رمز تعبيري',
+      'emojiNoResults': 'لا توجد رموز تعبيرية مطابقة',
+      'emojiResults': 'النتائج',
     },
     'ckb': {
       'send': 'ناردن',
@@ -717,6 +803,25 @@ class ElcStrings {
       'queueWait': 'ژمارە {position} · نزیکەی {minutes} خولەک',
       'incomingMessage': '{name}: {message}',
       'incomingMessageUnnamed': 'نامەی نوێ: {message}',
+      'emailTranscript': 'ئەم گفتوگۆیە بە ئیمەیڵ بۆم بنێرە',
+      'emailSendTo': 'کۆپییەک بۆ {email} دەنێرین.',
+      'emailOther': 'ناونیشانێکی تر بەکاربهێنە',
+      'emailSend': 'ناردن',
+      'emailSentTo': 'بۆ {email} نێردرا.',
+      'emailFailed': 'نەتوانرا بنێردرێت. دوای کەمێک دووبارە هەوڵ بدەرەوە.',
+      'emailRateLimited': 'پێشتر چەند جارێک داوای ئەم گفتوگۆیەت کردووە. دواتر هەوڵ بدەرەوە.',
+      'emailUnsubscribed': 'ئەم ناونیشانە بەشداریکردنی لە ئیمەیڵەکانمان هەڵوەشاندووەتەوە.',
+      'cancel': 'پاشگەزبوونەوە',
+      'dismiss': 'داخستن',
+      'notifyTitle': 'وەڵامەکە بە ئیمەیڵ وەربگرە',
+      'notifyBody': 'لێرە وەڵام دەدەینەوە. ئیمەیڵەکەت بەجێبهێڵە ئەگەر تا ئەو کاتە ڕۆیشتبیت.',
+      'notifyButton': 'ئیمەیڵم بۆ بنێرە',
+      'notifySaved': 'ئەگەر لە کاتی وەڵامدانەوەماندا ڕۆیشتبیت، ئیمەیڵ بۆ {email} دەنێرین.',
+      'notifyDismiss': 'ئێستا نا',
+      'moreOptions': 'بژاردەی زیاتر',
+      'emojiSearch': 'گەڕان بۆ ئیمۆجی',
+      'emojiNoResults': 'هیچ ئیمۆجییەک نەدۆزرایەوە',
+      'emojiResults': 'ئەنجامەکان',
     },
     'de': {
       'send': 'Senden',
@@ -827,6 +932,25 @@ class ElcStrings {
       'queueWait': '#{position} · ~{minutes} Min.',
       'incomingMessage': '{name}: {message}',
       'incomingMessageUnnamed': 'Neue Nachricht: {message}',
+      'emailTranscript': 'Chat per E-Mail an mich senden',
+      'emailSendTo': 'Wir senden eine Kopie an {email}.',
+      'emailOther': 'Andere Adresse verwenden',
+      'emailSend': 'Senden',
+      'emailSentTo': 'An {email} gesendet.',
+      'emailFailed': 'Das hat nicht geklappt. Bitte versuchen Sie es gleich noch einmal.',
+      'emailRateLimited': 'Sie haben diesen Chat schon mehrmals angefordert. Bitte versuchen Sie es später erneut.',
+      'emailUnsubscribed': 'Diese Adresse hat unsere E-Mails abbestellt.',
+      'cancel': 'Abbrechen',
+      'dismiss': 'Schließen',
+      'notifyTitle': 'Antwort per E-Mail erhalten',
+      'notifyBody': 'Wir antworten hier. Hinterlassen Sie Ihre E-Mail-Adresse, falls Sie bis dahin nicht mehr da sind.',
+      'notifyButton': 'Per E-Mail benachrichtigen',
+      'notifySaved': 'Wir schreiben an {email}, falls Sie bei unserer Antwort nicht mehr da sind.',
+      'notifyDismiss': 'Nicht jetzt',
+      'moreOptions': 'Weitere Optionen',
+      'emojiSearch': 'Emoji suchen',
+      'emojiNoResults': 'Kein Emoji gefunden',
+      'emojiResults': 'Ergebnisse',
     },
     'es': {
       'send': 'Enviar',
@@ -937,6 +1061,25 @@ class ElcStrings {
       'queueWait': '#{position} · ~{minutes} min',
       'incomingMessage': '{name}: {message}',
       'incomingMessageUnnamed': 'Nuevo mensaje: {message}',
+      'emailTranscript': 'Enviarme este chat por correo',
+      'emailSendTo': 'Enviaremos una copia a {email}.',
+      'emailOther': 'Usar otra dirección',
+      'emailSend': 'Enviar',
+      'emailSentTo': 'Enviado a {email}.',
+      'emailFailed': 'No se pudo enviar. Inténtalo de nuevo en un momento.',
+      'emailRateLimited': 'Ya has pedido este chat varias veces. Inténtalo más tarde.',
+      'emailUnsubscribed': 'Esta dirección se dio de baja de nuestros correos.',
+      'cancel': 'Cancelar',
+      'dismiss': 'Cerrar',
+      'notifyTitle': 'Recibe la respuesta por correo',
+      'notifyBody': 'Responderemos aquí. Déjanos tu correo por si ya no estás cuando lo hagamos.',
+      'notifyButton': 'Avisarme por correo',
+      'notifySaved': 'Escribiremos a {email} si ya te has ido cuando respondamos.',
+      'notifyDismiss': 'Ahora no',
+      'moreOptions': 'Más opciones',
+      'emojiSearch': 'Buscar emoji',
+      'emojiNoResults': 'No se encontró ningún emoji',
+      'emojiResults': 'Resultados',
     },
     'fr': {
       'send': 'Envoyer',
@@ -1047,6 +1190,25 @@ class ElcStrings {
       'queueWait': '#{position} · ~{minutes} min',
       'incomingMessage': '{name} : {message}',
       'incomingMessageUnnamed': 'Nouveau message : {message}',
+      'emailTranscript': 'Recevoir ce chat par e-mail',
+      'emailSendTo': 'Nous enverrons une copie à {email}.',
+      'emailOther': 'Utiliser une autre adresse',
+      'emailSend': 'Envoyer',
+      'emailSentTo': 'Envoyé à {email}.',
+      'emailFailed': "L'envoi a échoué. Réessayez dans un instant.",
+      'emailRateLimited': 'Vous avez déjà demandé ce chat plusieurs fois. Réessayez plus tard.',
+      'emailUnsubscribed': "Cette adresse s'est désabonnée de nos e-mails.",
+      'cancel': 'Annuler',
+      'dismiss': 'Fermer',
+      'notifyTitle': 'Recevoir la réponse par e-mail',
+      'notifyBody': "Nous répondrons ici. Laissez votre e-mail au cas où vous seriez parti d'ici là.",
+      'notifyButton': "M'avertir par e-mail",
+      'notifySaved': 'Nous écrirons à {email} si vous êtes parti au moment de notre réponse.',
+      'notifyDismiss': 'Pas maintenant',
+      'moreOptions': "Plus d'options",
+      'emojiSearch': 'Rechercher un émoji',
+      'emojiNoResults': 'Aucun émoji trouvé',
+      'emojiResults': 'Résultats',
     },
     'hi': {
       'send': 'भेजें',
@@ -1157,6 +1319,25 @@ class ElcStrings {
       'queueWait': '#{position} · ~{minutes} मिनट',
       'incomingMessage': '{name}: {message}',
       'incomingMessageUnnamed': 'नया संदेश: {message}',
+      'emailTranscript': 'यह चैट मुझे ईमेल करें',
+      'emailSendTo': 'हम {email} पर एक प्रति भेजेंगे।',
+      'emailOther': 'दूसरा पता इस्तेमाल करें',
+      'emailSend': 'भेजें',
+      'emailSentTo': '{email} पर भेज दिया गया।',
+      'emailFailed': 'भेजा नहीं जा सका। थोड़ी देर में फिर कोशिश करें।',
+      'emailRateLimited': 'आप यह चैट पहले ही कई बार माँग चुके हैं। बाद में फिर कोशिश करें।',
+      'emailUnsubscribed': 'इस पते ने हमारे ईमेल की सदस्यता छोड़ दी है।',
+      'cancel': 'रद्द करें',
+      'dismiss': 'बंद करें',
+      'notifyTitle': 'जवाब ईमेल पर पाएँ',
+      'notifyBody': 'हम यहीं जवाब देंगे। अगर तब तक आप चले जाएँ, तो अपना ईमेल छोड़ दें।',
+      'notifyButton': 'मुझे ईमेल करें',
+      'notifySaved': 'अगर हमारे जवाब तक आप चले गए हों, तो हम {email} पर ईमेल करेंगे।',
+      'notifyDismiss': 'अभी नहीं',
+      'moreOptions': 'और विकल्प',
+      'emojiSearch': 'इमोजी खोजें',
+      'emojiNoResults': 'कोई इमोजी नहीं मिला',
+      'emojiResults': 'परिणाम',
     },
     'it': {
       'send': 'Invia',
@@ -1267,6 +1448,25 @@ class ElcStrings {
       'queueWait': '#{position} · ~{minutes} min',
       'incomingMessage': '{name}: {message}',
       'incomingMessageUnnamed': 'Nuovo messaggio: {message}',
+      'emailTranscript': 'Inviami questa chat via email',
+      'emailSendTo': 'Invieremo una copia a {email}.',
+      'emailOther': 'Usa un altro indirizzo',
+      'emailSend': 'Invia',
+      'emailSentTo': 'Inviata a {email}.',
+      'emailFailed': 'Invio non riuscito. Riprova tra poco.',
+      'emailRateLimited': 'Hai già richiesto questa chat diverse volte. Riprova più tardi.',
+      'emailUnsubscribed': "Questo indirizzo ha annullato l'iscrizione alle nostre email.",
+      'cancel': 'Annulla',
+      'dismiss': 'Chiudi',
+      'notifyTitle': 'Ricevi la risposta via email',
+      'notifyBody': 'Risponderemo qui. Lasciaci la tua email nel caso tu non ci sia più.',
+      'notifyButton': 'Avvisami via email',
+      'notifySaved': 'Scriveremo a {email} se non ci sarai più quando risponderemo.',
+      'notifyDismiss': 'Non ora',
+      'moreOptions': 'Altre opzioni',
+      'emojiSearch': 'Cerca emoji',
+      'emojiNoResults': 'Nessuna emoji trovata',
+      'emojiResults': 'Risultati',
     },
     'kmr': {
       'send': 'هنارتن',
@@ -1377,6 +1577,25 @@ class ElcStrings {
       'queueWait': 'ژمارە {position} · نێزیکی {minutes} خولەک',
       'incomingMessage': '{name}: {message}',
       'incomingMessageUnnamed': 'نامەیا نوی: {message}',
+      'emailTranscript': 'ڤێ گفتوگۆیێ ب ئیمێلێ بۆ من فرێکە',
+      'emailSendTo': 'ئەم دێ کۆپیەکێ بۆ {email} فرێکەین.',
+      'emailOther': 'ئیمێلەکا دی بکاربینە',
+      'emailSend': 'هنارتن',
+      'emailSentTo': 'بۆ {email} هاتە فرێکرن.',
+      'emailFailed': 'نەهاتە فرێکرن. پشتی کێمەکێ دووبارە هەوڵ بدە.',
+      'emailRateLimited': 'تە چەند جاران داخوازا ڤێ گفتوگۆیێ کریە. پاشان دووبارە هەوڵ بدە.',
+      'emailUnsubscribed': 'ئەڤ ئیمێلە بەشداربوونا خۆ ژ ئیمێلێن مە هەلوەشاندیە.',
+      'cancel': 'بەتالکرن',
+      'dismiss': 'گرتن',
+      'notifyTitle': 'بەرسڤێ ب ئیمێلێ وەربگرە',
+      'notifyBody': 'ئەم دێ ل ڤێرە بەرسڤێ دەین. ئیمێلا خۆ بهێلە، بەلکی تو هەتا وی دەمی چووبی.',
+      'notifyButton': 'ئیمێلێ بۆ من فرێکە',
+      'notifySaved': 'ئەگەر تو هەتا بەرسڤدانا مە چووبی، دێ ئیمێلێ بۆ {email} فرێکەین.',
+      'notifyDismiss': 'نوکە نە',
+      'moreOptions': 'هەلبژارتنێن پتر',
+      'emojiSearch': 'ل ئیمۆجیان بگەڕە',
+      'emojiNoResults': 'چ ئیمۆجی نەهاتنە دیتن',
+      'emojiResults': 'ئەنجام',
     },
     'pt': {
       'send': 'Enviar',
@@ -1487,6 +1706,25 @@ class ElcStrings {
       'queueWait': '#{position} · ~{minutes} min',
       'incomingMessage': '{name}: {message}',
       'incomingMessageUnnamed': 'Nova mensagem: {message}',
+      'emailTranscript': 'Enviar este chat para o meu e-mail',
+      'emailSendTo': 'Enviaremos uma cópia para {email}.',
+      'emailOther': 'Usar outro endereço',
+      'emailSend': 'Enviar',
+      'emailSentTo': 'Enviado para {email}.',
+      'emailFailed': 'Não foi possível enviar. Tente novamente em instantes.',
+      'emailRateLimited': 'Você já pediu este chat algumas vezes. Tente mais tarde.',
+      'emailUnsubscribed': 'Este endereço cancelou a inscrição dos nossos e-mails.',
+      'cancel': 'Cancelar',
+      'dismiss': 'Fechar',
+      'notifyTitle': 'Receba a resposta por e-mail',
+      'notifyBody': 'Responderemos aqui. Deixe seu e-mail caso você já tenha saído até lá.',
+      'notifyButton': 'Avise-me por e-mail',
+      'notifySaved': 'Escreveremos para {email} se você já tiver saído quando respondermos.',
+      'notifyDismiss': 'Agora não',
+      'moreOptions': 'Mais opções',
+      'emojiSearch': 'Pesquisar emoji',
+      'emojiNoResults': 'Nenhum emoji encontrado',
+      'emojiResults': 'Resultados',
     },
     'tr': {
       'send': 'Gönder',
@@ -1597,6 +1835,25 @@ class ElcStrings {
       'queueWait': '#{position} · ~{minutes} dk',
       'incomingMessage': '{name}: {message}',
       'incomingMessageUnnamed': 'Yeni mesaj: {message}',
+      'emailTranscript': 'Bu sohbeti bana e-postayla gönder',
+      'emailSendTo': 'Bir kopyasını {email} adresine göndereceğiz.',
+      'emailOther': 'Başka bir adres kullan',
+      'emailSend': 'Gönder',
+      'emailSentTo': '{email} adresine gönderildi.',
+      'emailFailed': 'Gönderilemedi. Birazdan tekrar deneyin.',
+      'emailRateLimited': 'Bu sohbeti zaten birkaç kez istediniz. Daha sonra tekrar deneyin.',
+      'emailUnsubscribed': 'Bu adres e-postalarımızdan çıktı.',
+      'cancel': 'İptal',
+      'dismiss': 'Kapat',
+      'notifyTitle': 'Yanıtı e-postayla alın',
+      'notifyBody': 'Burada yanıt vereceğiz. O zamana kadar ayrılmış olursanız diye e-posta adresinizi bırakın.',
+      'notifyButton': 'Bana e-posta gönder',
+      'notifySaved': 'Yanıt verdiğimizde ayrılmış olursanız {email} adresine yazacağız.',
+      'notifyDismiss': 'Şimdi değil',
+      'moreOptions': 'Diğer seçenekler',
+      'emojiSearch': 'Emoji ara',
+      'emojiNoResults': 'Emoji bulunamadı',
+      'emojiResults': 'Sonuçlar',
     },
     'ur': {
       'send': 'بھیجیں',
@@ -1707,6 +1964,25 @@ class ElcStrings {
       'queueWait': 'نمبر {position} · تقریباً {minutes} منٹ',
       'incomingMessage': '{name}: {message}',
       'incomingMessageUnnamed': 'نیا پیغام: {message}',
+      'emailTranscript': 'یہ چیٹ مجھے ای میل کریں',
+      'emailSendTo': 'ہم {email} پر ایک کاپی بھیجیں گے۔',
+      'emailOther': 'دوسرا پتہ استعمال کریں',
+      'emailSend': 'بھیجیں',
+      'emailSentTo': '{email} پر بھیج دی گئی۔',
+      'emailFailed': 'بھیجی نہیں جا سکی۔ تھوڑی دیر میں دوبارہ کوشش کریں۔',
+      'emailRateLimited': 'آپ یہ چیٹ پہلے ہی کئی بار مانگ چکے ہیں۔ بعد میں دوبارہ کوشش کریں۔',
+      'emailUnsubscribed': 'اس پتے نے ہماری ای میلز سے ان سبسکرائب کر لیا ہے۔',
+      'cancel': 'منسوخ کریں',
+      'dismiss': 'بند کریں',
+      'notifyTitle': 'جواب ای میل پر حاصل کریں',
+      'notifyBody': 'ہم یہیں جواب دیں گے۔ اگر تب تک آپ چلے جائیں تو اپنی ای میل چھوڑ دیں۔',
+      'notifyButton': 'مجھے ای میل کریں',
+      'notifySaved': 'اگر ہمارے جواب تک آپ چلے گئے ہوں تو ہم {email} پر ای میل کریں گے۔',
+      'notifyDismiss': 'ابھی نہیں',
+      'moreOptions': 'مزید اختیارات',
+      'emojiSearch': 'ایموجی تلاش کریں',
+      'emojiNoResults': 'کوئی ایموجی نہیں ملا',
+      'emojiResults': 'نتائج',
     },
     'zh': {
       'send': '发送',
@@ -1817,6 +2093,25 @@ class ElcStrings {
       'queueWait': '#{position} · 约 {minutes} 分钟',
       'incomingMessage': '{name}：{message}',
       'incomingMessageUnnamed': '新消息：{message}',
+      'emailTranscript': '将此聊天发送到我的邮箱',
+      'emailSendTo': '我们会将副本发送到 {email}。',
+      'emailOther': '使用其他邮箱',
+      'emailSend': '发送',
+      'emailSentTo': '已发送到 {email}。',
+      'emailFailed': '发送失败，请稍后再试。',
+      'emailRateLimited': '您已多次请求此聊天，请稍后再试。',
+      'emailUnsubscribed': '该邮箱已退订我们的邮件。',
+      'cancel': '取消',
+      'dismiss': '关闭',
+      'notifyTitle': '通过邮件接收回复',
+      'notifyBody': '我们会在这里回复。请留下邮箱，以防您届时已离开。',
+      'notifyButton': '邮件通知我',
+      'notifySaved': '如果我们回复时您已离开，我们会发邮件到 {email}。',
+      'notifyDismiss': '以后再说',
+      'moreOptions': '更多选项',
+      'emojiSearch': '搜索表情',
+      'emojiNoResults': '未找到表情',
+      'emojiResults': '结果',
     },
   };
 }
